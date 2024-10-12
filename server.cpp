@@ -1,10 +1,3 @@
-/*  IMPORTANT
-functions that client side (built in python) should use:
-
-
-
-*/
-
 #include<stdio.h>
 #include<sys/socket.h>
 #include <netdb.h>
@@ -57,8 +50,18 @@ char *serializePlayerInfo(Player player){
     strcat(string, strnum);
     strcat(string, "|");
 
+    // append player flip
+    snprintf(strnum, sizeof(strnum), "%d", player.flip);
+    strcat(string, strnum);
+    strcat(string, "|");
+
     // append player action 
     strcat(string, player.action);
+    strcat(string, "|");
+
+    // append player flip
+    snprintf(strnum, sizeof(strnum), "%d", player.frame);
+    strcat(string, strnum);
 
     return result;
 }

@@ -6,7 +6,9 @@ struct Player {
     char name[50]; // player's name
     int position_x; // player x position
     int position_y; // player y position
+    int flip;
     char action[50]; // player's current action
+    int frame;
 };
 
 char *serializePlayerInfo(Player player){
@@ -34,8 +36,18 @@ char *serializePlayerInfo(Player player){
     strcat(string, strnum);
     strcat(string, "|");
 
+    // append player flip
+    snprintf(strnum, sizeof(strnum), "%d", player.flip);
+    strcat(string, strnum);
+    strcat(string, "|");
+
     // append player action 
     strcat(string, player.action);
+    strcat(string, "|");
+
+    // append player flip
+    snprintf(strnum, sizeof(strnum), "%d", player.frame);
+    strcat(string, strnum);
 
     return result;
 }
@@ -50,6 +62,8 @@ int main() {
     a.position_x = 5;
     a.position_y = 8;
     strcpy(a.action, "attacking");
+    a.flip = 1;
+    a.frame = 1;
 
     char *result = serializePlayerInfo(a);
 
