@@ -8,6 +8,18 @@
 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 
+
+/*
+Data format: data type is in string
+id|name|position_x|position_y|flip|action|frame
+
+- id: id of player
+- name: name of player
+- position_x, position_y: coordinate of player
+- flip: 1 (True) or 0 (False)
+- action: action of player
+- frame: frame number of player
+*/
 struct Player {
     int id; // id of player
     char name[50]; // player's name
@@ -279,6 +291,7 @@ int main (int argc, char *argv[]) {
 
 
     //Step 3: Communicate with client
+    // this loop will receive what is sent from client, and send back what is received
     while(1){
         // reset the buff
         memset(buff, BUFF_SIZE, 0);
@@ -304,14 +317,12 @@ int main (int argc, char *argv[]) {
         // print received client address, port and data received
         printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr[0].sin_port), buff);
 
-        // send result string back to client
+        // send data to client
         sendBytes = sendto(sockfd, result, strlen(result), 0, (struct sockaddr *) &cliaddr[0], addr_len);
         if(sendBytes < 0){
             perror("Error sending data to client: ");
             return 0;
         }
-
-        printf("%s\n", result);
     }
 
     return 0;
