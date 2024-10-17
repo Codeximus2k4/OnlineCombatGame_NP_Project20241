@@ -1,0 +1,1 @@
+id|name|position_x|position_y|flip|action|frame

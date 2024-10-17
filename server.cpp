@@ -8,9 +8,9 @@
 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 
-
 /*
 Data format: data type is in string
+
 id|name|position_x|position_y|flip|action|frame
 
 - id: id of player
