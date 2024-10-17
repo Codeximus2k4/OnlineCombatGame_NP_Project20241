@@ -3,7 +3,7 @@ import sys
 import math
 import pygame
 from pygame import SCRAP_TEXT
-from pygame_menu.font import get_font
+import socket
 
 from scripts.utils import load_image, load_images, Animation
 from scripts.entities import PhysicsEntity, Player
@@ -13,7 +13,7 @@ class Game:
         pygame.init()
 
         pygame.display.set_caption('combat game')
-        
+
         self.clock  = pygame.time.Clock()
         self.screen = pygame.display.set_mode((960,720))
         self.display =  pygame.Surface((640,480), pygame.SRCALPHA)
@@ -41,7 +41,32 @@ class Game:
             else :
                 self.background.blit(each, (0,0))
         
-        self.player = Player(game  = self, pos = (0,280),size = (128,128))
+        self.player = Player(id=1, game  = self, pos = (0,280),size = (128,128))
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    
+    def serializePlayerInfo(self, player):
+        """
+        Concatenates all relevant information of a Player object into a string.
+
+        Args:
+            player: A Player object representing the player's data.
+
+        Returns:
+            A string containing player information in a well-formatted way.
+        """
+
+        # Extract relevant information from the Player object
+        id = player.id
+        entity_type = player.entity_type
+        pos = player.pos
+        flip = player.flip
+        action = player.action
+
+        # Format the information into a string with clear labels
+        info_string = f"{id}|{entity_type}|{pos[0]}|{pos[1]}|{flip}|{action}"    # send the existed info according to format message of server
+
+        return info_string
 
     def get_font(self, size):  # Returns Press-Start-2P in the desired size
         return pygame.font.Font("data/images/menuAssets/font.ttf", size)
@@ -82,10 +107,14 @@ class Game:
 
 
     def run(self):
+        message = "Start game"
+        self.client_socket.sendto(message.encode("utf-8"), ("127.0.0.1", 5500))
         self.screen = pygame.display.set_mode((960, 720))
         while True:
             self.display.fill(color = (0,0,0,0))
             self.display_2.blit(pygame.transform.scale(self.background, self.display.get_size()), (0,0))
+            message = self.serializePlayerInfo(self.player)
+            self.client_socket.sendto(message.encode("utf-8"), ("127.0.0.1", 5500))
 
             for event in pygame.event.get():
                 if event.type ==pygame.QUIT:
@@ -111,7 +140,5 @@ class Game:
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
             pygame.display.update()
             self.clock.tick(60)
-
-            
 
 Game().menu()

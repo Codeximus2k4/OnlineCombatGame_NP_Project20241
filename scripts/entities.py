@@ -23,8 +23,9 @@ class PhysicsEntity:
         else:
             surf.blit(self.animation.get_img(),dest = self.pos)
 class Player(PhysicsEntity):
-    def __init__(self,game,pos,size):
-        super().__init__(game, 'player', pos, size )
+    def __init__(self, id, game,pos,size):
+        super().__init__(game, 'player', pos, size)
+        self.id = id
         self.air_time = 0
         self.speed = 3
         self.dashing = 0
