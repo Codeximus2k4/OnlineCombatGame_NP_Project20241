@@ -42,10 +42,14 @@ class Game:
                 self.background.blit(each, (0,0))
         
         self.player = Player(id=1, game  = self, pos = (0,280),size = (128,128))
+        self.player2 =  Player(id = 2, game = self, pos = (30,280),size = (128,128))
+        self.entities = []
+        self.entities.append(self.player)
+        self.entities.append(self.player2)
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     
-    def serializePlayerInfo(self, player):
+    def serializePlayerInfo(self):
         """
         Concatenates all relevant information of a Player object into a string.
 
@@ -57,11 +61,12 @@ class Game:
         """
 
         # Extract relevant information from the Player object
-        id = player.id
-        entity_type = player.entity_type
-        pos = player.pos
-        flip = player.flip
-        action = player.action
+        id = self.player.id
+        entity_type = self.player.entity_type
+        pos = self.player.pos
+        flip = self.player.flip
+        action = self.player.action
+        frame =  self.player.animation.frame
 
         # Format the information into a string with clear labels
         info_string = f"{id}|{entity_type}|{pos[0]}|{pos[1]}|{flip}|{action}"    # send the existed info according to format message of server
@@ -110,31 +115,39 @@ class Game:
         message = "Start game"
         self.client_socket.sendto(message.encode("utf-8"), ("127.0.0.1", 5500))
         self.screen = pygame.display.set_mode((960, 720))
+        bufferSize = 1024
         while True:
             self.display.fill(color = (0,0,0,0))
             self.display_2.blit(pygame.transform.scale(self.background, self.display.get_size()), (0,0))
-            message = self.serializePlayerInfo(self.player)
+            message = self.serializePlayerInfo()
             self.client_socket.sendto(message.encode("utf-8"), ("127.0.0.1", 5500))
+            data, address = self.client_socket.recvfrom(bufferSize)
+            print(data.decode())
 
             for event in pygame.event.get():
                 if event.type ==pygame.QUIT:
                      pygame.quit()
                      sys.exit()
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_LEFT:
+                    if event.key == pygame.K_a:
                         self.horizontal_movement[0]= True
-                    if event.key == pygame.K_RIGHT:
+                    if event.key == pygame.K_d:
                         self.horizontal_movement[1]= True
+                    if event.key == pygame.K_q:
+                        self.player.ground_attack("attack1", attack_cooldown=1)
+                    elif event.key == pygame.K_e:
+                        self.player.ground_attack("attack2", attack_cooldown=1)
                 if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_LEFT:
+                    if event.key == pygame.K_a:
                         self.horizontal_movement[0]= False
-                    if event.key == pygame.K_RIGHT:
+                    if event.key == pygame.K_d:
                         self.horizontal_movement[1]= False
             
-            if self.player.velocity[0]!=0:
-                self.player.set_action('run')
-            self.player.update((self.horizontal_movement[1]-self.horizontal_movement[0],0))
-            self.player.render(self.display)
+        
+            for each in self.entities:
+                each.render(self.display)
+                if each is self.player:
+                    each.update((self.horizontal_movement[1]-self.horizontal_movement[0],0))
 
             self.display_2.blit(self.display, (0,0))
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
