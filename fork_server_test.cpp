@@ -79,173 +79,43 @@ char *serializePlayerInfo(Player player){
     return result;
 }
 
+
+
 // function to publish player information to all other clients
 // input: data from a single client that needs to be broadcasted
 void broadCastData(Player players) {
     
 }
 
-// should be called before is_valid_domain()
-// check if the provided string is in correct IPv4 format
-// other cases can be wrong format or domain name
-bool is_valid_ip(char *ip){
-    struct sockaddr_in sa;
-    return (inet_pton(AF_INET, ip, &(sa.sin_addr)) != 0); 
-    // inet_pton() returns 1 if valid IP
-}
-
-// check if parameter provided by user is a valid domain name 
-// (used after is_valid_ip() is used and parameter is not a valid IP)
-// check for TLD domain, if all characters of TLD are not all in alphabetic then false
-bool is_valid_domain(char *str){
-    // check if user input "localhost"
-    if(strcmp(str, "localhost") == 0) return true;
-
-    char check[256];
-    strcpy(check, str); // copy a new string so that original provided parameter won't be changed
-    char *token;
-    char *prevToken; // previous token 
-
-    // initialize token and prevToekn
-    token = strtok(check, ".");
-    prevToken = token;
-    token = strtok(NULL, ".");
-
-    // if provided address doesn't contain a "." then not valid domain
-    if(token == NULL){
-        return false;
-    }
-
-    // now find the TLD characters
-    while(token != NULL){
-        prevToken = token;
-        token = strtok(NULL, ".");
-    }
-
-    // now the TLD is stored in prevToken
-    // we check if every character in prevToken is alphabetic
-    for(int i = 0; i < strlen(prevToken); i++){
-        // if a character is a space or a tab then return false
-        if(prevToken[i] == '\t' || prevToken[i] == ' ' || prevToken[i] == '\n') return false;
-        if(!isalpha(prevToken[i])){
-            return false;
-        }
+// function to check if 2 sockaddr_in is the same
+// input: sockaddr_in of client1 and client2
+// output: true if 2 clients have same address:port
+//         false otherwise
+bool checkSameAddress(sockaddr_in cli1, sockaddr_in cli2){
+    // check same IP
+    if(cli1.sin_port == cli2.sin_port){
+        // if also same port
+        if(cli1.sin_addr.s_addr == cli2.sin_addr.s_addr) return false;
     }
 
     return true;
 }
 
-// function to find domain and its aliases (if exists)
-// input: ip string
-// output: pointer to result string
-char *IpToDomainWithAliases(char *ip){
-    struct hostent *host;
-    struct in_addr ip_addr;
-    char **alias;
-    char *result; // pointer to the result string
-    char string[10000]; // actual result string
+// check if a client address is already in the list of stored players
+// input: a client address
+// output: true if client is in list
+//         flase otherwise
+bool clientInList(sockaddr_in *client){
 
-    // init
-    memset(string, 0, sizeof(string));
-    result = string;
 
-    // assign IP address to ip_addr
-    if(inet_pton(AF_INET, ip, &ip_addr) != 1){
-        strcpy(string, "Wrong IP format\n");
-        return result;
-    }
-
-    // search for domain name
-    host = gethostbyaddr(&ip_addr, sizeof(ip_addr), AF_INET);
-
-    // check if domain name is successfully returned
-    if(host == NULL){
-        strcpy(string, "Not found information\n");
-        return result;
-    }
-
-    // append offical domain name
-    strcpy(string, "Official name: ");
-    strcat(string, host->h_name);
-    strcat(string, "\n");
-
-    // check for aliases
-    alias = host->h_aliases;
-    if(alias == NULL){
-        return result;
-    }
-
-    // if there are aliases
-    strcat(string, "Alias name:\n");
-    for(alias = host->h_aliases; *alias != NULL; alias++){
-        strcat(string, *alias);
-        strcat(string, "\n");
-    }
-
-    return result;
+    return false;
 }
-
-// function to find IP and its aliases (if exists)
-// input: domain string
-// output: pointer to result string
-char *domainToIp(char *domain) {
-    struct addrinfo hints, *res, *p;
-    int status;
-    char ipstr[INET_ADDRSTRLEN]; // IPv4
-    char *result; // char pointer pointing to actual string
-    char string[10000]; // actual string 
-
-    // point result pointer to actual string
-    result = string;
-
-    // set up hints
-    // hints are guidance on what types of addresses the caller is interesting in obtaining
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET; // IPv4
-    hints.ai_socktype = SOCK_STREAM; // TCP
-
-    // find this domain name
-    // if no IP address found then return
-    if( (status = getaddrinfo(domain, NULL, &hints, &res)) != 0 ){
-        strcpy(string, "Not found information\n");
-        return result;
-    }
-
-    // append IP Address
-    p = res;
-    void *addr;
-    struct sockaddr_in *ipv4 = (struct sockaddr_in *) p->ai_addr;
-    inet_ntop(AF_INET, &(ipv4->sin_addr), ipstr, sizeof(ipstr));
-    strcpy(string, "Official IP: ");
-    strcat(string, ipstr);
-    strcat(string, "\n");
-
-    // append Alias IP (if exists)
-    p = p->ai_next;
-    if(p != NULL){
-        strcat(string, "Alias IP:\n");
-    }
-
-    for(p; p != NULL; p = p->ai_next){
-        struct sockaddr_in *ipv4 = (struct sockaddr_in *) p->ai_addr;
-        inet_ntop(AF_INET, &(ipv4->sin_addr), ipstr, sizeof(ipstr));
-        strcat(string, ipstr);
-        strcat(string, "\n");
-    }
-
-    // free linked list
-    freeaddrinfo(res);
-
-    // return 
-    return result;
-}
-
 
 int main (int argc, char *argv[]) {
     int sockfd, rcvBytes, sendBytes;
     char buff[BUFF_SIZE + 1];
     struct sockaddr_in servaddr;
-    struct sockaddr_in cliaddr[20]; // list of clients addresses
+    struct sockaddr_in cliaddr; // list of clients addresses
     socklen_t addr_len = sizeof(struct sockaddr_in); // size of address structure, in this case size of IPv4 structure
     int SERV_PORT;
     char cli_addr[100];
@@ -298,7 +168,7 @@ int main (int argc, char *argv[]) {
         memset(buff, BUFF_SIZE, 0);
 
         // receive data from client
-        rcvBytes = recvfrom(sockfd, buff, BUFF_SIZE, 0, (struct sockaddr *) &cliaddr[0], &addr_len);
+        rcvBytes = recvfrom(sockfd, buff, BUFF_SIZE, 0, (struct sockaddr *) &cliaddr, &addr_len);
         if(rcvBytes < 0){
             perror("Error receiving data from client: ");
             return 0;
@@ -309,17 +179,25 @@ int main (int argc, char *argv[]) {
         // we need to remove this character
         if(buff[strlen(buff) - 1] == '\n') buff[strlen(buff) - 1] = '\0';
 
+        // if client has not connected
+        if(!clientInList(&cliaddr)){
+            // create a new Player, associated the Player with address
+            
+        }
+
         // store client address into cli_addr variable
-        inet_ntop(AF_INET, (void *) &cliaddr[0].sin_addr, cli_addr, INET_ADDRSTRLEN);
+        inet_ntop(AF_INET, (void *) &cliaddr.sin_addr, cli_addr, INET_ADDRSTRLEN);
+
+
 
         // process data received
         result = buff;
 
         // print received client address, port and data received
-        printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr[0].sin_port), buff);
+        printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
 
         // send data to client
-        sendBytes = sendto(sockfd, result, strlen(result), 0, (struct sockaddr *) &cliaddr[0], addr_len);
+        sendBytes = sendto(sockfd, result, strlen(result), 0, (struct sockaddr *) &cliaddr, addr_len);
         if(sendBytes < 0){
             perror("Error sending data to client: ");
             return 0;
