@@ -28,7 +28,7 @@ struct Player {
     int flip; // player looking right or left
     char action[50]; // player's current action
     int frame; // player's frame
-    
+    sockaddr_in cliaddr; // IPv4 address corresponding to each player
 };
 
 // define variables
@@ -79,9 +79,9 @@ char *serializePlayerInfo(Player player){
     return result;
 }
 
-// function to publish players information to clients
-// input: list of clients addresses
-void sendDataToPlayers(Player players[]) {
+// function to publish player information to all other clients
+// input: data from a single client that needs to be broadcasted
+void broadCastData(Player players) {
     
 }
 
