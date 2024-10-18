@@ -121,8 +121,8 @@ class Game:
             self.display_2.blit(pygame.transform.scale(self.background, self.display.get_size()), (0,0))
             message = self.serializePlayerInfo()
             self.client_socket.sendto(message.encode("utf-8"), ("127.0.0.1", 5500))
-            data, address = self.client_socket.recvfrom(bufferSize)
-            print(data.decode())
+            # data, address = self.client_socket.recvfrom(bufferSize)
+            # print(data.decode())
 
             for event in pygame.event.get():
                 if event.type ==pygame.QUIT:
