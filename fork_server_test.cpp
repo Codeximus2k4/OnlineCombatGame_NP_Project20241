@@ -5,13 +5,14 @@
 #include <arpa/inet.h>
 #include<ctype.h>
 #include <stdlib.h>
+#include<unistd.h>
 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 
 
 /*
 Data format: data type is in string
-id|name|position_x|position_y|flip|action|frame
+id|name|position_x|position_y|flip|action
 
 - id: id of player
 - name: name of player
@@ -32,7 +33,7 @@ struct Player {
 };
 
 // define variables
-Player *players; // pointer to head of linked list of players
+Player *players = NULL; // pointer to head of linked list of players
 int maxPlayer = 0; // keep count of total players in the room
 
 // make a new Player based on the information provided
@@ -40,7 +41,7 @@ int maxPlayer = 0; // keep count of total players in the room
 // output: pointer to a new Player
 // dependencies: none
 Player *makePlayer(int id, char name[], int position_x, int position_y, int flip, char action[], sockaddr_in cliaddr){
-    Player *p = (Player*) malloc(sizeof(Player));
+   Player *p = (Player*) malloc(sizeof(Player));
     p->id = id;
     strcpy(p->name, name);
     p->position_x = position_x;
@@ -62,6 +63,7 @@ Player *addPlayer(Player *player){
     // if there are no players yet
     if(players == NULL){
         players = player;
+
         return players;
     }
 
@@ -81,11 +83,8 @@ Player *addPlayer(Player *player){
 // output: pointer to string contains player information
 // dependencies: none
 char *serializePlayerInfo(Player *player){
-    char string[10000]; // actual string that stores serialized player data
-    char *result; // pointer to string
+    char *string = (char *) malloc(10000); // string pointer that points to string storing serialized player data
     char strnum[50]; // used for converting integer to array of char
-
-    result = string;
     
     // append player id
     snprintf(string, sizeof(string), "%d", player->id);
@@ -112,9 +111,8 @@ char *serializePlayerInfo(Player *player){
 
     // append player action 
     strcat(string, player->action);
-    strcat(string, "|");
 
-    return result;
+    return string;
 }
 
 // function to make Player from serialized string information
@@ -130,10 +128,14 @@ Player *unserializePlayerInfo(char information[], sockaddr_in cliaddr){
     char action[50];
     int frame;
 
+    char string[500]; // copy string from information so that we dont mess with original information
+    strcpy(string, information);
+
+
     char *token;
     // get id
-    token = strtok(information, "|");
-    id = atof(token);
+    token = strtok(string, "|");
+    id = atoi(token);
 
     // get name
     token = strtok(NULL, "|");
@@ -141,23 +143,19 @@ Player *unserializePlayerInfo(char information[], sockaddr_in cliaddr){
 
     // get pos x
     token = strtok(NULL, "|");
-    position_x = atof(token);
+    position_x = atoi(token);
 
     // get pos y
     token = strtok(NULL, "|");
-    position_y = atof(token);
+    position_y = atoi(token);
 
     // get flip
     token = strtok(NULL, "|");
-    flip = atof(token);
+    flip = atoi(token);
 
     // get action
     token = strtok(NULL, "|");
     strcpy(action, token);
-    
-    // get frame
-    token = strtok(NULL, "|");
-    frame = atof(token);
 
     Player *p = makePlayer(id, name, position_x, position_y, flip, action, cliaddr);
 
@@ -179,10 +177,10 @@ bool checkSameAddress(sockaddr_in cli1, sockaddr_in cli2){
     // check same IP
     if(cli1.sin_addr.s_addr == cli2.sin_addr.s_addr){
         // if also same port
-        if(cli1.sin_port == cli2.sin_port) return false;
+        if(cli1.sin_port == cli2.sin_port) return true;
     }
 
-    return true;
+    return false;
 }
 
 // check if a client address is already in the list of stored players
@@ -274,32 +272,38 @@ int main (int argc, char *argv[]) {
         // we need to remove this character
         if(buff[strlen(buff) - 1] == '\n') buff[strlen(buff) - 1] = '\0';
 
-        // if client address is not in 
-        /*
+        // if client address is not in list of players
         if(!clientInList(&cliaddr)){
-            printf("1\n");
+            // store client address into cli_addr variable
+            inet_ntop(AF_INET, (void *) &cliaddr.sin_addr, cli_addr, INET_ADDRSTRLEN);
+
+            printf("A new connection arrived from [%s:%d], creating new player\n", cli_addr, ntohs(cliaddr.sin_port));
+
             // create a new Player, associated the Player with address
             Player *newPlayer = unserializePlayerInfo(buff, cliaddr);
-
-            printf("2\n");
 
             // update list of players
             maxPlayer++;
             players = addPlayer(newPlayer);
 
-            char *playerinfo = serializePlayerInfo(players);
-            printf("%s\n", playerinfo);
+            // logs out information
+            printf("A new player has been created with id assigned as %d, forking a new process for this client\n", newPlayer->id);
+
+            // fork a new process to handle this client
+            pid_t pid = fork();
+
+            if(pid < 0){
+                perror("Fork failed\n");
+            } else if(pid == 0){
+
+            }
         }
-        */
-
-        // store client address into cli_addr variable
-        inet_ntop(AF_INET, (void *) &cliaddr.sin_addr, cli_addr, INET_ADDRSTRLEN);
-
+        
         // process data received
         result = buff;
 
         // print received client address, port and data received
-        printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
+        //printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
 
         // send data to client
         sendBytes = sendto(sockfd, result, strlen(result), 0, (struct sockaddr *) &cliaddr, addr_len);

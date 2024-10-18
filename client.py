@@ -64,7 +64,10 @@ class Game:
         id = self.player.id
         entity_type = self.player.entity_type
         pos = self.player.pos
-        flip = self.player.flip
+
+        if(self.player.flip is True): flip = 1
+        else: flip = 0
+
         action = self.player.action
         frame =  self.player.animation.frame
 

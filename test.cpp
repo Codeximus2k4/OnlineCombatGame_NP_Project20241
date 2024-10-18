@@ -5,7 +5,25 @@
 #include <arpa/inet.h>
 #include<ctype.h>
 #include <stdlib.h>
+#include<unistd.h>
 
+#define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
+
+/*---------------------------------------------
+Defining Player structs
+-----------------------------------------------
+*/
+
+/*
+Data format: data type is in string:
+id|name|position_x|position_y|flip|action
+
+- id: id of player
+- name: name of player
+- position_x, position_y: coordinate of player
+- flip: 1 (True) or 0 (False)
+- action: action of player
+*/
 struct Player {
     int id; // id of player
     char name[50]; // player's name
@@ -13,26 +31,40 @@ struct Player {
     int position_y; // player y position
     int flip; // player looking right or left
     char action[50]; // player's current action
-    int frame; // player's frame
     sockaddr_in cliaddr; // IPv4 address corresponding to each player
     Player *next; // next player in the list
 };
 
-Player *players = NULL;
+/*---------------------------------------------
+Defining global variables
+-----------------------------------------------
+*/
 
-// make a new Player based on the information provided
-// input: all player's information
-// output: pointer to a new Player
-// dependencies: none
-Player *makePlayer(int id, char name[], int position_x, int position_y, int flip, char action[], int frame, sockaddr_in cliaddr){
-    Player *p = (Player*) malloc(sizeof(Player));
+// define list of players
+Player *players = NULL; // pointer to head of linked list of players
+int maxPlayer = 0; // keep count of total players in the room
+
+// used for IPC with fork() and pipe()
+int p_to_c[20][2]; // pipe to write from parent -> children processes
+int c_to_p[20][2]; // pipe hanle writing from children -> parent
+
+/*---------------------------------------------
+Defining functions
+-----------------------------------------------
+*/
+
+// - make a new Player based on the information provided
+// - input: all player's information
+// - output: pointer to a new Player
+// - dependencies: none
+Player *makePlayer(int id, char name[], int position_x, int position_y, int flip, char action[], sockaddr_in cliaddr){
+   Player *p = (Player*) malloc(sizeof(Player));
     p->id = id;
     strcpy(p->name, name);
     p->position_x = position_x;
     p->position_y = position_y;
     p->flip = flip;
     strcpy(p->action, action);
-    p->frame = frame;
     p->cliaddr = cliaddr;
 
     p->next = NULL;
@@ -40,16 +72,36 @@ Player *makePlayer(int id, char name[], int position_x, int position_y, int flip
     return p;
 }
 
-// function to serialize Player info into a string
-// input: pointer to struct Player
-// output: string contains player info
-// dependencies: none
-char *serializePlayerInfo(Player *player){
-    char string[10000]; // actual string that stores serialized player data
-    char *result; // pointer to string
-    char strnum[50]; // used for converting integer to array of char
+// - add a player to a list of existing player, or create a new list if no players exist
+// - input: a Player
+// - output: update "players" pointer
+// - dependencies: none
+Player *addPlayer(Player *player){
+    // if there are no players yet
+    if(players == NULL){
+        players = player;
 
-    result = string;
+        return players;
+    }
+
+    // else add to the end of the linked list
+    Player *p = players;
+    while(p->next != NULL){
+        p = p->next;
+    }
+
+    p->next = player;
+
+    return players;
+}
+
+// - function to serialize Player info into a string
+// - input: pointer to struct Player
+// - output: pointer to string contains player information
+// - dependencies: none
+char *serializePlayerInfo(Player *player){
+    char *string = (char *) malloc(10000); // string pointer that points to string storing serialized player data
+    char strnum[50]; // used for converting integer to array of char
     
     // append player id
     snprintf(string, sizeof(string), "%d", player->id);
@@ -76,18 +128,14 @@ char *serializePlayerInfo(Player *player){
 
     // append player action 
     strcat(string, player->action);
-    strcat(string, "|");
 
-    // append player flip
-    snprintf(strnum, sizeof(strnum), "%d", player->frame);
-    strcat(string, strnum);
-
-    return result;
+    return string;
 }
 
-// function to make Player from serialized string information
-// input: serialized Player data format, sockaddr_in client address
-// output: a pointer to a new player
+// - function to make Player from serialized string information
+// - input: serialized Player data format, sockaddr_in client address
+// - output: a pointer to a new player with information filled
+// - dependencies: makePlayer()
 Player *unserializePlayerInfo(char information[], sockaddr_in cliaddr){
     int id; 
     char name[50];
@@ -97,10 +145,14 @@ Player *unserializePlayerInfo(char information[], sockaddr_in cliaddr){
     char action[50];
     int frame;
 
+    char string[500]; // copy string from information so that we dont mess with original information
+    strcpy(string, information);
+
+
     char *token;
     // get id
-    token = strtok(information, "|");
-    id = atof(token);
+    token = strtok(string, "|");
+    id = atoi(token);
 
     // get name
     token = strtok(NULL, "|");
@@ -108,74 +160,58 @@ Player *unserializePlayerInfo(char information[], sockaddr_in cliaddr){
 
     // get pos x
     token = strtok(NULL, "|");
-    position_x = atof(token);
+    position_x = atoi(token);
 
     // get pos y
     token = strtok(NULL, "|");
-    position_y = atof(token);
+    position_y = atoi(token);
 
     // get flip
     token = strtok(NULL, "|");
-    flip = atof(token);
+    flip = atoi(token);
 
     // get action
     token = strtok(NULL, "|");
     strcpy(action, token);
-    
-    // get frame
-    token = strtok(NULL, "|");
-    frame = atof(token);
 
-    Player *p = makePlayer(id, name, position_x, position_y, flip, action, frame, cliaddr);
+    Player *p = makePlayer(id, name, position_x, position_y, flip, action, cliaddr);
 
     return p;
 }   
 
-// add a player to a list of existing player, or create a new list if no players exist
-// input: a Player
-// output: update "players" pointer
-// dependencies: none
-Player *addPlayer(Player *player){
-    // if there are no players yet
-    if(players == NULL){
-        players = player;
-        return players;
-    }
-
-    // else add to the end of the linked list
-    Player *p = players;
-    while(p->next != NULL){
-        p = p->next;
-    }
-
-    p->next = player;
-
-    return players;
+// function to publish player information to all other clients
+// input: data from a single client that needs to be broadcasted
+void broadCastData(Player players) {
+    
 }
 
-// function to check if 2 sockaddr_in is the same
-// input: sockaddr_in of client1 and client2
-// output: true if 2 clients have same address:port
+// - function to check if 2 sockaddr_in is the same
+// - input: sockaddr_in of client1 and client2
+// - output: true if 2 clients have same address:port
 //         false otherwise
-// dependencies: none;
+// - dependencies: none
 bool checkSameAddress(sockaddr_in cli1, sockaddr_in cli2){
     // check same IP
     if(cli1.sin_addr.s_addr == cli2.sin_addr.s_addr){
         // if also same port
-        if(cli1.sin_port == cli2.sin_port) return false;
+        if(cli1.sin_port == cli2.sin_port) return true;
     }
 
-    return true;
+    return false;
 }
 
-// check if a client address is already in the list of stored players
-// input: a client address
-// output: true if client is in list
+// - check if a client address is already in the list of stored players
+// - input: a client address
+// - output: true if client is in list
 //         false otherwise
-// dependencies: checkSameAddress()
+// - dependencies: checkSameAddress()
 bool clientInList(sockaddr_in *client){
+    // if list of players is empty then false
+    if(players == NULL) return false;
+
     Player *p = players;
 
+    // loop through list to compare
     while(p != NULL){
         if(checkSameAddress(p->cliaddr, *client) == true){
             return true;
@@ -186,51 +222,154 @@ bool clientInList(sockaddr_in *client){
     return false;
 }
 
-int main() {
-    char *playerinfo;
-    char information[100];
-    char ip[50];
-    sockaddr_in cliaddr1, cliaddr2;
-    char ip_con[100];
 
-    strcpy(ip, "1.1.1.1");
+// - function used by subprocess when client connects to server
+// - input: current player according to the client
+// - dependencies: broadCastData
+void handleClient(Player *currentPlayer){
 
-    cliaddr1.sin_family = AF_INET;
-    cliaddr1.sin_port = 5000;
-    inet_pton(AF_INET, ip, &cliaddr1.sin_addr);
+}
 
-    cliaddr1.sin_family = AF_INET;
-    cliaddr1.sin_port = 5000;
-    inet_pton(AF_INET, ip, &cliaddr2.sin_addr);
+/*---------------------------------------------
+Main function to handle server logic
+-----------------------------------------------
+*/
 
-    strcpy(information, "1|hieu|5|10|1|attack|50");
+int main (int argc, char *argv[]) {
 
-    Player *player = unserializePlayerInfo(information, cliaddr1);
+    pid_t pids[20]; // hold the list of PIDs of chlidren processes
+    int sockfd, rcvBytes, sendBytes;
+    char buff[BUFF_SIZE + 1];
+    struct sockaddr_in servaddr;
+    struct sockaddr_in cliaddr; // list of clients addresses
+    socklen_t addr_len = sizeof(struct sockaddr_in); // size of address structure, in this case size of IPv4 structure
+    int SERV_PORT;
+    char cli_addr[100];
+    char *result; // result string to return to client
+    char errorString[10000]; // actual string return to client (used in case of error)
+    
 
-    if(!clientInList(&cliaddr1)){
-        players = addPlayer(player);
-        printf("different address, adding\n");
+    // check if user inputed port or not
+    if(argc != 2){
+        fprintf(stderr, "Usage: ./fork_server_test port_number\n");
+        return 1;
     }
 
-    strcpy(information, "2|hoang|10|20|0|idle|10");
-
-    player = unserializePlayerInfo(information, cliaddr2);
-
-    if(!clientInList(&cliaddr2)){
-        players = addPlayer(player);
-        printf("different address, adding\n");
+    // check if string is correct port number 
+    if( (SERV_PORT = atoi(argv[1])) == 0){
+        fprintf(stderr, "Wrong port format number\n");
+        return 1;
     }
 
-    Player *p = players;
-
-    while(p != NULL){
-        playerinfo = serializePlayerInfo(p);
-
-        printf("%s\n", playerinfo);
-
-        p = p->next;
+    // check if port is in range
+    if(SERV_PORT < 1024 || SERV_PORT > 65535){
+        fprintf(stderr, "Port should be in between 1024 and 65535\n");
+        return 1;
     }
-   
+
+    //Step 1: Construct socket
+        if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
+        perror("Error constructing socket: ");
+        return 0;
+    }
+    fprintf(stdout, "Successfully created socket\n");
+
+    //Step 2: Bind address to socket
+    bzero(&servaddr, sizeof(servaddr));
+    servaddr.sin_family = AF_INET; // user IPv4
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // set server to accept connection from any network interface (IPv4 only)
+    servaddr.sin_port = htons(SERV_PORT); // set port of the server
+
+    if(bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))){
+        perror("Error binding socket: ");
+        return 0;
+    }
+    printf("Server started. Listening on port: %d\n", SERV_PORT);
+
+
+    //Step 3: Communicate with client
+    while(1){
+        // reset the buff
+        memset(buff, BUFF_SIZE, 0);
+
+        // receive new connection 
+        rcvBytes = recvfrom(sockfd, buff, BUFF_SIZE, 0, (struct sockaddr *) &cliaddr, &addr_len);
+        if(rcvBytes < 0){
+            perror("Error receiving data from client: ");
+            continue;
+        }
+        buff[rcvBytes] = '\0';
+
+        // now the last character in buff is \n -> makes the string len + 1, 
+        // we need to remove this character
+        if(buff[strlen(buff) - 1] == '\n') buff[strlen(buff) - 1] = '\0';
+
+        // if client address is not in list of players
+        if(!clientInList(&cliaddr)){
+            // store client address into cli_addr variable
+            inet_ntop(AF_INET, (void *) &cliaddr.sin_addr, cli_addr, INET_ADDRSTRLEN);
+
+            printf("A new connection arrived from [%s:%d], creating new player\n", cli_addr, ntohs(cliaddr.sin_port));
+
+            // create a new Player, associated the Player with address
+            Player *newPlayer = unserializePlayerInfo(buff, cliaddr);
+
+            // add this player to list of players
+            players = addPlayer(newPlayer);
+
+            // logs out information
+            printf("A new player has been created with id assigned as %d, forking a new process for this client\n", newPlayer->id);
+
+            // create a new pipe to commnunicate from server -> this client
+            if( pipe(p_to_c[maxPlayer]) == -1){
+                perror("pipe");
+                continue;
+            }
+
+            // create a new pipe from children -> parent to handle communications
+            if( pipe(c_to_p[maxPlayer]) == -1){
+                perror("pipe");
+                continue;
+            }
+
+            // fork a new process to handle this client
+            if( (pids[maxPlayer] = fork()) < 0){
+                perror("fork");
+                continue;
+            } else if(pids[maxPlayer] == 0){
+                // in child process
+                close(p_to_c[maxPlayer][1]); // close the write end of this pipe
+                close(c_to_p[maxPlayer][0]); // close the read end of this pipe
+
+                handleClient(newPlayer);
+
+
+            } else {
+                // in parent process
+                close(p_to_c[maxPlayer][0]); // close the read end of main process
+                close(c_to_p[maxPlayer][1]); // close the write end of this pipe
+
+                continue; // wait for next connection 
+            }
+        
+
+            // update total number of players
+            maxPlayer++;
+        }
+        
+        // process data received
+        result = buff;
+
+        // print received client address, port and data received
+        //printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
+
+        // send data to client
+        sendBytes = sendto(sockfd, result, strlen(result), 0, (struct sockaddr *) &cliaddr, addr_len);
+        if(sendBytes < 0){
+            perror("Error sending data to client: ");
+            return 0;
+        }
+    }
 
     return 0;
 }
