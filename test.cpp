@@ -44,9 +44,14 @@ Defining global variables
 Player *players = NULL; // pointer to head of linked list of players
 int maxPlayer = 0; // keep count of total players in the room
 
+/*
+--------------------------------------------------
+UNDER DEVELOPMENT VARIABLES - do not delete
+--------------------------------------------------
 // used for IPC with fork() and pipe()
 int p_to_c[20][2]; // pipe to write from parent -> children processes
 int c_to_p[20][2]; // pipe hanle writing from children -> parent
+*/
 
 /*---------------------------------------------
 Defining functions
@@ -179,197 +184,22 @@ Player *unserializePlayerInfo(char information[], sockaddr_in cliaddr){
     return p;
 }   
 
-// function to publish player information to all other clients
-// input: data from a single client that needs to be broadcasted
-void broadCastData(Player players) {
-    
-}
-
-// - function to check if 2 sockaddr_in is the same
-// - input: sockaddr_in of client1 and client2
-// - output: true if 2 clients have same address:port
-//         false otherwise
-// - dependencies: none
-bool checkSameAddress(sockaddr_in cli1, sockaddr_in cli2){
-    // check same IP
-    if(cli1.sin_addr.s_addr == cli2.sin_addr.s_addr){
-        // if also same port
-        if(cli1.sin_port == cli2.sin_port) return true;
-    }
-
-    return false;
-}
-
-// - check if a client address is already in the list of stored players
-// - input: a client address
-// - output: true if client is in list
-//         false otherwise
-// - dependencies: checkSameAddress()
-bool clientInList(sockaddr_in *client){
-    // if list of players is empty then false
-    if(players == NULL) return false;
-
-    Player *p = players;
-
-    // loop through list to compare
-    while(p != NULL){
-        if(checkSameAddress(p->cliaddr, *client) == true){
-            return true;
-        }
-        p = p->next;
-    }
-
-    return false;
-}
-
-
-// - function used by subprocess when client connects to server
-// - input: current player according to the client
-// - dependencies: broadCastData
-void handleClient(Player *currentPlayer){
-
-}
-
-/*---------------------------------------------
-Main function to handle server logic
------------------------------------------------
-*/
 
 int main (int argc, char *argv[]) {
+    char information[100];
+    char *infor;
+    sockaddr_in cliaddr;
+    char ip[50] = "1.1.1.1";
 
-    pid_t pids[20]; // hold the list of PIDs of chlidren processes
-    int sockfd, rcvBytes, sendBytes;
-    char buff[BUFF_SIZE + 1];
-    struct sockaddr_in servaddr;
-    struct sockaddr_in cliaddr; // list of clients addresses
-    socklen_t addr_len = sizeof(struct sockaddr_in); // size of address structure, in this case size of IPv4 structure
-    int SERV_PORT;
-    char cli_addr[100];
-    char *result; // result string to return to client
-    char errorString[10000]; // actual string return to client (used in case of error)
-    
+    strcpy(information, "1|hieu|5|10|1|attack");
+    inet_pton(AF_INET, ip, &cliaddr.sin_addr);
 
-    // check if user inputed port or not
-    if(argc != 2){
-        fprintf(stderr, "Usage: ./fork_server_test port_number\n");
-        return 1;
-    }
+    Player *player = unserializePlayerInfo(information, cliaddr);
 
-    // check if string is correct port number 
-    if( (SERV_PORT = atoi(argv[1])) == 0){
-        fprintf(stderr, "Wrong port format number\n");
-        return 1;
-    }
+    infor = serializePlayerInfo(player);
+    printf("%s\n", infor);
+    printf("%d", strlen(infor));
 
-    // check if port is in range
-    if(SERV_PORT < 1024 || SERV_PORT > 65535){
-        fprintf(stderr, "Port should be in between 1024 and 65535\n");
-        return 1;
-    }
-
-    //Step 1: Construct socket
-        if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
-        perror("Error constructing socket: ");
-        return 0;
-    }
-    fprintf(stdout, "Successfully created socket\n");
-
-    //Step 2: Bind address to socket
-    bzero(&servaddr, sizeof(servaddr));
-    servaddr.sin_family = AF_INET; // user IPv4
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // set server to accept connection from any network interface (IPv4 only)
-    servaddr.sin_port = htons(SERV_PORT); // set port of the server
-
-    if(bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))){
-        perror("Error binding socket: ");
-        return 0;
-    }
-    printf("Server started. Listening on port: %d\n", SERV_PORT);
-
-
-    //Step 3: Communicate with client
-    while(1){
-        // reset the buff
-        memset(buff, BUFF_SIZE, 0);
-
-        // receive new connection 
-        rcvBytes = recvfrom(sockfd, buff, BUFF_SIZE, 0, (struct sockaddr *) &cliaddr, &addr_len);
-        if(rcvBytes < 0){
-            perror("Error receiving data from client: ");
-            continue;
-        }
-        buff[rcvBytes] = '\0';
-
-        // now the last character in buff is \n -> makes the string len + 1, 
-        // we need to remove this character
-        if(buff[strlen(buff) - 1] == '\n') buff[strlen(buff) - 1] = '\0';
-
-        // if client address is not in list of players
-        if(!clientInList(&cliaddr)){
-            // store client address into cli_addr variable
-            inet_ntop(AF_INET, (void *) &cliaddr.sin_addr, cli_addr, INET_ADDRSTRLEN);
-
-            printf("A new connection arrived from [%s:%d], creating new player\n", cli_addr, ntohs(cliaddr.sin_port));
-
-            // create a new Player, associated the Player with address
-            Player *newPlayer = unserializePlayerInfo(buff, cliaddr);
-
-            // add this player to list of players
-            players = addPlayer(newPlayer);
-
-            // logs out information
-            printf("A new player has been created with id assigned as %d, forking a new process for this client\n", newPlayer->id);
-
-            // create a new pipe to commnunicate from server -> this client
-            if( pipe(p_to_c[maxPlayer]) == -1){
-                perror("pipe");
-                continue;
-            }
-
-            // create a new pipe from children -> parent to handle communications
-            if( pipe(c_to_p[maxPlayer]) == -1){
-                perror("pipe");
-                continue;
-            }
-
-            // fork a new process to handle this client
-            if( (pids[maxPlayer] = fork()) < 0){
-                perror("fork");
-                continue;
-            } else if(pids[maxPlayer] == 0){
-                // in child process
-                close(p_to_c[maxPlayer][1]); // close the write end of this pipe
-                close(c_to_p[maxPlayer][0]); // close the read end of this pipe
-
-                handleClient(newPlayer);
-
-
-            } else {
-                // in parent process
-                close(p_to_c[maxPlayer][0]); // close the read end of main process
-                close(c_to_p[maxPlayer][1]); // close the write end of this pipe
-
-                continue; // wait for next connection 
-            }
-        
-
-            // update total number of players
-            maxPlayer++;
-        }
-        
-        // process data received
-        result = buff;
-
-        // print received client address, port and data received
-        //printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
-
-        // send data to client
-        sendBytes = sendto(sockfd, result, strlen(result), 0, (struct sockaddr *) &cliaddr, addr_len);
-        if(sendBytes < 0){
-            perror("Error sending data to client: ");
-            return 0;
-        }
-    }
 
     return 0;
 }

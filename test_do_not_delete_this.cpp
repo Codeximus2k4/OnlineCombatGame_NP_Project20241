@@ -224,7 +224,7 @@ bool clientInList(sockaddr_in *client){
 // function to publish player information to all other clients
 // input: data from a single client that needs to be broadcasted
 // dependencies: 
-void broadCastData(Player player) {
+void broadCastData(Player players) {
     
 }
 
@@ -259,7 +259,7 @@ Main function to handle server logic
 int main (int argc, char *argv[]) {
 
     pid_t pids[20]; // hold the list of PIDs of chlidren processes
-    int sockfd1, sockfd2, rcvBytes, sendBytes;
+    int sockfd, rcvBytes, sendBytes;
     char buff[BUFF_SIZE + 1];
     struct sockaddr_in servaddr;
     struct sockaddr_in cliaddr; // list of clients addresses
@@ -272,7 +272,7 @@ int main (int argc, char *argv[]) {
 
     // check if user inputed port or not
     if(argc != 2){
-        fprintf(stderr, "Usage: ./server port_number\n");
+        fprintf(stderr, "Usage: ./fork_server_test port_number\n");
         return 1;
     }
 
@@ -289,7 +289,7 @@ int main (int argc, char *argv[]) {
     }
 
     //Step 1: Construct socket
-        if((sockfd1 = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
+        if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
         perror("Error constructing socket: ");
         return 0;
     }
@@ -301,7 +301,7 @@ int main (int argc, char *argv[]) {
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // set server to accept connection from any network interface (IPv4 only)
     servaddr.sin_port = htons(SERV_PORT); // set port of the server
 
-    if(bind(sockfd1, (struct sockaddr *) &servaddr, sizeof(servaddr))){
+    if(bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))){
         perror("Error binding socket: ");
         return 0;
     }
@@ -311,10 +311,10 @@ int main (int argc, char *argv[]) {
     //Step 3: Communicate with client
     while(1){
         // reset the buff
-        memset(buff, 0, sizeof(buff));
+        memset(buff, BUFF_SIZE, 0);
 
         // receive new connection 
-        rcvBytes = recvfrom(sockfd1, buff, BUFF_SIZE, 0, (struct sockaddr *) &cliaddr, &addr_len);
+        rcvBytes = recvfrom(sockfd, buff, BUFF_SIZE, 0, (struct sockaddr *) &cliaddr, &addr_len);
         if(rcvBytes < 0){
             perror("Error receiving data from client: ");
             continue;
@@ -393,13 +393,11 @@ int main (int argc, char *argv[]) {
         //printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
 
         // send data to client
-        sendBytes = sendto(sockfd1, result, strlen(result), 0, (struct sockaddr *) &cliaddr, addr_len);
+        sendBytes = sendto(sockfd, result, strlen(result), 0, (struct sockaddr *) &cliaddr, addr_len);
         if(sendBytes < 0){
             perror("Error sending data to client: ");
             return 0;
         }
-
-        
     }
 
     return 0;
