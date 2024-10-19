@@ -46,7 +46,7 @@ class Game:
         self.entities = []
         self.entities.append(self.player)
         self.entities.append(self.player2)
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     
     def serializePlayerInfo(self):
@@ -116,15 +116,18 @@ class Game:
 
     def run(self):
         message = "Start game"
-        self.client_socket.sendto(message.encode("utf-8"), ("127.0.0.1", 5500))
+        self.client_socket.connect(("127.0.0.1", 5500))
+        self.client_socket.send(message.encode("utf-8"))
         self.screen = pygame.display.set_mode((960, 720))
         bufferSize = 1024
-        while True:
+        while True: 
             self.display.fill(color = (0,0,0,0))
             self.display_2.blit(pygame.transform.scale(self.background, self.display.get_size()), (0,0))
             message = self.serializePlayerInfo()
-            self.client_socket.sendto(message.encode("utf-8"), ("127.0.0.1", 5500))
-            # data, address = self.client_socket.recvfrom(bufferSize)
+            self.client_socket.send(message.encode("utf-8"))
+            
+            # Receive data from server
+            # data = self.client_socket.recv(bufferSize)
             # print(data.decode())
 
             for event in pygame.event.get():

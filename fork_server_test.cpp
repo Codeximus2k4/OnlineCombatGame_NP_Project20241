@@ -8,6 +8,7 @@
 #include<unistd.h>
 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
+#define UDP_PORT 7070 // UPD port for transferring data
 
 /*---------------------------------------------
 Defining Player structs
@@ -228,6 +229,43 @@ void broadCastData(Player player) {
     
 }
 
+// after a "Start game" request received from client side
+// this function will handle handle transferring data between client
+// and corresponding subprocess
+void handleClient(sockaddr_in cliaddr, char cli_addr[]) {
+    int clientfd; // socket for transferring data with client
+
+    printf("1\n");
+
+    while(1){
+        // this subprocess 
+    }
+    
+    /*-----------------------------
+    Handle UDP data transfer from client - under development
+    -------------------------------
+    while(1){
+
+    }
+    // create a new Player, associated the Player with address
+    Player *newPlayer = unserializePlayerInfo(buff, cliaddr);
+
+    // update total number of players
+    maxPlayer++;
+
+    // add this player to list of players
+    players = addPlayer(newPlayer);
+
+    // logs out information
+    printf("A new player has been created with id assigned as %d, forking a new process for this client\n", newPlayer->id);
+
+    */
+
+
+   
+    
+}
+
 
 /*
 --------------------------------------------------
@@ -259,7 +297,9 @@ Main function to handle server logic
 int main (int argc, char *argv[]) {
 
     pid_t pids[20]; // hold the list of PIDs of chlidren processes
-    int sockfd1, sockfd2, rcvBytes, sendBytes;
+    pid_t pid; // test pid
+    int sockfd, rcvBytes, sendBytes;
+    int connectfd;
     char buff[BUFF_SIZE + 1];
     struct sockaddr_in servaddr;
     struct sockaddr_in cliaddr; // list of clients addresses
@@ -268,11 +308,12 @@ int main (int argc, char *argv[]) {
     char cli_addr[100];
     char *result; // result string to return to client
     char errorString[10000]; // actual string return to client (used in case of error)
+
     
 
     // check if user inputed port or not
     if(argc != 2){
-        fprintf(stderr, "Usage: ./server port_number\n");
+        fprintf(stderr, "Usage: ./fork_server_test port_number\n");
         return 1;
     }
 
@@ -288,118 +329,90 @@ int main (int argc, char *argv[]) {
         return 1;
     }
 
-    //Step 1: Construct socket
-        if((sockfd1 = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
+    //Step 1: Construct socket using SOCK_STREAM (TCP)
+        if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
         perror("Error constructing socket: ");
         return 0;
     }
     fprintf(stdout, "Successfully created socket\n");
 
     //Step 2: Bind address to socket
-    bzero(&servaddr, sizeof(servaddr));
+    memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET; // user IPv4
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // set server to accept connection from any network interface (IPv4 only)
     servaddr.sin_port = htons(SERV_PORT); // set port of the server
 
-    if(bind(sockfd1, (struct sockaddr *) &servaddr, sizeof(servaddr))){
+    if(bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))){
         perror("Error binding socket: ");
         return 0;
     }
-    printf("Server started. Listening on port: %d\n", SERV_PORT);
 
+    // Step 3: Listen for incoming connections 
+    // backlog = 10 -> accept at most 10 connections at a time
+    if(listen(sockfd, 10) < 0){
+        perror("Error listening on socket");
+        return 1;
+    }
 
-    //Step 3: Communicate with client
+    printf("Server started. Listening on port: %d using SOCK_STREAM (TCP)\n", SERV_PORT);
+
+    //Step 4: Accept and hanle client connections
     while(1){
+        // accept connections waiting in the queue
+        // create a new file descriptor
+        connectfd = accept(sockfd, (struct sockaddr *) &cliaddr, &addr_len);
+        if(connectfd < 0){
+            perror("Error accepting new connection");
+            continue;
+        }
+        
         // reset the buff
         memset(buff, 0, sizeof(buff));
 
-        // receive new connection 
-        rcvBytes = recvfrom(sockfd1, buff, BUFF_SIZE, 0, (struct sockaddr *) &cliaddr, &addr_len);
-        if(rcvBytes < 0){
+        // receive data from this connection
+        if( (rcvBytes = recv(connectfd, buff, BUFF_SIZE, 0)) == -1){
             perror("Error receiving data from client: ");
             continue;
         }
-        buff[rcvBytes] = '\0';
 
-        // handle "start game" case from client
-        if(strcmp(buff, "Start game") == 0) continue;
+        buff[rcvBytes] = '\0';
 
         // now the last character in buff is \n -> makes the string len + 1, 
         // we need to remove this character
         if(buff[strlen(buff) - 1] == '\n') buff[strlen(buff) - 1] = '\0';
 
-        // if client address is not in list of players
-        if(!clientInList(&cliaddr)){
-            // store client address into cli_addr variable
-            inet_ntop(AF_INET, (void *) &cliaddr.sin_addr, cli_addr, INET_ADDRSTRLEN);
+        // if client sends a "start game" message
+        if(strcmp(buff, "Start game") == 0){
+            // if client address is not in list of players
+            if(!clientInList(&cliaddr)){
+                // fork a new process to handle this client
+                pid = fork();
+                if(pid < 0){
+                    perror("Error forking\n");
+                    continue;
+                }
+                else if(pid == 0){
+                    // child process:
+                    // close connection on listening socket of parent process
+                    close(sockfd);
+                    
+                    // store client address into cli_addr variable
+                    inet_ntop(AF_INET, (void *) &cliaddr.sin_addr, cli_addr, INET_ADDRSTRLEN);
 
-            printf("A new connection arrived from [%s:%d], creating new player\n", cli_addr, ntohs(cliaddr.sin_port));
+                    printf("A new connection arrived from [%s:%d], assigning subproces for this client\n", cli_addr, ntohs(cliaddr.sin_port));
 
-            // create a new Player, associated the Player with address
-            Player *newPlayer = unserializePlayerInfo(buff, cliaddr);
+                    // handle client data transferring
+                    handleClient(cliaddr, cli_addr);
+                } else{
+                    // parent process
+                    // close connection socket descriptor of children process
+                    close(connectfd);
 
-            // add this player to list of players
-            players = addPlayer(newPlayer);
-
-            // logs out information
-            printf("A new player has been created with id assigned as %d, forking a new process for this client\n", newPlayer->id);
-
-            /*  
-            -----------------------------------------
-            Under development code, do not delete
-            -----------------------------------------
-            // create a new pipe to commnunicate from server -> this client
-            if( pipe(p_to_c[maxPlayer]) == -1){
-                perror("pipe");
-                continue;
+                    // continue accepting new connection
+                    continue;
+                }
             }
-
-            // create a new pipe from children -> parent to handle communications
-            if( pipe(c_to_p[maxPlayer]) == -1){
-                perror("pipe");
-                continue;
-            }
-
-            // fork a new process to handle this client
-            if( (pids[maxPlayer] = fork()) < 0){
-                perror("fork");
-                continue;
-            } else if(pids[maxPlayer] == 0){
-                // in child process
-                close(p_to_c[maxPlayer][1]); // close the write end of this pipe
-                close(c_to_p[maxPlayer][0]); // close the read end of this pipe
-
-                handleClient(newPlayer);
-
-
-            } else {
-                // in parent process
-                close(p_to_c[maxPlayer][0]); // close the read end of main process
-                close(c_to_p[maxPlayer][1]); // close the write end of this pipe
-
-                continue; // wait for next connection 
-            }
-            */
-        
-
-            // update total number of players
-            maxPlayer++;
         }
-        
-        // process data received
-        result = buff;
-
-        // print received client address, port and data received
-        //printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
-
-        // send data to client
-        sendBytes = sendto(sockfd1, result, strlen(result), 0, (struct sockaddr *) &cliaddr, addr_len);
-        if(sendBytes < 0){
-            perror("Error sending data to client: ");
-            return 0;
-        }
-
-        
     }
 
     return 0;
