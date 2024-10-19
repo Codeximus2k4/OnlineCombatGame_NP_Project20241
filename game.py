@@ -3,7 +3,8 @@ import sys
 import math
 import pygame
 from pygame import SCRAP_TEXT
-from pygame_menu.font import get_font
+
+FONT_PATH = "data/images/menuAssets/font.ttf"
 
 from scripts.utils import load_image, load_images, Animation
 from scripts.entities import PhysicsEntity, Player
@@ -15,38 +16,18 @@ class Game:
         pygame.display.set_caption('combat game')
         
         self.clock  = pygame.time.Clock()
-        self.screen = pygame.display.set_mode((960,720))
         self.display =  pygame.Surface((640,480), pygame.SRCALPHA)
         self.display_2 =  pygame.Surface((640,480))
         self.horizontal_movement = [False,False]
         self.game_state = "menu"
-        self.assets = {
-                'player': load_image('entities/Samurai/Idle/Idle_1.png'),
-                'background': load_images('background'),
-                'player/idle': Animation(load_images('entities/Samurai/Idle'), img_dur=5, loop = True),
-                'player/attack1': Animation(load_images('entities/Samurai/Attack1'), img_dur = 5, loop =False),
-                'player/attack2': Animation(load_images('entities/Samurai/Attack2'),img_dur = 5, loop = False),
-                'player/death':Animation(load_images('entities/Samurai/Death'),img_dur = 5, loop = False),
-                'player/run':Animation(load_images('entities/Samurai/Run'),img_dur=5, loop = True),
-                'player/jump':Animation(load_images('entities/Samurai/Jump'),img_dur= 5, loop=False)
-        }
+        self.assets = {}
         self.background_offset_y = -80
-
-        self.background =  pygame.Surface(self.assets['background'][0].get_size())
-        count = 0
-        for each in self.assets['background']:
-            count+=1
-            if count>=3:
-                self.background.blit(each,(0,self.background_offset_y))
-            else :
-                self.background.blit(each, (0,0))
-        
-        self.player = Player(game  = self, pos = (0,280),size = (128,128))
 
     def get_font(self, size):  # Returns Press-Start-2P in the desired size
         return pygame.font.Font("data/images/menuAssets/font.ttf", size)
 
     def menu(self):
+        self.screen = pygame.display.set_mode((960,720))
         # self.screen = pygame.display.set_mode((1280, 720))
         BG = pygame.image.load('data/images/menuAssets/Background.png')
         while True:
@@ -83,6 +64,26 @@ class Game:
 
     def run(self):
         self.screen = pygame.display.set_mode((960, 720))
+        self.assets = {
+                'player': load_image('entities/Samurai/Idle/Idle_1.png'),
+                'background': load_images('background'),
+                'player/idle': Animation(load_images('entities/Samurai/Idle'), img_dur=5, loop = True),
+                'player/attack1': Animation(load_images('entities/Samurai/Attack1'), img_dur = 5, loop =False),
+                'player/attack2': Animation(load_images('entities/Samurai/Attack2'),img_dur = 5, loop = False),
+                'player/death':Animation(load_images('entities/Samurai/Death'),img_dur = 5, loop = False),
+                'player/run':Animation(load_images('entities/Samurai/Run'),img_dur=5, loop = True),
+                'player/jump':Animation(load_images('entities/Samurai/Jump'),img_dur= 5, loop=False)
+        }
+        self.background =  pygame.Surface(self.assets['background'][0].get_size())
+        count = 0
+        for each in self.assets['background']:
+            count+=1
+            if count>=3:
+                self.background.blit(each,(0,self.background_offset_y))
+            else :
+                self.background.blit(each, (0,0))
+        
+        self.player = Player(game  = self, pos = (0,280),size = (128,128))
         while True:
             self.display.fill(color = (0,0,0,0))
             self.display_2.blit(pygame.transform.scale(self.background, self.display.get_size()), (0,0))
@@ -112,4 +113,3 @@ class Game:
             pygame.display.update()
             self.clock.tick(60)
 
-Game().menu()
