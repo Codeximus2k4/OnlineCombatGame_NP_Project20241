@@ -12,7 +12,6 @@
 void handle_client(int client_socket, PGconn *conn);
 int check_user(const char *username, const char *password, PGconn *conn);
 int add_user(const char *username, const char *password, PGconn *conn);
-void DBconnection();
 
 int main() {
     //////////////////////DB connection///////////////////////////
