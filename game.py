@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import pygame
+import socket
 from pygame import SCRAP_TEXT
 
 FONT_PATH = "data/images/menuAssets/font.ttf"
@@ -22,6 +23,34 @@ class Game:
         self.game_state = "menu"
         self.assets = {}
         self.background_offset_y = -80
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    def serializePlayerInfo(self):
+        """
+        Concatenates all relevant information of a Player object into a string.
+
+        Args:
+            player: A Player object representing the player's data.
+
+        Returns:
+            A string containing player information in a well-formatted way.
+        """
+
+        # Extract relevant information from the Player object
+        id = self.player.id
+        entity_type = self.player.entity_type
+        pos = self.player.pos
+
+        if(self.player.flip is True): flip = 1
+        else: flip = 0
+
+        action = self.player.action
+        frame =  self.player.animation.frame
+
+        # Format the information into a string with clear labels
+        info_string = f"{id}|{entity_type}|{pos[0]}|{pos[1]}|{flip}|{action}"    # send the existed info according to format message of server
+
+        return info_string
 
     def get_font(self, size):  # Returns Press-Start-2P in the desired size
         return pygame.font.Font("data/images/menuAssets/font.ttf", size)
@@ -83,30 +112,48 @@ class Game:
             else :
                 self.background.blit(each, (0,0))
         
-        self.player = Player(game  = self, pos = (0,280),size = (128,128))
+        self.player = Player(id=1, game  = self, pos = (0,280),size = (128,128))
+        self.player2 =  Player(id = 2, game = self, pos = (30,280),size = (128,128))
+        self.entities = []
+        self.entities.append(self.player)
+        self.entities.append(self.player2)
+
+        message = "Start game"
+        self.client_socket.connect(("127.0.0.1", 5500))
+        self.client_socket.send(message.encode("utf-8"))
+        bufferSize = 1024
+
+
         while True:
             self.display.fill(color = (0,0,0,0))
             self.display_2.blit(pygame.transform.scale(self.background, self.display.get_size()), (0,0))
-
+            message = self.serializePlayerInfo()
+            self.client_socket.send(message.encode("utf-8"))
+            
             for event in pygame.event.get():
                 if event.type ==pygame.QUIT:
                      pygame.quit()
                      sys.exit()
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_LEFT:
+                    if event.key == pygame.K_a:
                         self.horizontal_movement[0]= True
-                    if event.key == pygame.K_RIGHT:
+                    if event.key == pygame.K_d:
                         self.horizontal_movement[1]= True
+                    if event.key == pygame.K_q:
+                        self.player.ground_attack("attack1", attack_cooldown=1)
+                    elif event.key == pygame.K_e:
+                        self.player.ground_attack("attack2", attack_cooldown=1)
                 if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_LEFT:
+                    if event.key == pygame.K_a:
                         self.horizontal_movement[0]= False
-                    if event.key == pygame.K_RIGHT:
+                    if event.key == pygame.K_d:
                         self.horizontal_movement[1]= False
             
-            if self.player.velocity[0]!=0:
-                self.player.set_action('run')
-            self.player.update((self.horizontal_movement[1]-self.horizontal_movement[0],0))
-            self.player.render(self.display)
+        
+            for each in self.entities:
+                each.render(self.display)
+                if each is self.player:
+                    each.update((self.horizontal_movement[1]-self.horizontal_movement[0],0))
 
             self.display_2.blit(self.display, (0,0))
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
