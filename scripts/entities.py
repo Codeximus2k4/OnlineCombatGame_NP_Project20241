@@ -61,10 +61,7 @@ class Player(PhysicsEntity):
 
             # update on whether the player can attack or not with the cooldown time
             self.timeSinceAttack = min (self.timeSinceAttack+1, self.attack_cooldown+1)
-        else:
-            if self.animation.done:
-                self.isAttacking = False
-                self.set_action('idle')
+       
         self.animation.update()
 
 
@@ -81,13 +78,4 @@ class Player(PhysicsEntity):
         return "player|" + str(self.id) +"|"+str(self.pos[0])+"|"+str(self.pos[1])+"|"+str(int(self.flip))+"|"+self.action+"|"+str(self.animation.frame)
 
     
-    def render(self,surf):
-        super().render(surf)
-
-    def ground_attack(self, attack_animation):
-        if self.timeSinceAttack > self.attack_cooldown:
-            self.isAttacking = True
-            self.set_action(attack_animation)
-    def serialize_data(self):
-        return "player|" + str(self.id) +"|"+str(self.pos[0])+"|"+str(self.pos[1])+"|"+str(int(self.flip))+"|"+self.action+"|"+str(self.animation.frame)
     
