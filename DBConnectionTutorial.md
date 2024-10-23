@@ -30,6 +30,11 @@ Once you are the postgres user, access the PostgreSQL command line interface (CL
 psql
 ```
 
+- note: after successfully connected to postgres, run script in _./db-data/db-init.sql_ to initialize database (need to know absolute path to _/db-data/db-init.sql_)
+```
+\i abosulute/path/to/script
+```
+
 #### 4. Create a Database
 Now that you’re inside the PostgreSQL shell, create a new database:
 ```
@@ -75,6 +80,8 @@ SELECT * FROM users;
 ```
 \q
 ```
+
+
 
 
 
