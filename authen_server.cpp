@@ -1,3 +1,12 @@
+/*
+brew install postgresql
+
+GCC command for Mac (Hieu): (after install postgres with brew)
+
+g++ -I/usr/local//Cellar/libpq/16.4/include/ -L/usr/local/Cellar/libpq/16.4/lib/ -lpq -o authen_server authen_server.cpp
+ 
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,18 +31,21 @@ int main() {
     printf("Enter user (enter postgres for default user): "); //u can use default user = postgres
     scanf("%s", user);
     printf("Enter password: ");
+    fflush(stdin);
     scanf("%s", password); 
 
     // Connect to the database
     // conninfo is a string of keywords and values separated by spaces.
     char conninfo[100];
     
-    strcpy(conninfo, "host=localhost port=5432 dbname=users "); 
+    strcpy(conninfo, "host=localhost port=5432 dbname=game_users"); 
     strcat(conninfo, " user="); 
     strcat(conninfo, user);
     strcat(conninfo, " password=");
     strcat(conninfo, password);
     
+    printf("%s\n", conninfo);
+
     //char conninfo[100 ]= "host=localhost port=5432 dbname=users user=postgres password=@Ngo1702";
 
     // Create a connection

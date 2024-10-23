@@ -76,6 +76,8 @@ SELECT * FROM users;
 \q
 ```
 
+
+
 ### II. Set up connection
 
 #### 1. Install  libpq
