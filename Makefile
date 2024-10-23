@@ -4,7 +4,7 @@
 # make clean: clean all C binaries
 
 # Rule to build executables
-all: server
+all: server, fork_server_test
 	@echo "\nAll C code compile into binaries\n"; 
 	@echo "*****Online combat game*****";
 	@echo "How to play: "; 
@@ -14,6 +14,10 @@ all: server
 server: server.cpp
 	@echo "Compiling C server code..."; 
 	@g++ -o server server.cpp;
+
+fork_server_test: fork_server_test.cpp
+	@echo "Compiling C fork_server_test...";
+	@g++ -o fork_server_test fork_server_test.cpp;
 
 # Clean rule to remove the executable
 clean:
