@@ -53,7 +53,7 @@ class Game:
         return info_string
 
     def get_font(self, size):  # Returns Press-Start-2P in the desired size
-        return pygame.font.Font("data/images/menuAssets/font.ttf", size)
+        return pygame.font.Font(FONT_PATH, size)
 
     def menu(self):
         self.screen = pygame.display.set_mode((960,720))
@@ -125,29 +125,52 @@ class Game:
 
 
         while True:
+            # ------- Send/Receive inputs from client to server -----
+            # r - move left
+            # l - move right
+            # q - attack 1
+            # e - attack 2
+            # u - key up
+            # d - key down
+            # MSG FORMAT: {key_up/key_down}|{button}
+            #---------------------------------------------------------
             self.display.fill(color = (0,0,0,0))
             self.display_2.blit(pygame.transform.scale(self.background, self.display.get_size()), (0,0))
-            message = self.serializePlayerInfo()
-            self.client_socket.send(message.encode("utf-8"))
             
+            input_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            ADDRESS = "127.0.0.1"
+            PORT = "5000"
+
             for event in pygame.event.get():
+                msg = ""
                 if event.type ==pygame.QUIT:
                      pygame.quit()
                      sys.exit()
                 if event.type == pygame.KEYDOWN:
+                    msg = msg + "d|"
                     if event.key == pygame.K_a:
-                        self.horizontal_movement[0]= True
-                    if event.key == pygame.K_d:
-                        self.horizontal_movement[1]= True
-                    if event.key == pygame.K_q:
-                        self.player.ground_attack("attack1", attack_cooldown=1)
+                        # self.horizontal_movement[0]= True
+                        msg = msg + "l"
+                    elif event.key == pygame.K_d:
+                        # self.horizontal_movement[1]= True
+                        msg = msg + "r"
+                    elif event.key == pygame.K_q:
+                        # self.player.ground_attack("attack1", attack_cooldown=1)
+                        msg = msg +"q"
                     elif event.key == pygame.K_e:
-                        self.player.ground_attack("attack2", attack_cooldown=1)
+                        # self.player.ground_attack("attack2", attack_cooldown=1)
+                        msg = msg + "e"
+                    input_socket.sendto(msg.encode(), (ADDRESS, PORT))
                 if event.type == pygame.KEYUP:
+                    msg = msg + "u"
                     if event.key == pygame.K_a:
-                        self.horizontal_movement[0]= False
+                        # self.horizontal_movement[0]= False
+                        msg = msg + "l"
                     if event.key == pygame.K_d:
-                        self.horizontal_movement[1]= False
+                        # self.horizontal_movement[1]= False
+                        msg = msg + "r"
+                    input_socket.sendto(msg.encode(), (ADDRESS, PORT))
+                    
             
         
             for each in self.entities:
