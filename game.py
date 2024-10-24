@@ -149,7 +149,6 @@ class Game:
                         self.horizontal_movement[0] = False
                     elif data == "u|r":
                         self.horizontal_movement[1] = False
-                    print("Received from server: ", data.decode())
                 except OSError:
                     break # Exit loop if socket is closed
         
@@ -194,7 +193,7 @@ class Game:
                     input_socket.sendto(msg.encode(), (ADDRESS, PORT))
                     print(msg)
                 if event.type == pygame.KEYUP:
-                    msg = msg + "u"
+                    msg = msg + "u|"
                     if event.key == pygame.K_a:
                         # self.horizontal_movement[0]= False
                         msg = msg + "l"
