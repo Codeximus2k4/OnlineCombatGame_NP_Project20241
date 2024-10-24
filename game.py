@@ -7,6 +7,8 @@ import threading
 from pygame import SCRAP_TEXT
 
 FONT_PATH = "data/images/menuAssets/font.ttf"
+ADDRESS = "127.0.0.1"
+PORT = 7070
 
 from scripts.utils import load_image, load_images, Animation
 from scripts.entities import PhysicsEntity, Player
@@ -126,15 +128,14 @@ class Game:
 
         # create socket to send input/receive input to/from server
         input_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        ADDRESS = "127.0.0.1"
-        PORT = "5000"
+        
 
         # ---------- MULTI-THREAD HANDLING---------
         # target function for multi-thread handling
         def receive_messages():
             while True:
                 try:
-                    data, _ = input_socket.recfrom(bufferSize)
+                    data, _ = input_socket.recvfrom(bufferSize)
                     data = data.decode()
                     if data == "d|l":
                         self.horizontal_movement[0] = True
@@ -191,6 +192,7 @@ class Game:
                         # self.player.ground_attack("attack2", attack_cooldown=1)
                         msg = msg + "e"
                     input_socket.sendto(msg.encode(), (ADDRESS, PORT))
+                    print(msg)
                 if event.type == pygame.KEYUP:
                     msg = msg + "u"
                     if event.key == pygame.K_a:
@@ -200,6 +202,7 @@ class Game:
                         # self.horizontal_movement[1]= False
                         msg = msg + "r"
                     input_socket.sendto(msg.encode(), (ADDRESS, PORT))
+                    print(msg)
 
             
         

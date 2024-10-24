@@ -242,7 +242,8 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
     int status;
     char buff[BUFF_SIZE + 1];
     socklen_t addr_len = sizeof(servaddr);
-    int rcvBytes;
+    int rcvBytes, sendBytes;
+    char *result;
 
     // initialized server address for UDP data trasnfer
     memset(&servaddr, 0, sizeof(servaddr));
@@ -255,7 +256,8 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
         clientfd = socket(PF_INET, SOCK_DGRAM, 0);
     } while(clientfd == -1);
 
-    // set this UDP socket nonblocking (if there is no data keeps running)
+    // set this TCP and UDP sockets nonblocking (if there is no data keeps running)
+    fcntl(connectfd, F_SETFL, O_NONBLOCK);
     fcntl(clientfd, F_SETFL, O_NONBLOCK);
 
     // bind socket (keeps trying on failure)
@@ -263,39 +265,38 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
         status = bind(clientfd, (struct sockaddr*) &servaddr, sizeof(servaddr));
     } while(status == -1);
 
-    printf("Sub process created to handle client [%s:%d]\n", cli_addr, ntohs(cliaddr.sin_port));
+    printf("Subprocess created to handle client [%s:%d]\n", cli_addr, ntohs(cliaddr.sin_port));
 
     while(1){
-        // check client connection using TCP socket
+        // HANLDE TCP connection from client
+        memset(buff, 0, sizeof(buff));
         rcvBytes = recv(connectfd, buff, BUFF_SIZE, 0);
-
-        if(rcvBytes < 0){
-            // Error in receiving data
-            printf("Client [%s:%d] closes connection\n", cli_addr, ntohs(cliaddr.sin_port));
-            break;
-        } else if (rcvBytes == 0) {
+        
+        if (rcvBytes == 0) {
             // Client has closed the connection
+            // in non-blocking mode recv returns -1 if no data is available
+            // 0 if client closes connection
             printf("Client [%s:%d] has disconnected.\n", cli_addr, ntohs(cliaddr.sin_port));
+            close(connectfd);
+            close(clientfd);
             return;
         }
         buff[rcvBytes] = '\0';
-
-        // now the last character in buff is \n -> makes the string len + 1, 
-        // we need to remove this character
         if(buff[strlen(buff) - 1] == '\n') buff[strlen(buff) - 1] = '\0';
 
-        // print received client address, port and data received
-        printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
+        // print received client address, port and data received via TCP connection
+        //printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
 
 
+        // HANDLE UDP data transfer
         // clear buffer
         memset(buff, 0, sizeof(buff));
 
-        // receive data from client
+        // receive data from client (UDP)
         rcvBytes = recvfrom(clientfd, buff, BUFF_SIZE, 0, (struct sockaddr *) &cliaddr, &addr_len);
-        if(rcvBytes < 0){
+        if(rcvBytes < 0){ // do nothing if client hasnt sent anything yet
             // reading from non-blocking socket and there is no data will return -1 to rcvBytes
-            printf("Error receiving data from client [%s:%d]\n", cli_addr, ntohs(cliaddr.sin_port));
+            //printf("Error receiving data from client [%s:%d]\n", cli_addr, ntohs(cliaddr.sin_port));
             continue;
         }
         buff[rcvBytes] = '\0';
@@ -304,10 +305,17 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
         // we need to remove this character
         if(buff[strlen(buff) - 1] == '\n') buff[strlen(buff) - 1] = '\0';
 
-        printf("3\n");
+        // print received client address, port and data received via UDP connection
+        //printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
 
-        // print received client address, port and data received
-        printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
+        result = buff;
+
+        // send data back to client
+        sendBytes = sendto(clientfd, result, strlen(result), 0, (struct sockaddr *) &cliaddr, addr_len);
+        if(sendBytes < 0){
+            perror("Error sending data to client: ");
+            continue;
+        }
     }
     
     /*-----------------------------
