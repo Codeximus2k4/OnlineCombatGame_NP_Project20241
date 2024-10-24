@@ -3,6 +3,7 @@ import sys
 import math
 import pygame
 import socket
+import threading
 from pygame import SCRAP_TEXT
 
 FONT_PATH = "data/images/menuAssets/font.ttf"
@@ -123,8 +124,43 @@ class Game:
         self.client_socket.send(message.encode("utf-8"))
         bufferSize = 1024
 
+        # create socket to send input/receive input to/from server
+        input_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        ADDRESS = "127.0.0.1"
+        PORT = "5000"
+
+        # ---------- MULTI-THREAD HANDLING---------
+        # target function for multi-thread handling
+        def receive_messages():
+            while True:
+                try:
+                    data, _ = input_socket.recfrom(bufferSize)
+                    data = data.decode()
+                    if data == "d|l":
+                        self.horizontal_movement[0] = True
+                    elif data == "d|r":
+                        self.horizontal_movement[1] = True
+                    elif data == "d|q":
+                        self.player.ground_attack("attack1", attack_cooldown=1)
+                    elif data == "d|e":
+                        self.player.ground_attack("attack2", attack_cooldown=1)
+                    elif data == "u|l":
+                        self.horizontal_movement[0] = False
+                    elif data == "u|r":
+                        self.horizontal_movement[1] = False
+                    print("Received from server: ", data.decode())
+                except OSError:
+                    break # Exit loop if socket is closed
+        
+        # Start a thread to handle incoming messages
+        thread = threading.Thread(target=receive_messages)
+        thread.daemon = True # Allow thread to exit when main program exits
+        thread.start()
 
         while True:
+            self.display.fill(color = (0,0,0,0))
+            self.display_2.blit(pygame.transform.scale(self.background, self.display.get_size()), (0,0))
+
             # ------- Send/Receive inputs from client to server -----
             # r - move left
             # l - move right
@@ -134,13 +170,7 @@ class Game:
             # d - key down
             # MSG FORMAT: {key_up/key_down}|{button}
             #---------------------------------------------------------
-            self.display.fill(color = (0,0,0,0))
-            self.display_2.blit(pygame.transform.scale(self.background, self.display.get_size()), (0,0))
-            
-            input_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            ADDRESS = "127.0.0.1"
-            PORT = "5000"
-
+         
             for event in pygame.event.get():
                 msg = ""
                 if event.type ==pygame.QUIT:
@@ -170,7 +200,7 @@ class Game:
                         # self.horizontal_movement[1]= False
                         msg = msg + "r"
                     input_socket.sendto(msg.encode(), (ADDRESS, PORT))
-                    
+
             
         
             for each in self.entities:
@@ -183,3 +213,5 @@ class Game:
             pygame.display.update()
             self.clock.tick(60)
 
+if __name__ == "__main__":
+    Game().menu()
