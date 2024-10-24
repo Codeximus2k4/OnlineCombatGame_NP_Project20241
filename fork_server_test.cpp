@@ -6,6 +6,7 @@
 #include<ctype.h>
 #include <stdlib.h>
 #include<unistd.h>
+#include <fcntl.h>
 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 #define UDP_PORT 7070 // UPD port for transferring data
@@ -232,13 +233,81 @@ void broadCastData(Player player) {
 // after a "Start game" request received from client side
 // this function will handle handle transferring data between client
 // and corresponding subprocess
-void handleClient(sockaddr_in cliaddr, char cli_addr[]) {
-    int clientfd; // socket for transferring data with client
+void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
+    // connectfd remains valid until client closes connection (recv returns 0)
+    // or server uses closes(connectfd)
 
-    printf("1\n");
+    int clientfd; // socket for transferring data with client (UDP)
+    struct sockaddr_in servaddr;
+    int status;
+    char buff[BUFF_SIZE + 1];
+    socklen_t addr_len = sizeof(servaddr);
+    int rcvBytes;
+
+    // initialized server address for UDP data trasnfer
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET; // user IPv4
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // set server to accept connection from any network interface (IPv4 only)
+    servaddr.sin_port = htons(UDP_PORT); // set port of the server
+
+    // keeps trying to create a socket if fails
+    do {
+        clientfd = socket(PF_INET, SOCK_DGRAM, 0);
+    } while(clientfd == -1);
+
+    // set this UDP socket nonblocking (if there is no data keeps running)
+    fcntl(clientfd, F_SETFL, O_NONBLOCK);
+
+    // bind socket (keeps trying on failure)
+    do{
+        status = bind(clientfd, (struct sockaddr*) &servaddr, sizeof(servaddr));
+    } while(status == -1);
+
+    printf("Sub process created to handle client [%s:%d]\n", cli_addr, ntohs(cliaddr.sin_port));
 
     while(1){
-        // this subprocess 
+        // check client connection using TCP socket
+        rcvBytes = recv(connectfd, buff, BUFF_SIZE, 0);
+
+        if(rcvBytes < 0){
+            // Error in receiving data
+            printf("Client [%s:%d] closes connection\n", cli_addr, ntohs(cliaddr.sin_port));
+            break;
+        } else if (rcvBytes == 0) {
+            // Client has closed the connection
+            printf("Client [%s:%d] has disconnected.\n", cli_addr, ntohs(cliaddr.sin_port));
+            return;
+        }
+        buff[rcvBytes] = '\0';
+
+        // now the last character in buff is \n -> makes the string len + 1, 
+        // we need to remove this character
+        if(buff[strlen(buff) - 1] == '\n') buff[strlen(buff) - 1] = '\0';
+
+        // print received client address, port and data received
+        printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
+
+
+        // clear buffer
+        memset(buff, 0, sizeof(buff));
+
+        // receive data from client
+        rcvBytes = recvfrom(clientfd, buff, BUFF_SIZE, 0, (struct sockaddr *) &cliaddr, &addr_len);
+        if(rcvBytes < 0){
+            // reading from non-blocking socket and there is no data will return -1 to rcvBytes
+            printf("Error receiving data from client [%s:%d]\n", cli_addr, ntohs(cliaddr.sin_port));
+            continue;
+        }
+        buff[rcvBytes] = '\0';
+
+        // now the last character in buff is \n -> makes the string len + 1, 
+        // we need to remove this character
+        if(buff[strlen(buff) - 1] == '\n') buff[strlen(buff) - 1] = '\0';
+
+        printf("3\n");
+
+        // print received client address, port and data received
+        printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
     }
     
     /*-----------------------------
@@ -402,11 +471,18 @@ int main (int argc, char *argv[]) {
                     printf("A new connection arrived from [%s:%d], assigning subproces for this client\n", cli_addr, ntohs(cliaddr.sin_port));
 
                     // handle client data transferring
-                    handleClient(cliaddr, cli_addr);
+                    handleClient(connectfd, cliaddr, cli_addr);
+
+                    // kill this subprocess after client closes connection
+                    return 0;
                 } else{
                     // parent process
                     // close connection socket descriptor of children process
                     close(connectfd);
+
+                    // update list of players
+                    maxPlayer++;
+                    printf("Player count = %d\n", maxPlayer);
 
                     // continue accepting new connection
                     continue;
