@@ -1,0 +1,11 @@
+__pycache__
+
+*.exe
+
+*.o
+
+test.cpp
+
+test_do_not_delete_this.cpp
+
+tempCodeRunnerFile.cpp
