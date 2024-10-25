@@ -483,7 +483,7 @@ int main (int argc, char *argv[]) {
 
                     // kill this subprocess after client closes connection
                     return 0;
-                } else{
+                } else{ // pid > 0
                     // parent process
                     // close connection socket descriptor of children process
                     close(connectfd);
