@@ -46,9 +46,20 @@ int key;
 char *shm_data; 
 int sockfd; // sockfd for listening on TCP on general server
 
+/* Shared memory data structure format
+# of players
+player information on each line
+
+for e.g: a room with 2 players, then shared memory data is:
+2
+1|127.0.0.1|55555
+2|127.0.0.1|66666
+
+*/
+
 // define list of players
 Player *players = NULL; // pointer to head of linked list of players
-int maxPlayer = 0; // keep count of total players in the room
+int playerCount = 0; // keep count of total players in the room
 
 /*---------------------------------------------
 Defining functions
@@ -216,6 +227,11 @@ bool clientInList(sockaddr_in *client){
     return false;
 }
 
+// 
+void updateListPlayer() {
+
+}
+
 // function to publish player information to all other clients
 // input: data from a single client that needs to be broadcasted
 // dependencies: 
@@ -226,6 +242,8 @@ void broadCastData(Player player) {
 // after a "Start game" request received from client side
 // this function will handle handle transferring data between client
 // and corresponding subprocess
+// - input: TCP socket that accepted from client, sockaddr_in of client address, string of client address, id of shared memory created 
+// this function will run indefinitely until client closes connection
 void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid) {
     // connectfd remains valid until client closes connection (recv returns 0)
     // or server uses closes(connectfd)
@@ -257,7 +275,7 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid
     fcntl(connectfd, F_SETFL, O_NONBLOCK);
     fcntl(clientfd, F_SETFL, O_NONBLOCK);
 
-    // bind socket (keeps trying on failure)
+    // bind socket (report on failure)
     status = bind(clientfd, (struct sockaddr*) &servaddr, sizeof(servaddr));
     if(status == -1) {
         perror("Error binding UDP socket to handle client data transfer");
@@ -296,7 +314,8 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid
         // ------------------------ READ DATA FROM SHARED MEMORY -----------------------------
         // point shm_data to shared memory region
         shm_cli_data = (char *) shmat(shmid, NULL, 0);
-        printf("Current data in shared memory (read from subprocess):\n%s\n", shm_cli_data);
+        printf("Current data in shared memory (read from subprocess):\n%s, strlen = %d\n", shm_cli_data, strlen(shm_cli_data));
+
 
         // ------------------------ UDP DATA TRANSFER -----------------------------
         // HANDLE UDP data transfer
@@ -411,11 +430,16 @@ int main (int argc, char *argv[]) {
 
     printf("Server started. Listening on port: %d using SOCK_STREAM (TCP)\n", SERV_PORT);
 
+    // initialize list of players as 0
+    shm_data = (char *) shmat(shmid, NULL, 0);
+    strcpy(shm_data, "0");
+
     //Step 4: Accept and handle client connections
     while(1){
         // ------------------------ READ DATA FROM SHARED MEMORY -----------------------------
+        // read data from shared memory to update list of players
         shm_data = (char *) shmat(shmid, NULL, 0);
-        strncpy(shm_data, "1|127.0.0.1|55555\n2|127.0.0.1|66666", 36);
+        updateListPlayer();
 
 
         // ------------------------ ACCEPT NEXT CONNECTION -----------------------------
@@ -473,8 +497,8 @@ int main (int argc, char *argv[]) {
                     close(connectfd);
 
                     // update list of players
-                    maxPlayer++;
-                    printf("Player count = %d\n", maxPlayer);
+                    playerCount++;
+                    printf("Player count = %d\n", playerCount);
 
                     // continue accepting new connection
                     continue;
