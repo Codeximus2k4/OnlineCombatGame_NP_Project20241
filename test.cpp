@@ -1,205 +1,72 @@
-#include<stdio.h>
-#include<sys/socket.h>
-#include <netdb.h>
+#include <stdio.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <string.h>
-#include <arpa/inet.h>
-#include<ctype.h>
 #include <stdlib.h>
-#include<unistd.h>
 
-#define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
+int main() {
+    int shmid;
+    key_t key;
+    pid_t pid;
+    char *s_addr, *p_addr;
+    char string[50];
 
-/*---------------------------------------------
-Defining Player structs
------------------------------------------------
-*/
+    // Create a unique key for the shared memory segment
+    key = ftok("./a.c", 'a');
+    shmid = shmget(key, 1024, 0777 | IPC_CREAT);
 
-/*
-Data format: data type is in string:
-id|name|position_x|position_y|flip|action
-
-- id: id of player
-- name: name of player
-- position_x, position_y: coordinate of player
-- flip: 1 (True) or 0 (False)
-- action: action of player
-*/
-struct Player {
-    int id; // id of player
-    char name[50]; // player's name
-    int position_x; // player x position
-    int position_y; // player y position
-    int flip; // player looking right or left
-    char action[50]; // player's current action
-    sockaddr_in cliaddr; // IPv4 address corresponding to each player
-    Player *next; // next player in the list
-};
-
-/*---------------------------------------------
-Defining global variables
------------------------------------------------
-*/
-
-// define list of players
-Player *players = NULL; // pointer to head of linked list of players
-int maxPlayer = 0; // keep count of total players in the room
-
-/*
---------------------------------------------------
-UNDER DEVELOPMENT VARIABLES - do not delete
---------------------------------------------------
-// used for IPC with fork() and pipe()
-int p_to_c[20][2]; // pipe to write from parent -> children processes
-int c_to_p[20][2]; // pipe hanle writing from children -> parent
-*/
-
-/*---------------------------------------------
-Defining functions
------------------------------------------------
-*/
-
-// - make a new Player based on the information provided
-// - input: all player's information
-// - output: pointer to a new Player
-// - dependencies: none
-Player *makePlayer(int id, char name[], int position_x, int position_y, int flip, char action[], sockaddr_in cliaddr){
-   Player *p = (Player*) malloc(sizeof(Player));
-    p->id = id;
-    strcpy(p->name, name);
-    p->position_x = position_x;
-    p->position_y = position_y;
-    p->flip = flip;
-    strcpy(p->action, action);
-    p->cliaddr = cliaddr;
-
-    p->next = NULL;
-
-    return p;
-}
-
-// - add a player to a list of existing player, or create a new list if no players exist
-// - input: a Player
-// - output: update "players" pointer
-// - dependencies: none
-Player *addPlayer(Player *player){
-    // if there are no players yet
-    if(players == NULL){
-        players = player;
-
-        return players;
+    if (shmid < 0) {
+        printf("shmget is error\n");
+        return -1;
     }
 
-    // else add to the end of the linked list
-    Player *p = players;
-    while(p->next != NULL){
-        p = p->next;
+    printf("shmget is ok and shmid is %d\n", shmid);
+    pid = fork();
+
+    if (pid > 0) { // Parent Process
+        // Attach to the shared memory segment
+        p_addr = (char *) shmat(shmid, NULL, 0);
+        
+        // Write to shared memory
+        strncpy(p_addr, "hello", 6);
+        printf("Parent wrote: %s\n", p_addr);
+
+        // Wait for a moment to allow child to read
+        sleep(1);
+
+        // Read from shared memory
+        printf("Parent read: %s\n", p_addr);
+
+        // Detach from the shared memory
+        if (shmdt(p_addr) == -1) {
+            perror("shmdt failed");
+            exit(1);
+        }
+
+        // Delete the shared memory segment
+        if (shmctl(shmid, IPC_RMID, NULL) == -1) {
+            perror("shmctl failed to delete shared memory");
+            exit(1);
+        }
+    } else if (pid == 0) { // Child Process
+        // Attach to the shared memory segment
+        s_addr = (char *) shmat(shmid, NULL, 0);
+        
+        // Read from shared memory
+        printf("Child read: %s\n", s_addr);
+
+        // Write to shared memory
+        strncpy(s_addr, "child", 5);
+
+        // Detach from the shared memory
+        if (shmdt(s_addr) == -1) {
+            perror("shmdt failed");
+            exit(1);
+        }
     }
-
-    p->next = player;
-
-    return players;
-}
-
-// - function to serialize Player info into a string
-// - input: pointer to struct Player
-// - output: pointer to string contains player information
-// - dependencies: none
-char *serializePlayerInfo(Player *player){
-    char *string = (char *) malloc(10000); // string pointer that points to string storing serialized player data
-    char strnum[50]; // used for converting integer to array of char
-    
-    // append player id
-    snprintf(string, sizeof(string), "%d", player->id);
-    strcat(string, "|");
-
-    // append player name
-    strcat(string, player->name);
-    strcat(string, "|");
-
-    // append position x
-    snprintf(strnum, sizeof(strnum), "%d", player->position_x);
-    strcat(string, strnum);
-    strcat(string, "|");
-
-    // append position y
-    snprintf(strnum, sizeof(strnum), "%d", player->position_y);
-    strcat(string, strnum);
-    strcat(string, "|");
-
-    // append player flip
-    snprintf(strnum, sizeof(strnum), "%d", player->flip);
-    strcat(string, strnum);
-    strcat(string, "|");
-
-    // append player action 
-    strcat(string, player->action);
-
-    return string;
-}
-
-// - function to make Player from serialized string information
-// - input: serialized Player data format, sockaddr_in client address
-// - output: a pointer to a new player with information filled
-// - dependencies: makePlayer()
-Player *unserializePlayerInfo(char information[], sockaddr_in cliaddr){
-    int id; 
-    char name[50];
-    int position_x;
-    int position_y;
-    int flip;
-    char action[50];
-    int frame;
-
-    char string[500]; // copy string from information so that we dont mess with original information
-    strcpy(string, information);
-
-
-    char *token;
-    // get id
-    token = strtok(string, "|");
-    id = atoi(token);
-
-    // get name
-    token = strtok(NULL, "|");
-    strcpy(name, token);
-
-    // get pos x
-    token = strtok(NULL, "|");
-    position_x = atoi(token);
-
-    // get pos y
-    token = strtok(NULL, "|");
-    position_y = atoi(token);
-
-    // get flip
-    token = strtok(NULL, "|");
-    flip = atoi(token);
-
-    // get action
-    token = strtok(NULL, "|");
-    strcpy(action, token);
-
-    Player *p = makePlayer(id, name, position_x, position_y, flip, action, cliaddr);
-
-    return p;
-}   
-
-
-int main (int argc, char *argv[]) {
-    char information[100];
-    char *infor;
-    sockaddr_in cliaddr;
-    char ip[50] = "1.1.1.1";
-
-    strcpy(information, "1|hieu|5|10|1|attack");
-    inet_pton(AF_INET, ip, &cliaddr.sin_addr);
-
-    Player *player = unserializePlayerInfo(information, cliaddr);
-
-    infor = serializePlayerInfo(player);
-    printf("%s\n", infor);
-    printf("%d", strlen(infor));
-
-
     return 0;
 }
