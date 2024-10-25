@@ -13,7 +13,17 @@
 #include <signal.h>
 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
-#define UDP_PORT 7070 // UPD port for transferring data
+
+// Define color escape codes for colorful text
+#define RESET   "\033[0m"
+#define BOLD    "\033[1m"
+#define RED     "\033[0;31m"
+#define GREEN   "\033[0;32m"
+#define YELLOW  "\033[0;33m"
+#define BLUE    "\033[0;34m"
+#define MAGENTA "\033[0;35m"
+#define CYAN    "\033[0;36m"
+#define WHITE   "\033[0;37m"
 
 /*---------------------------------------------
 Defining Player structs
@@ -45,17 +55,8 @@ int shmid; // shared memory id to use for holding list of players and their addr
 int key;
 char *shm_data; 
 int sockfd; // sockfd for listening on TCP on general server
-
-/* Shared memory data structure format
-# of players
-player information on each line
-
-for e.g: a room with 2 players, then shared memory data is:
-2
-1|127.0.0.1|55555
-2|127.0.0.1|66666
-
-*/
+int UDP_PORT[4] = {7070, 7071, 7072, 7073};
+bool usedPort[4]; // to check if the port on the server is used or not
 
 // define list of players
 Player *players = NULL; // pointer to head of linked list of players
@@ -69,12 +70,12 @@ Defining functions
 // Cleanup function to handle Ctrl+C (SIGINT)
 // clean up shared memory created by the server
 void signalHandler(int sig) {
-    printf("\nCaught signal %d. Cleaning up and exiting...\n", sig);
+    printf(BLUE "\nCaught signal %d. Cleaning up and exiting...\n" RESET, sig);
 
     // close socket
     close(sockfd);
-    printf("socketfd closed\n");
-
+    printf(GREEN "[+] Socketfd closed\n" RESET);
+ 
     // Detach from the shared memory
     if (shmdt(shm_data) == -1) {
         perror("shmdt failed");
@@ -86,7 +87,7 @@ void signalHandler(int sig) {
         perror("shmctl failed to delete shared memory");
     }
 
-    printf("shared memory deleted\n");
+    printf(GREEN "[+] Shared memory deleted\n" RESET);
 
     exit(0);
 }
@@ -98,7 +99,7 @@ void cleanup(int shmid, int sockfd) {
 
     // Delete the shared memory segment
     if (shmctl(shmid, IPC_RMID, NULL) == -1) {
-        perror("shmctl failed to delete shared memory");
+        perror(RED "shmctl failed to delete shared memory" RESET);
         exit(1);
     }
 }
@@ -190,6 +191,16 @@ Player *unserializePlayerInfo(char information[], sockaddr_in cliaddr){
     return p;
 }  
 
+// functions to find the available port of the server to use for handling client
+// - output: index of port number available, -1 if there are no available ports from server
+int findAvailablePort() {
+    for(int i = 0; i < 4; i++){
+        if(usedPort[i] == false) return i;
+    }
+
+    return -1;
+}
+
 // - function to check if 2 sockaddr_in is the same
 // - input: sockaddr_in of client1 and client2
 // - output: true if 2 clients have same address:port
@@ -233,7 +244,7 @@ void updateListPlayer() {
 }
 
 // function to publish player information to all other clients
-// input: data from a single client that needs to be broadcasted
+// - input: data from a single client that needs to be broadcasted
 // dependencies: 
 void broadCastData(Player player) {
     
@@ -244,7 +255,7 @@ void broadCastData(Player player) {
 // and corresponding subprocess
 // - input: TCP socket that accepted from client, sockaddr_in of client address, string of client address, id of shared memory created 
 // this function will run indefinitely until client closes connection
-void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid) {
+void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid, int cli_udp_port) {
     // connectfd remains valid until client closes connection (recv returns 0)
     // or server uses closes(connectfd)
 
@@ -261,13 +272,17 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET; // user IPv4
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // set server to accept connection from any network interface (IPv4 only)
-    servaddr.sin_port = htons(UDP_PORT); // set port of the server
+
+    printf("port UDP is %d\n", cli_udp_port);
+
+    // assign UDP port of server 
+    servaddr.sin_port = htons(cli_udp_port); // set port of the server
 
     // keeps trying to create a socket if fails
     do {
         clientfd = socket(PF_INET, SOCK_DGRAM, 0);
         if(clientfd == -1) {
-            perror("Error creating UDP socket");
+            perror(RED "Error creating UDP socket" RED);
         }
     } while(clientfd == -1);
 
@@ -278,12 +293,13 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid
     // bind socket (report on failure)
     status = bind(clientfd, (struct sockaddr*) &servaddr, sizeof(servaddr));
     if(status == -1) {
-        perror("Error binding UDP socket to handle client data transfer");
+        perror(RED "Error binding UDP socket to handle client data transfer" RESET);
         fprintf(stdout, "Try exiting VSC and run again\n");
         cleanup(shmid, clientfd);
+        return;
     }
 
-    printf("Subprocess created to handle client [%s:%d]\n", cli_addr, ntohs(cliaddr.sin_port));
+    printf(GREEN "[+] Subprocess created to handle client [%s:%d]\n" RESET, cli_addr, ntohs(cliaddr.sin_port));
 
     while(1){
         // ------------------------ CHECK CONNECTION -----------------------------
@@ -298,10 +314,11 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid
             printf("Client [%s:%d] has disconnected.\n", cli_addr, ntohs(cliaddr.sin_port));
             close(connectfd);
             close(clientfd);
+
             // Detach from the shared memory
             if (shmdt(shm_cli_data) == -1) {
-                perror("shmdt failed");
-                exit(1);
+                perror(RED "shmdt failed" RESET);
+                return;
             }
             return;
         }
@@ -313,8 +330,8 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid
 
         // ------------------------ READ DATA FROM SHARED MEMORY -----------------------------
         // point shm_data to shared memory region
-        shm_cli_data = (char *) shmat(shmid, NULL, 0);
-        printf("Current data in shared memory (read from subprocess):\n%s, strlen = %d\n", shm_cli_data, strlen(shm_cli_data));
+        // shm_cli_data = (char *) shmat(shmid, NULL, 0);
+        // printf("Current data in shared memory (read from subprocess):\n%s, strlen = %d\n", shm_cli_data, strlen(shm_cli_data));
 
 
         // ------------------------ UDP DATA TRANSFER -----------------------------
@@ -343,7 +360,7 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid
         // send data back to client
         sendBytes = sendto(clientfd, result, strlen(result), 0, (struct sockaddr *) &cliaddr, addr_len);
         if(sendBytes < 0){
-            perror("Error sending data to client: ");
+            perror(RED "Error sending data to client: " RESET);
             continue;
         }
     }    
@@ -355,7 +372,7 @@ Main function to handle server logic
 */
 
 int main (int argc, char *argv[]) {
-    pid_t pids[20]; // hold the list of PIDs of chlidren processes
+    int cli_udp_port_index; // index of port from server to assign to subprocess to handle client
     pid_t pid; // test pid
     int rcvBytes, sendBytes;
     int connectfd;
@@ -373,19 +390,19 @@ int main (int argc, char *argv[]) {
 
     // check if user inputed port or not
     if(argc != 2){
-        fprintf(stderr, "Usage: ./fork_server_test port_number\n");
+        fprintf(stderr, RED "Usage: ./fork_server_test port_number\n" RESET);
         return 1;
     }
 
     // check if string is correct port number 
     if( (SERV_PORT = atoi(argv[1])) == 0){
-        fprintf(stderr, "Wrong port format number\n");
+        fprintf(stderr, RED "Wrong port format number\n" RESET);
         return 1;
     }
 
     // check if port is in range
     if(SERV_PORT < 1024 || SERV_PORT > 65535){
-        fprintf(stderr, "Port should be in between 1024 and 65535\n");
+        fprintf(stderr, RED "Port should be in between 1024 and 65535\n" RESET);
         return 1;
     }
 
@@ -394,11 +411,11 @@ int main (int argc, char *argv[]) {
     do{
         shmid = shmget(key, 1024, 0777 | IPC_CREAT);
         if(shmid < 0){
-            printf("shmget failed, trying again\n");
+            printf(RED "shmget failed, trying again\n" RESET);
         }
     } while(shmid < 0);
 
-    printf("Shared memory created to store players and their addresses, shmid = %d\n", shmid);
+    printf(GREEN "[+] Shared memory created to store players and their addresses, shmid = %d\n" RESET, shmid);
 
     //Step 1: Construct socket using SOCK_STREAM (TCP)
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
@@ -406,7 +423,7 @@ int main (int argc, char *argv[]) {
         cleanup(shmid, sockfd);
         return 0;
     }
-    fprintf(stdout, "Successfully created TCP socket\n");
+    fprintf(stdout, GREEN "[+] Successfully created TCP socket\n" RESET);
 
     //Step 2: Bind address to socket
     memset(&servaddr, 0, sizeof(servaddr));
@@ -415,7 +432,7 @@ int main (int argc, char *argv[]) {
     servaddr.sin_port = htons(SERV_PORT); // set port of the server
 
     if(bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))){
-        perror("Error binding TCP socket: ");
+        perror(RED "Error binding TCP socket: " RESET);
         cleanup(shmid, sockfd);
         return 0;
     }
@@ -423,23 +440,22 @@ int main (int argc, char *argv[]) {
     // Step 3: Listen for incoming connections 
     // backlog = 10 -> accept at most 10 connections at a time
     if(listen(sockfd, 10) < 0){
-        perror("Error listening on TCP socket");
+        perror(RED "Error listening on TCP socket" RESET);
         cleanup(shmid, sockfd);
         return 1;
     }
 
-    printf("Server started. Listening on port: %d using SOCK_STREAM (TCP)\n", SERV_PORT);
+    printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP)\n" RESET, SERV_PORT);
 
     // initialize list of players as 0
     shm_data = (char *) shmat(shmid, NULL, 0);
-    strcpy(shm_data, "0");
+    strcpy(shm_data, "hieu");
 
     //Step 4: Accept and handle client connections
     while(1){
         // ------------------------ READ DATA FROM SHARED MEMORY -----------------------------
         // read data from shared memory to update list of players
         shm_data = (char *) shmat(shmid, NULL, 0);
-        updateListPlayer();
 
 
         // ------------------------ ACCEPT NEXT CONNECTION -----------------------------
@@ -447,7 +463,7 @@ int main (int argc, char *argv[]) {
         // create a new file descriptor
         connectfd = accept(sockfd, (struct sockaddr *) &cliaddr, &addr_len);
         if(connectfd < 0){
-            perror("Error accepting new connection");
+            perror(RED "Error accepting new connection from new client" RESET);
             continue;
         }
         
@@ -456,7 +472,7 @@ int main (int argc, char *argv[]) {
 
         // receive data from this connection
         if( (rcvBytes = recv(connectfd, buff, BUFF_SIZE, 0)) == -1){
-            perror("Error receiving data from client: ");
+            perror(RED "Error receiving data from client: " RESET);
             continue;
         }
 
@@ -470,10 +486,14 @@ int main (int argc, char *argv[]) {
         if(strcmp(buff, "Start game") == 0){
             // if client address is not in list of players
             if(!clientInList(&cliaddr)){
+                // find available port of server and mark as used 
+                cli_udp_port_index = findAvailablePort();
+                usedPort[cli_udp_port_index] = true;
+
                 // fork a new process to handle this client
                 pid = fork();
                 if(pid < 0){
-                    perror("Error forking\n");
+                    perror(RED "Error forking\n" RESET);
                     continue;
                 }
                 else if(pid == 0){
@@ -484,10 +504,14 @@ int main (int argc, char *argv[]) {
                     // store client address into cli_addr variable
                     inet_ntop(AF_INET, (void *) &cliaddr.sin_addr, cli_addr, INET_ADDRSTRLEN);
 
-                    printf("A new connection arrived from [%s:%d], assigning subprocess for this client\n", cli_addr, ntohs(cliaddr.sin_port));
+                    printf(BLUE "[+] A new connection arrived from [%s:%d], assigning subprocess for this client\n" RESET, cli_addr, ntohs(cliaddr.sin_port));
 
+                    
                     // handle client data transferring
-                    handleClient(connectfd, cliaddr, cli_addr, shmid);
+                    handleClient(connectfd, cliaddr, cli_addr, shmid, UDP_PORT[cli_udp_port_index]);
+
+                    // if subprocess ends we mark port as unused
+                    usedPort[cli_udp_port_index] = false;
 
                     // kill this subprocess after client closes connection
                     return 0;

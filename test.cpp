@@ -1,8 +1,9 @@
 #include<stdio.h>
 
 int main() {
+    bool hieu = true;
 
-    printf("Hieu\r\nHoang\r\n");
+    printf("%d\n", hieu);
 
     return 0;
     
