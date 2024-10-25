@@ -299,6 +299,10 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid
         return;
     }
 
+    // map shared_cli_data to shared memory 
+    // shmat should be called only once
+    shm_cli_data = (char *) shmat(shmid, NULL, 0);
+
     printf(GREEN "[+] Subprocess created to handle client [%s:%d]\n" RESET, cli_addr, ntohs(cliaddr.sin_port));
 
     while(1){
@@ -329,10 +333,9 @@ void handleClient(int connectfd, sockaddr_in cliaddr, char cli_addr[], int shmid
         //printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
 
         // ------------------------ READ DATA FROM SHARED MEMORY -----------------------------
-        // point shm_data to shared memory region
-        // shm_cli_data = (char *) shmat(shmid, NULL, 0);
-        // printf("Current data in shared memory (read from subprocess):\n%s, strlen = %d\n", shm_cli_data, strlen(shm_cli_data));
+        printf("Current data in shared memory (read from subprocess):\n%s, strlen = %d\n", shm_cli_data, strlen(shm_cli_data));
 
+        
 
         // ------------------------ UDP DATA TRANSFER -----------------------------
         // HANDLE UDP data transfer
@@ -417,6 +420,11 @@ int main (int argc, char *argv[]) {
 
     printf(GREEN "[+] Shared memory created to store players and their addresses, shmid = %d\n" RESET, shmid);
 
+    // initialize list of players as 0
+    // note that shmat should be called only once
+    shm_data = (char *) shmat(shmid, NULL, 0);
+    strcpy(shm_data, "hieu");
+
     //Step 1: Construct socket using SOCK_STREAM (TCP)
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
         perror("Error constructing socket: ");
@@ -447,15 +455,11 @@ int main (int argc, char *argv[]) {
 
     printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP)\n" RESET, SERV_PORT);
 
-    // initialize list of players as 0
-    shm_data = (char *) shmat(shmid, NULL, 0);
-    strcpy(shm_data, "hieu");
-
     //Step 4: Accept and handle client connections
     while(1){
         // ------------------------ READ DATA FROM SHARED MEMORY -----------------------------
         // read data from shared memory to update list of players
-        shm_data = (char *) shmat(shmid, NULL, 0);
+        
 
 
         // ------------------------ ACCEPT NEXT CONNECTION -----------------------------
