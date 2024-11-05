@@ -1,255 +1,201 @@
-#include<stdio.h>
-#include<sys/socket.h>
-#include <netdb.h>
-#include <string.h>
-#include <arpa/inet.h>
-#include<ctype.h>
-#include <stdlib.h>
-#include<unistd.h>
+#include <stdio.h>
+#include "game_room.cpp"
+// #include "data_structs.cpp"
 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 
-/*---------------------------------------------
-Defining Player structs
------------------------------------------------
-*/
+// Define color escape codes for colorful text
+#define RESET   "\033[0m"
+#define BOLD    "\033[1m"
+#define RED     "\033[0;31m"
+#define GREEN   "\033[0;32m"
+#define YELLOW  "\033[0;33m"
+#define BLUE    "\033[0;34m"
+#define MAGENTA "\033[0;35m"
+#define CYAN    "\033[0;36m"
+#define WHITE   "\033[0;37m"
 
-/*
-Data format: data type is in string:
-id|name|position_x|position_y|flip|action
-
-- id: id of player
-- name: name of player
-- position_x, position_y: coordinate of player
-- flip: 1 (True) or 0 (False)
-- action: action of player
-*/
-struct Player {
-    int id; // id of player
-    char name[50]; // player's name
-    int position_x; // player x position
-    int position_y; // player y position
-    int flip; // player looking right or left
-    char action[50]; // player's current action
-    sockaddr_in cliaddr; // IPv4 address corresponding to each player
-    Player *next; // next player in the list
-};
 
 /*---------------------------------------------
 Defining global variables
 -----------------------------------------------
 */
 
-// define list of players
-Player *players = NULL; // pointer to head of linked list of players
-int maxPlayer = 0; // keep count of total players in the room
-
-/*
---------------------------------------------------
-UNDER DEVELOPMENT VARIABLES - do not delete
---------------------------------------------------
-// used for IPC with fork() and pipe()
-int p_to_c[20][2]; // pipe to write from parent -> children processes
-int c_to_p[20][2]; // pipe hanle writing from children -> parent
-*/
+int room_port = 10000; // port for each game room, first used port will be 10000
+Room *rooms = NULL; // pointer to head of rooms created on server
+Player *logged_in_players = NULL; // pointer to head of logged in players linked list
+int roomCount = 0; // keep track of total rooms created
 
 /*---------------------------------------------
 Defining functions
 -----------------------------------------------
 */
 
-// - make a new Player based on the information provided
-// - input: all player's information
-// - output: pointer to a new Player
-// - dependencies: none
-Player *makePlayer(int id, char name[], int position_x, int position_y, int flip, char action[], sockaddr_in cliaddr){
-   Player *p = (Player*) malloc(sizeof(Player));
-    p->id = id;
-    strcpy(p->name, name);
-    p->position_x = position_x;
-    p->position_y = position_y;
-    p->flip = flip;
-    strcpy(p->action, action);
-    p->cliaddr = cliaddr;
+// 
+void updateListPlayer() {
 
-    p->next = NULL;
-
-    return p;
 }
 
-// - add a player to a list of existing player, or create a new list if no players exist
-// - input: a Player
-// - output: update "players" pointer
-// - dependencies: none
-Player *addPlayer(Player *player){
-    // if there are no players yet
-    if(players == NULL){
-        players = player;
-
-        return players;
-    }
-
-    // else add to the end of the linked list
-    Player *p = players;
-    while(p->next != NULL){
-        p = p->next;
-    }
-
-    p->next = player;
-
-    return players;
-}
-
-// - function to serialize Player info into a string
-// - input: pointer to struct Player
-// - output: pointer to string contains player information
-// - dependencies: none
-char *serializePlayerInfo(Player *player){
-    char *string = (char *) malloc(10000); // string pointer that points to string storing serialized player data
-    char strnum[50]; // used for converting integer to array of char
-    
-    // append player id
-    snprintf(string, sizeof(string), "%d", player->id);
-    strcat(string, "|");
-
-    // append player name
-    strcat(string, player->name);
-    strcat(string, "|");
-
-    // append position x
-    snprintf(strnum, sizeof(strnum), "%d", player->position_x);
-    strcat(string, strnum);
-    strcat(string, "|");
-
-    // append position y
-    snprintf(strnum, sizeof(strnum), "%d", player->position_y);
-    strcat(string, strnum);
-    strcat(string, "|");
-
-    // append player flip
-    snprintf(strnum, sizeof(strnum), "%d", player->flip);
-    strcat(string, strnum);
-    strcat(string, "|");
-
-    // append player action 
-    strcat(string, player->action);
-
-    return string;
-}
-
-// - function to make Player from serialized string information
-// - input: serialized Player data format, sockaddr_in client address
-// - output: a pointer to a new player with information filled
-// - dependencies: makePlayer()
-Player *unserializePlayerInfo(char information[], sockaddr_in cliaddr){
-    int id; 
-    char name[50];
-    int position_x;
-    int position_y;
-    int flip;
-    char action[50];
-    int frame;
-
-    char string[500]; // copy string from information so that we dont mess with original information
-    strcpy(string, information);
-
-
-    char *token;
-    // get id
-    token = strtok(string, "|");
-    id = atoi(token);
-
-    // get name
-    token = strtok(NULL, "|");
-    strcpy(name, token);
-
-    // get pos x
-    token = strtok(NULL, "|");
-    position_x = atoi(token);
-
-    // get pos y
-    token = strtok(NULL, "|");
-    position_y = atoi(token);
-
-    // get flip
-    token = strtok(NULL, "|");
-    flip = atoi(token);
-
-    // get action
-    token = strtok(NULL, "|");
-    strcpy(action, token);
-
-    Player *p = makePlayer(id, name, position_x, position_y, flip, action, cliaddr);
-
-    return p;
-}   
-
-// - function to check if 2 sockaddr_in is the same
-// - input: sockaddr_in of client1 and client2
-// - output: true if 2 clients have same address:port
-//         false otherwise
-// - dependencies: none
-bool checkSameAddress(sockaddr_in cli1, sockaddr_in cli2){
-    // check same IP
-    if(cli1.sin_addr.s_addr == cli2.sin_addr.s_addr){
-        // if also same port
-        if(cli1.sin_port == cli2.sin_port) return true;
-    }
-
-    return false;
-}
-
-// - check if a client address is already in the list of stored players
-// - input: a client address
-// - output: true if client is in list
-//         false otherwise
-// - dependencies: checkSameAddress()
-bool clientInList(sockaddr_in *client){
-    // if list of players is empty then false
-    if(players == NULL) return false;
-
-    Player *p = players;
-
-    // loop through list to compare
-    while(p != NULL){
-        if(checkSameAddress(p->cliaddr, *client) == true){
-            return true;
-        }
-        p = p->next;
-    }
-
-    return false;
-}
-
-// function to publish player information to all other clients
-// input: data from a single client that needs to be broadcasted
-// dependencies: 
-void broadCastData(Player player) {
-    
-}
-
-
-/*
---------------------------------------------------
-UNDER DEVELOPMENT FUNCTION - do not delete
---------------------------------------------------
-// - function used by subprocess when client connects to server
-// - input: socket descriptor of client connect, current player according to the client
-// - dependencies: broadCastData
-void handleClient(Player *currentPlayer){
-    char buff[BUFF_SIZE];
-    int rcvBytes, sendBytes;
-    int sockfd;
-
-    
-
-    while(1){
-        memset(buff, 0, sizeof(buff));
-
-        rcvBytes = recvfrom(sockfd, buff, BUFF_SIZE, 0, )
-    }
-}
+/*---------------------------------------------
+DEFINING RESPONSE FUNCTIONS:
+- note that all of the below response functions are only
+responsible for sending data from server to client,
+does not handle logic
+-----------------------------------------------
 */
+
+// - function to handle if client sends unauthorized request
+void sendNotLoggedInResponse(int connectfd){
+
+}
+
+// - function to handle case client wants to register
+void sendResponse1(int connectfd){
+    
+}
+
+// - function to handle case client wants to login
+void sendResponse2(int connectfd){
+
+}
+// - function to handle case client wants to get list room
+// - input: socket descriptor to client
+// - this function will send list of rooms in a serialized format (response type 3) to client, processing this data is client's job
+void sendResponse3(int connectfd){
+    char data[500];
+    char roomInformation[500];
+    int sendBytes;
+
+    memset(roomInformation, 0, sizeof(roomInformation));
+
+    // init data to send
+    serializeRoomInformation(roomInformation, rooms);
+    strcpy(data, "3");
+    strcat(data, roomInformation);
+
+    int number_of_bytes_to_send = 1 + strlen(roomInformation);
+
+    // send to client (5 bytes)
+    if( (sendBytes = send(connectfd, data, number_of_bytes_to_send, 0)) < 0){
+        perror("Error");
+    };
+    
+    // print to check
+    printf(YELLOW "Number of bytes sent to client=%d\n" RESET, sendBytes);
+}
+
+// - function to handle case client wants to create room
+// - input: socket descriptor connected to client, room_id, room_port
+// - this function will send information of newly created room (response type 4) for client to connect
+// - IMPORTANT NOTE: request type is in char, status is in char, however room_id is ASCII value
+void sendResponse4(int connectfd, int room_id, int room_udp_port){
+    char data[500];
+    int sendBytes;
+
+    memset(data, 0, sizeof(data));
+
+    // init data
+    data[0] = '4'; // first byte is request type
+    data[1] = '1'; // second byte is status
+    // set first byte of packet to length of the data 
+    data[2] = (char) room_id; // third byte is room_id, note that this is ASCII value of character, e.g: '0' will be 48 in value
+
+    // convert UDP port of room network byte (2 bytes) because there are 65536 ports
+    uint16_t byte_room_port = htons(room_udp_port);
+
+    // append these 2 bytes to response packet
+    memcpy(data + 3, &byte_room_port, 2);
+
+    // send to client (5 bytes)
+    if( (sendBytes = send(connectfd, data, 5, 0)) < 0){
+        perror("Error");
+    };
+    
+    // print to check
+    printf(YELLOW "Number of bytes sent to client=%d, type=%c, status=%c, room_id=%c, port=%d\n" RESET, sendBytes, data[0], data[1], data[2], room_udp_port);
+}
+
+// - function to handle case client wants to join room
+void sendResponse5(int connectfd){
+    
+}
+
+// - function to handle a request from client
+// - input: socket descriptor connected with client, 
+// - dependencies: sendResponse1, sendResponse2, sendResponse3, sendResponse4, sendResponse5
+void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
+    int recvBytes;
+    char message_type;
+    char buff[500];
+
+    memset(buff, 0, sizeof(buff));
+
+    // get first byte to determine which request
+    if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+        perror("Error");
+    } else if(recvBytes == 0){
+        fprintf(stdout, "Server closes connection\n");
+        return;
+    }
+    message_type = buff[0];
+
+    // print request type
+    printf(BLUE "[+] Request type %c from [%s:%d]\n" RESET, message_type, cli_addr, ntohs(cliaddr.sin_port));
+
+    if(message_type == '1'){
+        // register request from client
+        // sendResponse1(clientfd);
+
+    } else if(message_type == '2'){
+        // login request from client
+
+    } else if(message_type == '3'){
+        // get list room request from client
+        sendResponse3(connectfd);
+
+    } else if(message_type == '4'){
+        // create room request from client
+        int room_id = roomCount; // set room_id
+
+        // create room and add room to list of rooms
+        // note that first room_port will be 10000
+        Room *room = makeRoom(room_id, room_port);
+        rooms = addRoom(rooms, room);
+
+        // fork a new game room
+        int pid = fork();
+        if(pid < 0){
+            perror(RED "Error forking a game room\n" RESET);
+            return;
+        }
+        else if(pid == 0){
+            // child process:
+            printf(BLUE "[+] Created a new game room with id = %d, udp_port used is: %d\n" RESET, roomCount, room_port, cli_addr, ntohs(cliaddr.sin_port));
+
+            // gameRoom();
+            
+            // kill this subprocess after room closes
+            return;
+        } else{ // pid > 0
+            // parent process
+
+            // notify back to client
+            sendResponse4(connectfd, room_id, room_port);
+
+            // update room count and room port 
+            roomCount++;
+            room_port++;
+
+            // exit function right after this
+        }
+    } else if(message_type == '5'){
+        // join room request from client
+
+
+    }
+
+    return;
+}
 
 /*---------------------------------------------
 Main function to handle server logic
@@ -257,149 +203,85 @@ Main function to handle server logic
 */
 
 int main (int argc, char *argv[]) {
-
-    pid_t pids[20]; // hold the list of PIDs of chlidren processes
-    int sockfd1, sockfd2, rcvBytes, sendBytes;
-    char buff[BUFF_SIZE + 1];
+    int cli_udp_port_index; // index of port from server to assign to subprocess to handle client
+    pid_t pid; // test pid
+    int rcvBytes, sendBytes;
+    int connectfd;
     struct sockaddr_in servaddr;
     struct sockaddr_in cliaddr; // list of clients addresses
     socklen_t addr_len = sizeof(struct sockaddr_in); // size of address structure, in this case size of IPv4 structure
     int SERV_PORT;
     char cli_addr[100];
-    char *result; // result string to return to client
-    char errorString[10000]; // actual string return to client (used in case of error)
-    
+    int sockfd; // sockfd for listening on TCP on general server
 
     // check if user inputed port or not
     if(argc != 2){
-        fprintf(stderr, "Usage: ./server port_number\n");
+        fprintf(stderr, RED "Usage: ./server port_number\n" RESET);
         return 1;
     }
 
     // check if string is correct port number 
     if( (SERV_PORT = atoi(argv[1])) == 0){
-        fprintf(stderr, "Wrong port format number\n");
+        fprintf(stderr, RED "Wrong port format number\n" RESET);
         return 1;
     }
 
     // check if port is in range
     if(SERV_PORT < 1024 || SERV_PORT > 65535){
-        fprintf(stderr, "Port should be in between 1024 and 65535\n");
+        fprintf(stderr, RED "Port should be in between 1024 and 65535\n" RESET);
         return 1;
     }
 
-    //Step 1: Construct socket
-        if((sockfd1 = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
+    //Step 1: Construct socket using SOCK_STREAM (TCP)
+    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
         perror("Error constructing socket: ");
         return 0;
     }
-    fprintf(stdout, "Successfully created socket\n");
+    fprintf(stdout, GREEN "[+] Successfully created TCP socket\n" RESET);
 
     //Step 2: Bind address to socket
-    bzero(&servaddr, sizeof(servaddr));
+    memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET; // user IPv4
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // set server to accept connection from any network interface (IPv4 only)
     servaddr.sin_port = htons(SERV_PORT); // set port of the server
 
-    if(bind(sockfd1, (struct sockaddr *) &servaddr, sizeof(servaddr))){
-        perror("Error binding socket: ");
+    if(bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))){
+        perror(RED "Error binding TCP socket: " RESET);
         return 0;
     }
-    printf("Server started. Listening on port: %d\n", SERV_PORT);
 
+    // Step 3: Listen for incoming connections 
+    // backlog = 10 -> accept at most 10 connections at a time
+    if(listen(sockfd, 10) < 0){
+        perror(RED "Error listening on TCP socket" RESET);
+        return 1;
+    }
 
-    //Step 3: Communicate with client
+    printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP)\n" RESET, SERV_PORT);
+
+    //Step 4: Accept and handle client connections
     while(1){
-        // reset the buff
-        memset(buff, 0, sizeof(buff));
-
-        // receive new connection 
-        rcvBytes = recvfrom(sockfd1, buff, BUFF_SIZE, 0, (struct sockaddr *) &cliaddr, &addr_len);
-        if(rcvBytes < 0){
-            perror("Error receiving data from client: ");
+        // ------------------------ ACCEPT NEXT CONNECTION -----------------------------
+        // accept connections waiting in the queue
+        // create a new file descriptor
+        connectfd = accept(sockfd, (struct sockaddr *) &cliaddr, &addr_len);
+        if(connectfd < 0){
+            perror(RED "Error accepting new connection from new client" RESET);
             continue;
         }
-        buff[rcvBytes] = '\0';
 
-        // handle "start game" case from client
-        if(strcmp(buff, "Start game") == 0) continue;
+        // store client address into cli_addr variable
+        inet_ntop(AF_INET, (void *) &cliaddr.sin_addr, cli_addr, INET_ADDRSTRLEN);
 
-        // now the last character in buff is \n -> makes the string len + 1, 
-        // we need to remove this character
-        if(buff[strlen(buff) - 1] == '\n') buff[strlen(buff) - 1] = '\0';
+        printf(BLUE "[+] A new connection arrived from [%s:%d], handling this request\n" RESET, cli_addr, ntohs(cliaddr.sin_port));
 
-        // if client address is not in list of players
-        if(!clientInList(&cliaddr)){
-            // store client address into cli_addr variable
-            inet_ntop(AF_INET, (void *) &cliaddr.sin_addr, cli_addr, INET_ADDRSTRLEN);
+        // handle this client's request
+        handleRequest(connectfd, cliaddr, cli_addr);
 
-            printf("A new connection arrived from [%s:%d], creating new player\n", cli_addr, ntohs(cliaddr.sin_port));
+        // close connection with this client
+        close(connectfd);
 
-            // create a new Player, associated the Player with address
-            Player *newPlayer = unserializePlayerInfo(buff, cliaddr);
-
-            // add this player to list of players
-            players = addPlayer(newPlayer);
-
-            // logs out information
-            printf("A new player has been created with id assigned as %d, forking a new process for this client\n", newPlayer->id);
-
-            /*  
-            -----------------------------------------
-            Under development code, do not delete
-            -----------------------------------------
-            // create a new pipe to commnunicate from server -> this client
-            if( pipe(p_to_c[maxPlayer]) == -1){
-                perror("pipe");
-                continue;
-            }
-
-            // create a new pipe from children -> parent to handle communications
-            if( pipe(c_to_p[maxPlayer]) == -1){
-                perror("pipe");
-                continue;
-            }
-
-            // fork a new process to handle this client
-            if( (pids[maxPlayer] = fork()) < 0){
-                perror("fork");
-                continue;
-            } else if(pids[maxPlayer] == 0){
-                // in child process
-                close(p_to_c[maxPlayer][1]); // close the write end of this pipe
-                close(c_to_p[maxPlayer][0]); // close the read end of this pipe
-
-                handleClient(newPlayer);
-
-
-            } else {
-                // in parent process
-                close(p_to_c[maxPlayer][0]); // close the read end of main process
-                close(c_to_p[maxPlayer][1]); // close the write end of this pipe
-
-                continue; // wait for next connection 
-            }
-            */
-        
-
-            // update total number of players
-            maxPlayer++;
-        }
-        
-        // process data received
-        result = buff;
-
-        // print received client address, port and data received
-        //printf("[%s:%d]: %s\n", cli_addr, ntohs(cliaddr.sin_port), buff);
-
-        // send data to client
-        sendBytes = sendto(sockfd1, result, strlen(result), 0, (struct sockaddr *) &cliaddr, addr_len);
-        if(sendBytes < 0){
-            perror("Error sending data to client: ");
-            return 0;
-        }
-
-        
+        // continue handle next request   
     }
 
     return 0;

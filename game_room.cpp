@@ -1,9 +1,19 @@
 #include <stdio.h>
-
-#include"data_structs.cpp"
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <ctype.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include "data_structs.cpp"
 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
-#define SERV_PORT 9999
 
 // Define color escape codes for colorful text
 #define RESET   "\033[0m"
@@ -16,99 +26,41 @@
 #define CYAN    "\033[0;36m"
 #define WHITE   "\033[0;37m"
 
+/*---------------------------------------------
+Defining Player structs
+-----------------------------------------------
+*/
 
-int UDP_PORT[4] = {7070, 7071, 7072, 7073};
-bool usedPort[4]; // to check if the port on the server is used or not
 
-// define list of current game rooms
-Room *rooms = NULL;
-int playerCount = 0; // keep count of total players in the room
+/*---------------------------------------------
+Defining global variables
+-----------------------------------------------
+*/
+
 
 /*---------------------------------------------
 Defining functions
 -----------------------------------------------
 */
 
-// function to find the available port of the server to use for handling client
-// - output: index of port number available, -1 if there are no available ports from server
-int findAvailablePort() {
-    for(int i = 0; i < 4; i++){
-        if(usedPort[i] == false) return i;
-    }
-
-    return -1;
-}
-
 // 
 void updateListPlayer() {
 
 }
 
-// - function to handle case client wants to register
-void sendResponse1(int clientfd){
-
-}
-
-// - function to handle case client wants to login
-void sendResponse2(int clientfd){
-
-}
-// - function to handle case client wants to get list room
-void sendResponse3(int clientfd){
-
-}
-
-// - function to handle case client wants to create room
-void sendResponse4(int clientfd){
+// function to publish player information to all other clients
+// - input: data from a single client that needs to be broadcasted
+// dependencies: 
+void broadCastData(Player player) {
     
-
-}
-
-// - function to handle a request from client
-// 
-// dependencies: sendResponse1, sendResponse2, sendResponse3, sendResponse4, sendResponse5
-void handleRequest(int clientfd, char buff[]) {
-    int recvBytes;
-    char message_type;
-
-    // get first byte to determine which request
-    if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
-        perror("Error");
-    } else if(recvBytes == 0){
-        fprintf(stdout, "Server closes connection\n");
-        return;
-    }
-    message_type = buff[0];
-
-    //
-    if(message_type == '1'){
-        // register request from client
-        // sendResponse1(clientfd);
-
-    } else if(message_type == '2'){
-        // login request from client
-
-    } else if(message_type == '3'){
-        // get list room request from client
-
-    } else if(message_type == '4'){
-        // create room request from client
-        sendResponse4(clientfd);
-
-    } else if(message_type == '5'){
-        // join room request from client
-
-    }
-
-    return;
 }
 
 /*---------------------------------------------
-Main function to handle server logic
+Main function to handle game room logic
 -----------------------------------------------
 */
 
-int main (int argc, char *argv[]) {
+int gameRoom() {
     int cli_udp_port_index; // index of port from server to assign to subprocess to handle client
     pid_t pid; // test pid
     int rcvBytes, sendBytes;
@@ -117,11 +69,11 @@ int main (int argc, char *argv[]) {
     struct sockaddr_in servaddr;
     struct sockaddr_in cliaddr; // list of clients addresses
     socklen_t addr_len = sizeof(struct sockaddr_in); // size of address structure, in this case size of IPv4 structure
+    int SERV_PORT;
     char cli_addr[100];
     char *result; // result string to return to client
     char errorString[10000]; // actual string return to client (used in case of error)
-    char data[500]; 
-    int sockfd; // sockfd for listening on TCP on general server
+    int sockfd;
 
     //Step 1: Construct socket using SOCK_STREAM (TCP)
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
@@ -148,7 +100,7 @@ int main (int argc, char *argv[]) {
         return 1;
     }
 
-    printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP), listening socket id: %d\n" RESET, SERV_PORT, sockfd);
+    printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP)\n" RESET, SERV_PORT);
 
     //Step 4: Accept and handle client connections
     while(1){
@@ -175,14 +127,6 @@ int main (int argc, char *argv[]) {
         // now the last character in buff is \n -> makes the string len + 1, 
         // we need to remove this character
         if(buff[strlen(buff) - 1] == '\n') buff[strlen(buff) - 1] = '\0';
-
-        printf("Received from client: %s\n", buff);
-
-        // handle client request
-        // handleRequest(connectfd, buff);
-
-        // print
-        printf(GREEN "connected socket id: %d\n" RESET, SERV_PORT, connectfd);
 
 
     }

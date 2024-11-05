@@ -148,7 +148,7 @@ Player *addPlayer(Player *player){
 char *serializePlayerInfo(Player *player){
     char *string = (char *) malloc(10000); // string pointer that points to string storing serialized player data
     char strnum[50]; // used for converting integer to array of char
-    char *ip;
+    char ip[INET_ADDRSTRLEN];
     int port;
     
     // append player id
