@@ -11,7 +11,7 @@ BLUE   = \033[34m
 RESET  = \033[0m
 
 # Rule to build executables
-all: server fork_server_test authen_server
+all: server authen_server
 	@echo "$(BLUE)*****Online combat game*****$(RESET)";
 	@echo "How to play: "; 
 	@echo "1. Start C server"; 
@@ -20,11 +20,7 @@ all: server fork_server_test authen_server
 
 server: server.cpp
 	@echo "$(GREEN)Compiling C server code...$(RESET)"; 
-	@g++ -o server.o server.cpp;
-
-fork_server_test: fork_server_test.cpp
-	@echo "$(GREEN)Compiling C fork_server_test...$(RESET)";
-	@g++ -o fork_server_test.o fork_server_test.cpp;
+	@g++ -o server server.cpp;
 
 authen_server: authen_server.cpp
 	@echo  "$(RED)INFO: For compiling authen_server.cpp you need to manually use gcc because of different OS$(RESET)" 
@@ -32,9 +28,8 @@ authen_server: authen_server.cpp
 # Clean rule to remove the executable
 clean:
 	@echo "\n$(GREEN)Cleaning all C binaries..."; 
-	@rm -rf server.o;
-	@rm -rf fork_server_test.o;
-	@rm -rf test.o;
-	@rm -rf authen_server.o;
+	@rm -rf server;
+	@rm -rf fork_server_test;
+	@rm -rf test;
 	@rm -rf authen_server;
 	@echo "Completed cleaning$(RESET)";
