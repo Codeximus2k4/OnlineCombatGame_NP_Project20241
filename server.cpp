@@ -21,7 +21,8 @@ Defining global variables
 -----------------------------------------------
 */
 
-int room_port = 10000; // port for each game room, first used port will be 10000
+int tcp_room_port = 10000; // tcp port for each game room, first used port will be 10000
+int udp_room_port = 20000; // udp port for each game room, first used port will be 20000
 Room *rooms = NULL; // pointer to head of rooms created on server
 Player *logged_in_players = NULL; // pointer to head of logged in players linked list
 int roomCount = 0; // keep track of total rooms created
@@ -30,11 +31,6 @@ int roomCount = 0; // keep track of total rooms created
 Defining functions
 -----------------------------------------------
 */
-
-// 
-void updateListPlayer() {
-
-}
 
 /*---------------------------------------------
 DEFINING RESPONSE FUNCTIONS:
@@ -85,10 +81,10 @@ void sendResponse3(int connectfd){
 }
 
 // - function to handle case client wants to create room
-// - input: socket descriptor connected to client, room_id, room_port
+// - input: socket descriptor connected to client, room_id, tcp port of room
 // - this function will send information of newly created room (response type 4) for client to connect
 // - IMPORTANT NOTE: request type is in char, status is in char, however room_id is ASCII value
-void sendResponse4(int connectfd, int room_id, int room_udp_port){
+void sendResponse4(int connectfd, int room_id, int room_tcp_port){
     char data[500];
     int sendBytes;
 
@@ -100,11 +96,10 @@ void sendResponse4(int connectfd, int room_id, int room_udp_port){
     // set first byte of packet to length of the data 
     data[2] = (char) room_id; // third byte is room_id, note that this is ASCII value of character, e.g: '0' will be 48 in value
 
-    // convert UDP port of room network byte (2 bytes) because there are 65536 ports
-    uint16_t byte_room_port = htons(room_udp_port);
-
+    // convert TCP port of room network byte (2 bytes) because there are 65536 ports
+    uint16_t byte_room_tcp_port = htons(room_tcp_port);
     // append these 2 bytes to response packet
-    memcpy(data + 3, &byte_room_port, 2);
+    memcpy(data + 3, &byte_room_tcp_port, 2);
 
     // send to client (5 bytes)
     if( (sendBytes = send(connectfd, data, 5, 0)) < 0){
@@ -112,12 +107,54 @@ void sendResponse4(int connectfd, int room_id, int room_udp_port){
     };
     
     // print to check
-    printf(YELLOW "Number of bytes sent to client=%d, type=%c, status=%c, room_id=%c, port=%d\n" RESET, sendBytes, data[0], data[1], data[2], room_udp_port);
+    printf(YELLOW "Bytes sent to client=%d, type=%c, status=%c, room_id=%d, tcp_port=%d\n" RESET, sendBytes, data[0], data[1], data[2], room_tcp_port);
 }
 
 // - function to handle case client wants to join room
-void sendResponse5(int connectfd){
+// - input: socket descriptor connected to client, status, room_id, tcp port of room
+// - this function will send information of existed room (response type 5) for client to connect
+// - IMPORTANT NOTE: request type is in char, status is in char, however room_id is ASCII value
+void sendResponse5(int connectfd, int status, int room_id, int room_tcp_port){
+    char data[500];
+    int sendBytes;
+
+    memset(data, 0, sizeof(data));
+
+    // init data
+    data[0] = '5'; // first byte is request type
+    data[1] = status + '0'; // second byte is status
     
+    // check if status = 0
+    if(status == 0){
+        // send to client (2 bytes only)
+        if( (sendBytes = send(connectfd, data, 2, 0)) < 0){
+            perror("Error");
+        };
+
+        // print to check
+        printf(YELLOW "Bytes sent to client=%d, type=%c, status=%c, room_id=%d, tcp_port=%d\n" RESET, sendBytes, data[0], data[1], data[2], room_tcp_port);
+
+        return;
+    }   
+
+    // else status = 1
+    
+    // set first byte of packet to length of the data 
+    data[2] = (char) room_id; // third byte is room_id, note that this is ASCII value of character, e.g: '0' will be 48 in value
+
+    // convert TCP port of room network byte (2 bytes) because there are 65536 ports
+    uint16_t byte_room_tcp_port = htons(room_tcp_port);
+    // append these 2 bytes to response packet
+    memcpy(data + 3, &byte_room_tcp_port, 2);
+
+    // send to client (5 bytes)
+    if( (sendBytes = send(connectfd, data, 5, 0)) < 0){
+        perror("Error");
+    };
+    
+    // print to check
+    printf(YELLOW "Bytes sent to client=%d, type=%c, status=%c, room_id=%d, tcp_port=%d\n" RESET, sendBytes, data[0], data[1], data[2], room_tcp_port);
+
 }
 
 // - function to handle a request from client
@@ -134,7 +171,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
     if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
         perror("Error");
     } else if(recvBytes == 0){
-        fprintf(stdout, "Server closes connection\n");
+        fprintf(stdout, "Client closes connection\n");
         return;
     }
     message_type = buff[0];
@@ -144,10 +181,16 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
 
     if(message_type == '1'){
         // register request from client
+
+        // update database
+
+        // send response back to client
         // sendResponse1(clientfd);
 
     } else if(message_type == '2'){
         // login request from client
+
+        // update list of 
 
     } else if(message_type == '3'){
         // get list room request from client
@@ -157,9 +200,18 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
         // create room request from client
         int room_id = roomCount; // set room_id
 
+        // get player id
+        if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+            perror("Error");
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int player_id = buff[0] - '0';
+
         // create room and add room to list of rooms
-        // note that first room_port will be 10000
-        Room *room = makeRoom(room_id, room_port);
+        // note that first tcp_udp_room will be 10000 udp_room_port will be 20000
+        Room *room = makeRoom(room_id, tcp_room_port, udp_room_port);
         rooms = addRoom(rooms, room);
 
         // fork a new game room
@@ -170,28 +222,79 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
         }
         else if(pid == 0){
             // child process:
-            printf(BLUE "[+] Created a new game room with id = %d, udp_port used is: %d\n" RESET, roomCount, room_port, cli_addr, ntohs(cliaddr.sin_port));
+            // close connection on this client
+            close(connectfd);
 
-            // gameRoom();
+            printf(BLUE "[+] Created a new game room with id = %d, tcp_port is: %d, udp_port is: %d\n" RESET, roomCount, tcp_room_port, udp_room_port, cli_addr, ntohs(cliaddr.sin_port));
+
+            // ------------------------ GAME ROOM SERVER -----------------------------
+            // now game room server is created, game room server will listen
+            // on another socket with another port separated from main server
+            gameRoom(tcp_room_port, udp_room_port);
             
             // kill this subprocess after room closes
-            return;
+            exit(0);
         } else{ // pid > 0
             // parent process
 
             // notify back to client
-            sendResponse4(connectfd, room_id, room_port);
+            sendResponse4(connectfd, room_id, tcp_room_port);
 
-            // update room count and room port 
+            // add this player to the room
+            Player *p = makePlayer(player_id, cliaddr);
+            addPlayerToRoom(rooms, room_id, p);
+
+            // update room count and room ports
             roomCount++;
-            room_port++;
+            tcp_room_port++;
+            udp_room_port++;
 
             // exit function right after this
         }
     } else if(message_type == '5'){
         // join room request from client
 
+        // get player id
+        if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+            perror("Error");
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int player_id = buff[0] - '0';
 
+        // get room id
+        if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+            perror("Error");
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int room_id = buff[0] - '0';
+
+        // check if client can join this room
+        Room *room = findRoomById(rooms, room_id);
+        int status;
+        if(countPlayerInRoom(room) >= 4){
+            status = 0;
+        } else {
+            status = 1;
+        }
+
+        // if player can join
+        if(status == 1){
+            // add this player to the room
+            Player *p = makePlayer(player_id, cliaddr);
+            addPlayerToRoom(rooms, room_id, p);
+
+            // send response back to client
+            sendResponse5(connectfd, status, room_id, tcp_room_port);
+        } else {
+            // player cannot join because room full
+
+            // send response back to client
+            sendResponse5(connectfd, status, room_id, tcp_room_port);
+        }
     }
 
     return;
@@ -203,7 +306,6 @@ Main function to handle server logic
 */
 
 int main (int argc, char *argv[]) {
-    int cli_udp_port_index; // index of port from server to assign to subprocess to handle client
     pid_t pid; // test pid
     int rcvBytes, sendBytes;
     int connectfd;

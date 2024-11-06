@@ -27,11 +27,13 @@ struct Player {
 };
 
 // int id;
+// int tcp_port; // TCP port assign for each game room to handle client connection
 // int udp_port; // UDP port assign for each game room to transfer data
 // Player *players; // store the head pointer to the list of Players in this room
 // Room *next;
 struct Room {
     int id;
+    int tcp_port; // TCP port assign for each game room to handle client connection
     int udp_port; // UDP port assign for each game room to transfer data
 
     Player *players; // store the head pointer to the list of Players in this room
@@ -135,12 +137,13 @@ Room *addRoom(Room *head, Room *room) {
 }
 
 // - make a new Room based on the information provided
-// - input: room's id and udp_port, players pointer will be initilized as NULL, call addPlayer() to add player to a room
+// - input: room's id, tcp_port, udp_port, players pointer of Room will be initilized as NULL, call addPlayer() to add player to a room
 // - output: pointer to a new Room
 // - dependencies: none
-Room *makeRoom(int id, int udp_port){
+Room *makeRoom(int id, int tcp_port, int udp_port){
     Room *p = (Room *) malloc(sizeof(Room));
     p->id = id;
+    p->tcp_port = udp_port;
     p->udp_port = udp_port;
 
     p->players = NULL;
@@ -232,3 +235,21 @@ void serializeRoomInformation(char result[], Room *head){
     // printf("totalRooms=%d\n", totalRooms);
     // printf("result=%s\n", result);
 }
+
+// - function to find room by id
+// - input: head pointer to list of rooms, room_id
+// - output: pointer to the room, NULL if doesn't exist room with the id
+// - dependencies: none
+Room *findRoomById(Room *head, int room_id){
+    if(head == NULL) return NULL;
+    
+    Room *p = head;
+    while(p != NULL){
+        if(p->id == room_id) {
+            break;
+        }
+    }
+
+    return p;
+}
+
