@@ -3,6 +3,16 @@
 # make all: compile all C source files into binaries
 # make clean: clean all C binaries
 
+#For ubuntu: gcc -o server server.cpp -I/usr/include/postgresql -L/usr/lib -lpq
+
+
+# brew install postgresql
+
+# GCC command for Mac (Hieu): (after install postgres with brew)
+
+# g++ -I/usr/local//Cellar/libpq/16.4/include/ -L/usr/local/Cellar/libpq/16.4/lib/ -lpq -o server server.cpp
+ 
+
 # Define color codes
 RED    = \033[31m
 GREEN  = \033[32m

@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include "game_room.cpp"
-// #include "data_structs.cpp"
+//#include "data_structs.cpp"
+
+#include "db_connection.cpp"
+#include <libpq-fe.h> //library to connect to postgresql
+
 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 
@@ -46,12 +50,50 @@ void sendNotLoggedInResponse(int connectfd){
 }
 
 // - function to handle case client wants to register
-void sendResponse1(int connectfd){
+// - input: socket descriptor to client, register status (0 - fail, 1 - success)
+// - this function sends response in format: [1][status]
+void sendResponse1(int connectfd, char status){
+    char data[5];
+    int sendBytes;
+
+    data[0] = '1';
+    data[1] = status;
+
+    // send to client (2 bytes)
+    if( (sendBytes = send(connectfd, data, 2, 0)) < 0){
+        perror("Error");
+    };
     
+    // print to check
+    printf(YELLOW "Number of bytes sent to client=%d\n" RESET, sendBytes);
+
 }
 
 // - function to handle case client wants to login
-void sendResponse2(int connectfd){
+// - input: socket descriptor to client, login status (0 - fail, 1 - success), user id of the loggin client
+// - this function sends response in format: [2][status][user_id], where user_id only exists when logging in successfully
+void sendResponse2(int connectfd, char status, char user_id){
+    char data[5];
+    int sendBytes;
+
+    data[0] = '2';
+    data[1] = status;
+    if (user_id > 0) { //login succesfully
+        data[2] = user_id;
+        // send to client (3 bytes)
+        if( (sendBytes = send(connectfd, data, 3, 0)) < 0){
+            perror("Error");
+        };
+    }
+    else { //login fail
+        // send to client (2 bytes)
+        if( (sendBytes = send(connectfd, data, 2, 0)) < 0){ //if login fail, user_id field doesnt exist in message
+            perror("Error");
+        };
+    }
+
+    // print to check
+    printf(YELLOW "Number of bytes sent to client=%d\n" RESET, sendBytes);
 
 }
 // - function to handle case client wants to get list room
@@ -157,6 +199,8 @@ void sendResponse5(int connectfd, int status, int room_id, int room_tcp_port){
 
 }
 
+
+
 // - function to handle a request from client
 // - input: socket descriptor connected with client, 
 // - dependencies: sendResponse1, sendResponse2, sendResponse3, sendResponse4, sendResponse5
@@ -181,16 +225,134 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
 
     if(message_type == '1'){
         // register request from client
+        char username[200];
+        int username_length;
+        char password[200];
+        int password_length;
 
-        // update database
+        //get username_length
+        if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+            perror("Error");
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
 
+        username_length = buff[0];
+
+        // check if username string is empty
+        if(username_length != 0){
+            // now extract username
+            if( (recvBytes = recv(connectfd, buff, username_length, 0)) < 0){
+                perror("Error");
+            } 
+            buff[recvBytes] = '\0';
+            strcpy(username, buff);
+        }
+
+        //get password_length
+        if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+            perror("Error");
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+
+        password_length = buff[0];
+
+        // check if password string is empty
+        if(password_length != 0){
+            // now extract password
+            if( (recvBytes = recv(connectfd, buff, password_length, 0)) < 0){
+                perror("Error");
+            } 
+            buff[recvBytes] = '\0';
+            strcpy(password, buff);
+        }
+
+        //connect database
+        char status;
+        PGconn *conn = connect_db();
+        if (add_user(username, password, conn)) { //register succesfully
+            status = 1;
+        }
+        else status = 0; //register fail
         // send response back to client
-        // sendResponse1(clientfd);
+        sendResponse1(connectfd, status);
+        // close db
+        close_db(conn);
 
+        
     } else if(message_type == '2'){
         // login request from client
+        char username[200];
+        int username_length;
+        char password[200];
+        int password_length;
 
-        // update list of 
+        //get username_length
+        if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+            perror("Error");
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+
+        username_length = buff[0];
+
+        // check if username string is empty
+        if(username_length != 0){
+            // now extract username
+            if( (recvBytes = recv(connectfd, buff, username_length, 0)) < 0){
+                perror("Error");
+            } 
+            buff[recvBytes] = '\0';
+            strcpy(username, buff);
+        }
+
+        //get password_length
+        if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+            perror("Error");
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+
+        password_length = buff[0];
+
+        // check if password string is empty
+        if(password_length != 0){
+            // now extract password
+            if( (recvBytes = recv(connectfd, buff, password_length, 0)) < 0){
+                perror("Error");
+            } 
+            buff[recvBytes] = '\0';
+            strcpy(password, buff);
+        }
+
+        
+        char status;
+        char user_id;
+        PGconn *conn = connect_db();
+        if (check_user(username, password, conn)) { //login succesfully
+            status = 1;
+            user_id = get_user_id(username, conn);
+
+            // send response back to client
+            sendResponse2(connectfd, status, user_id);
+
+            //add a new player to the logged_in_players list
+            Player *new_player = makePlayer(user_id, cliaddr);
+            logged_in_players = addPlayerToLoginList(logged_in_players, new_player);
+        }
+        else { //login fail
+            status = 0; 
+            user_id = -1;
+            // send response back to client
+            sendResponse2(connectfd, status, user_id);
+        }
+
+        close_db(conn);
 
     } else if(message_type == '3'){
         // get list room request from client
