@@ -193,7 +193,7 @@ int gameRoom(int TCP_SERV_PORT, int UDP_SERV_PORT) {
             if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
                 perror("Error");
             }
-            int player_id = buff[0] - '0';
+            int player_id = buff[0];
 
             // add this client to list of players
             Player *p = makePlayer(player_id, cliaddr);
