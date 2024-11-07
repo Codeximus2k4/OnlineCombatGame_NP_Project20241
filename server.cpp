@@ -352,8 +352,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
             sendResponse2(connectfd, status, user_id);
         }
 
-
-
+        // update list of players 
 
     } else if(message_type == '3'){
         // get list room request from client
