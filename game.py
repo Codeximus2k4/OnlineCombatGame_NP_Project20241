@@ -57,6 +57,185 @@ class Game:
 
     def get_font(self, size):  # Returns Press-Start-2P in the desired size
         return pygame.font.Font(FONT_PATH, size)
+    
+    def login_register(self):
+        # Constants
+        BG_PATH = "data/images/menuAssets/Background.png"
+        FONT_PATH = "data/images/menuAssets/font.ttf"
+        SCREEN_WIDTH, SCREEN_HEIGHT = 400, 300
+        WHITE = (255, 255, 255)
+        RED = (255, 0, 0)
+        BLACK = (0, 0, 0)
+        COLOR_ACTIVE = pygame.Color('lightskyblue3')
+        COLOR_PASSIVE = pygame.Color('white')
+        DISPLAY_LIMIT = 10  # Display only the last 10 characters
+        BUFF_SIZE = 1024
+        SERVER_ADDR = "127.0.0.1"
+        SERVER_PORT = 5500
+
+        # Initialize Pygame and Font
+        pygame.init()
+        clock = pygame.time.Clock()
+        screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
+        base_font = pygame.font.Font(FONT_PATH, 15)
+        base_bg = pygame.image.load(BG_PATH)
+
+        # Interface Mode (login or register)
+        mode = "login"
+
+        # Input Field Setup
+        username_text = ""
+        password_text = ""
+        active_input = None  # Track which input is active
+
+        # Rectangles for Input Fields and Buttons
+        username_rect = pygame.Rect(120, 100, 170, 32)
+        password_rect = pygame.Rect(120, 150, 170, 32)
+        login_button_rect = pygame.Rect(50, 200, 130, 32)
+        register_button_rect = pygame.Rect(230, 200, 130, 32)
+
+        # Cursor settings
+        cursor_visible = True
+        cursor_timer = 0
+        cursor_flash_rate = 500  # Milliseconds
+
+        self.client_socket.connect((SERVER_ADDR, SERVER_PORT))
+
+        def render_text(text, font, color):
+            return font.render(text, True, color)
+        
+        def login_register_request(username, password, mode=mode):
+            # message components
+            request_type = ""
+            user_name = username
+            pass_word = password
+
+            # define request type
+            if mode == "login":
+                request_type = "1"
+            else:
+                request_type = "2"
+
+            # Convert components to bytes
+            request_type_byte = request_type.encode("ascii")
+            username_length_byte = len(username).to_bytes(1, "big")
+            username_data = user_name.encode("ascii")
+            password_length_byte = len(password).to_bytes(1, "big")
+            password_data = password.encode("ascii")
+
+            # Combine all components into a single message
+            message = request_type_byte + username_length_byte + username_data + \
+                password_length_byte + password_data
+            
+            # Send the message to the server
+            self.client_socket.send(message)
+
+            # Receive the response
+            response = self.client_socket.recv(BUFF_SIZE)
+
+            return response.decode()
+            
+
+        while True:
+            screen.blit(base_bg, (0,0))
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                # Handle mouse click
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if username_rect.collidepoint(event.pos):
+                        active_input = "username"
+                    elif password_rect.collidepoint(event.pos):
+                        active_input = "password"
+                    elif login_button_rect.collidepoint(event.pos):
+                        if mode == "login":
+                            print("Attempting to log in with:", username_text, password_text)
+                            response = login_register_request(username=username_text, password=password_text, mode=mode)
+                        else:
+                            mode = "login"
+                    elif register_button_rect.collidepoint(event.pos):
+                        if mode == "register":
+                            print("Attempting to register with:", username_text, password_text)
+                            response = login_register_request(username=username_text, password=password_text, mode=mode)
+                        else:
+                            mode = "register"
+                    else:
+                        active_input = None
+
+                # Handle keyboard input
+                if event.type == pygame.KEYDOWN:
+                    if active_input == "username":
+                        if event.key == pygame.K_BACKSPACE:
+                            username_text = username_text[:-1]
+                        else:
+                            username_text += event.unicode
+                    elif active_input == "password":
+                        if event.key == pygame.K_BACKSPACE:
+                            password_text = password_text[:-1]
+                        else:
+                            password_text += event.unicode
+
+            # Blinking cursor logic
+            cursor_timer += clock.get_time()
+            if cursor_timer >= cursor_flash_rate:
+                cursor_timer = 0
+                cursor_visible = not cursor_visible
+
+            # Input boxes and their colors
+            username_color = COLOR_ACTIVE if active_input == "username" else COLOR_PASSIVE
+            password_color = COLOR_ACTIVE if active_input == "password" else COLOR_PASSIVE
+            pygame.draw.rect(screen, username_color, username_rect)
+            pygame.draw.rect(screen, password_color, password_rect)
+
+            # Render text for input fields with DISPLAY_LIMIT
+            username_display_text = username_text[-DISPLAY_LIMIT:]  # Display only the last 10 characters
+            password_display_text = "*" * len(password_text[-DISPLAY_LIMIT:])
+            username_surface = base_font.render(username_display_text, True, BLACK)
+            password_surface = base_font.render(password_display_text, True, BLACK)
+            screen.blit(username_surface, (username_rect.x + 5, username_rect.y + 10))
+            screen.blit(password_surface, (password_rect.x + 5, password_rect.y + 10))
+
+            # Draw the blinking cursor in active input box
+            if cursor_visible:
+                if active_input == "username":
+                    cursor_x = username_rect.x + 5 + username_surface.get_width() + 2
+                    pygame.draw.line(screen, WHITE, (cursor_x, username_rect.y + 5), (cursor_x, username_rect.y + 27), 2)
+                elif active_input == "password":
+                    cursor_x = password_rect.x + 5 + password_surface.get_width() + 2
+                    pygame.draw.line(screen, WHITE, (cursor_x, password_rect.y + 5), (cursor_x, password_rect.y + 27), 2)
+
+            # Draw buttons and labels
+            # Create semi-transparent surfaces for the buttons
+            login_button_surface = pygame.Surface((login_button_rect.width, login_button_rect.height), pygame.SRCALPHA)
+            register_button_surface = pygame.Surface((register_button_rect.width, register_button_rect.height), pygame.SRCALPHA)
+
+            # Set the alpha value (0 is fully transparent, 255 is fully opaque)
+            login_button_surface.set_alpha(150)  # Adjust the value for desired transparency
+            register_button_surface.set_alpha(150)
+
+            # Fill the button surfaces with a color (with an alpha value already set)
+            login_button_surface.fill(COLOR_PASSIVE)
+            register_button_surface.fill(COLOR_PASSIVE)
+
+            # Blit the semi-transparent button surfaces onto the main screen
+            screen.blit(login_button_surface, (login_button_rect.x, login_button_rect.y))
+            screen.blit(register_button_surface, (register_button_rect.x, register_button_rect.y))
+            login_label = render_text("Login", base_font, WHITE)
+            register_label = render_text("Register", base_font, WHITE)
+            screen.blit(login_label, (login_button_rect.x + 20, login_button_rect.y + 10))
+            screen.blit(register_label, (register_button_rect.x + 10, register_button_rect.y + 10))
+
+            # Display login or register text
+            title = "Login" if mode == "login" else "Register"
+            screen.blit(render_text(title.upper(), base_font, COLOR_PASSIVE), (SCREEN_WIDTH // 2 - 30, 50))
+
+            # Update screen and set frame rate
+            pygame.display.update()
+            clock.tick(60)
+
+
 
     def menu(self):
         self.screen = pygame.display.set_mode((960,720))
