@@ -9,7 +9,7 @@ PGconn *connect_db() {
     //////////////////////DB connection///////////////////////////
     // Connect to the database
 
-    char conninfo[100]= "host=localhost port=5432 dbname=users user=postgres password=postgres";
+    char conninfo[100]= "host=localhost port=5432 dbname=game_users user=postgres password=postgres";
 
     // Create a connection
     PGconn *conn = PQconnectdb(conninfo);

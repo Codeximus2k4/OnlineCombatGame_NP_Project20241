@@ -544,7 +544,7 @@ int main (int argc, char *argv[]) {
         printf(BLUE "[+] A new connection arrived from [%s:%d], handling this request\n" RESET, cli_addr, ntohs(cliaddr.sin_port));
 
         // handle this client's request
-        handleRequest(connectfd, cliaddr, cli_addr);
+        handleRequest(connectfd, cliaddr, cli_addr, conn);
 
         // close connection with this client
         close(connectfd);
