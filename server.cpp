@@ -223,7 +223,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
     // print request type
     printf(BLUE "[+] Request type %c from [%s:%d]\n" RESET, message_type, cli_addr, ntohs(cliaddr.sin_port));
 
-    if(message_type == '1'){
+    if(message_type == 1){
         // register request from client
         char username[200];
         int username_length;
@@ -283,7 +283,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
         close_db(conn);
 
         
-    } else if(message_type == '2'){
+    } else if(message_type == 2){
         // login request from client
         char username[200];
         int username_length;
@@ -354,11 +354,11 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
 
         close_db(conn);
 
-    } else if(message_type == '3'){
+    } else if(message_type == 3){
         // get list room request from client
         sendResponse3(connectfd);
 
-    } else if(message_type == '4'){
+    } else if(message_type == 4){
         // create room request from client
         int room_id = roomCount; // set room_id
 
@@ -413,7 +413,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
 
             // exit function right after this
         }
-    } else if(message_type == '5'){
+    } else if(message_type == 5){
         // join room request from client
 
         // get player id
