@@ -207,7 +207,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
             fprintf(stdout, "Client closes connection\n");
             return;
         }
-        int player_id = buff[0] - '0';
+        int player_id = buff[0];
 
         // create room and add room to list of rooms
         // note that first tcp_udp_room will be 10000 udp_room_port will be 20000
@@ -261,7 +261,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
             fprintf(stdout, "Client closes connection\n");
             return;
         }
-        int player_id = buff[0] - '0';
+        int player_id = buff[0];
 
         // get room id
         if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
