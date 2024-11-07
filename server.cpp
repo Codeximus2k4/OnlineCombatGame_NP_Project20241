@@ -206,9 +206,9 @@ void sendResponse5(int connectfd, int status, int room_id, int room_tcp_port){
 
 
 // - function to handle a request from client
-// - input: socket descriptor connected with client, 
+// - input: socket descriptor connected with client, users db connection
 // - dependencies: sendResponse1, sendResponse2, sendResponse3, sendResponse4, sendResponse5
-void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
+void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *conn) {
     int recvBytes;
     char message_type;
     char buff[500];
@@ -276,17 +276,12 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
 
         int status;
 
-        //connect to users db
-        PGconn *conn = connect_db();
-
         if (add_user(username, password, conn)) { //register succesfully
             status = 1;
         }
         else status = 0; //register fail
         // send response back to client
         sendResponse1(connectfd, status);
-
-        close_db(conn);
         
     } else if(message_type == '2'){
         // login request from client
@@ -339,9 +334,6 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
         int status;
         int user_id;
 
-        //connect to users db
-        PGconn *conn = connect_db();
-
         if (check_user(username, password, conn)) { //login succesfully
             status = 1;
             user_id = get_user_id(username, conn);
@@ -360,7 +352,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
             sendResponse2(connectfd, status, user_id);
         }
 
-        close_db(conn);
+
 
 
     } else if(message_type == '3'){
@@ -505,6 +497,9 @@ int main (int argc, char *argv[]) {
         return 1;
     }
 
+    //connect to users db
+    PGconn *conn = connect_db();
+
     //Step 1: Construct socket using SOCK_STREAM (TCP)
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
         perror("Error constructing socket: ");
@@ -557,6 +552,8 @@ int main (int argc, char *argv[]) {
 
         // continue handle next request   
     }
+
+    close_db(conn);
 
     return 0;
 }

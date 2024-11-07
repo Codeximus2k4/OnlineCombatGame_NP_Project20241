@@ -7,29 +7,9 @@
 // - init db: db-data/db-init.sql 
 PGconn *connect_db() {
     //////////////////////DB connection///////////////////////////
-
-    //input db infomation
-    char host[20], port[5], dbname[20], user[20], password[20];
-
-    printf("Enter user (enter postgres for default user): "); //u can use default user = postgres
-    scanf("%s", user);
-    printf("Enter password: ");
-    fflush(stdin);
-    scanf("%s", password); 
-
     // Connect to the database
-    // conninfo is a string of keywords and values separated by spaces.
-    char conninfo[100];
-    
-    strcpy(conninfo, "host=localhost port=5432 dbname=game_users"); 
-    strcat(conninfo, " user="); 
-    strcat(conninfo, user);
-    strcat(conninfo, " password=");
-    strcat(conninfo, password);
-    
-    printf("%s\n", conninfo);
 
-    //char conninfo[100 ]= "host=localhost port=5432 dbname=users user=postgres password=@Ngo1702";
+    char conninfo[100]= "host=localhost port=5432 dbname=users user=postgres password=postgres";
 
     // Create a connection
     PGconn *conn = PQconnectdb(conninfo);
