@@ -28,33 +28,6 @@ class Game:
         self.background_offset_y = -80
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def serializePlayerInfo(self):
-        """
-        Concatenates all relevant information of a Player object into a string.
-
-        Args:
-            player: A Player object representing the player's data.
-
-        Returns:
-            A string containing player information in a well-formatted way.
-        """
-
-        # Extract relevant information from the Player object
-        id = self.player.id
-        entity_type = self.player.entity_type
-        pos = self.player.pos
-
-        if(self.player.flip is True): flip = 1
-        else: flip = 0
-
-        action = self.player.action
-        frame =  self.player.animation.frame
-
-        # Format the information into a string with clear labels
-        info_string = f"{id}|{entity_type}|{pos[0]}|{pos[1]}|{flip}|{action}"    # send the existed info according to format message of server
-
-        return info_string
-
     def get_font(self, size):  # Returns Press-Start-2P in the desired size
         return pygame.font.Font(FONT_PATH, size)
     
@@ -66,6 +39,8 @@ class Game:
         WHITE = (255, 255, 255)
         RED = (255, 0, 0)
         BLACK = (0, 0, 0)
+        GREEN = (0, 128, 0)
+        BROWN = (182,143,64)
         COLOR_ACTIVE = pygame.Color('lightskyblue3')
         COLOR_PASSIVE = pygame.Color('white')
         DISPLAY_LIMIT = 10  # Display only the last 10 characters
@@ -79,6 +54,7 @@ class Game:
         screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
         base_font = pygame.font.Font(FONT_PATH, 15)
         base_bg = pygame.image.load(BG_PATH)
+        response_font = pygame.font.Font(FONT_PATH, 12)
 
         # Interface Mode (login or register)
         mode = "login"
@@ -91,16 +67,16 @@ class Game:
         # Rectangles for Input Fields and Buttons
         username_rect = pygame.Rect(120, 100, 170, 32)
         password_rect = pygame.Rect(120, 150, 170, 32)
-        login_button_rect = pygame.Rect(50, 200, 130, 32)
-        register_button_rect = pygame.Rect(230, 200, 130, 32)
+        login_button_rect = pygame.Rect(50, 250, 135, 32)
+        register_button_rect = pygame.Rect(230, 250, 135, 32)
 
         # Cursor settings
         cursor_visible = True
         cursor_timer = 0
         cursor_flash_rate = 500  # Milliseconds
 
-        self.client_socket.connect((SERVER_ADDR, SERVER_PORT))
-
+        
+        
         def render_text(text, font, color):
             return font.render(text, True, color)
         
@@ -111,10 +87,10 @@ class Game:
             pass_word = password
 
             # define request type
-            if mode == "login":
-                request_type = "2"
-            else:
+            if mode == "register":
                 request_type = "1"
+            else:
+                request_type = "2"
 
             # Convert components to bytes
             request_type_byte = request_type.encode("ascii")
@@ -127,6 +103,10 @@ class Game:
             message = request_type_byte + username_length_byte + username_data + \
                 password_length_byte + password_data
             
+            # Connect the socket to the server
+            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.client_socket.connect((SERVER_ADDR, SERVER_PORT))
+            
             # Send the message to the server
             self.client_socket.send(message)
 
@@ -135,7 +115,8 @@ class Game:
 
             return response.decode()
             
-
+        response_text = ""
+        response_flag = True # flag to to distinguish successful response and successful response
         while True:
             screen.blit(base_bg, (0,0))
             for event in pygame.event.get():
@@ -152,13 +133,31 @@ class Game:
                     elif login_button_rect.collidepoint(event.pos):
                         if mode == "login":
                             print("Attempting to log in with:", username_text, password_text)
+                            
+                            # get response of login request
                             response = login_register_request(username=username_text, password=password_text, mode=mode)
+                            print(response)
+                            if response[1] == "1": 
+                                self.menu()
+                                response_flag = True
+                            else:
+                                response_text = "Unsuccessfully login"
+                                response_flag = False
                         else:
                             mode = "login"
                     elif register_button_rect.collidepoint(event.pos):
                         if mode == "register":
                             print("Attempting to register with:", username_text, password_text)
+                            
+                            # get response of register request
                             response = login_register_request(username=username_text, password=password_text, mode=mode)
+                            print(response)
+                            if response[1] == "1":
+                                mode = "login"
+                                response_flag = True
+                            else:
+                                response_text = "Unsuccessfully register"
+                                response_flag = False
                         else:
                             mode = "register"
                     else:
@@ -224,13 +223,19 @@ class Game:
             screen.blit(register_button_surface, (register_button_rect.x, register_button_rect.y))
             login_label = render_text("Login", base_font, WHITE)
             register_label = render_text("Register", base_font, WHITE)
-            screen.blit(login_label, (login_button_rect.x + 20, login_button_rect.y + 10))
+            screen.blit(login_label, (login_button_rect.x + 30, login_button_rect.y + 10))
             screen.blit(register_label, (register_button_rect.x + 10, register_button_rect.y + 10))
 
             # Display login or register text
-            title = "Login" if mode == "login" else "Register"
-            screen.blit(render_text(title.upper(), base_font, COLOR_PASSIVE), (SCREEN_WIDTH // 2 - 30, 50))
+            title = mode
+            screen.blit(render_text(title.upper(), base_font, BROWN), (SCREEN_WIDTH // 2 - 30, 50))
 
+            # Display response after login and register
+            if response_flag:
+                screen.blit(render_text(response_text, response_font, GREEN), (120, 200))
+            else:
+                screen.blit(render_text(response_text, response_font, RED), (120, 200))
+            
             # Update screen and set frame rate
             pygame.display.update()
             clock.tick(60)
@@ -301,6 +306,7 @@ class Game:
         self.entities.append(self.player2)
 
         message = "Start game"
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(("127.0.0.1", 5500))
         self.client_socket.send(message.encode("utf-8"))
         bufferSize = 1024
