@@ -141,7 +141,7 @@ int add_user(const char *username, const char *password, PGconn *conn) {
 // output 
 // - user_id if the user is found
 // - -1 if user not found
-char get_user_id(const char *username, PGconn *conn) {
+int get_user_id(const char *username, PGconn *conn) {
     // SQL query to get user_id
     const char *query = "SELECT id FROM users WHERE username = $1";
     const char *paramValues[1];
@@ -164,7 +164,7 @@ char get_user_id(const char *username, PGconn *conn) {
     }
 
     // Retrieve the user_id from the query result
-    char user_id = (char)atoi(PQgetvalue(res, 0, 0));
+    int user_id = atoi(PQgetvalue(res, 0, 0));
 
     // Clean up
     PQclear(res);

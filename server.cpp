@@ -41,6 +41,10 @@ DEFINING RESPONSE FUNCTIONS:
 - note that all of the below response functions are only
 responsible for sending data from server to client,
 does not handle logic
+- data type: 
+    + respond_type: char (eg: '1')
+    + status: char (eg: '1')
+    + id: int (eg: 1)
 -----------------------------------------------
 */
 
@@ -52,12 +56,12 @@ void sendNotLoggedInResponse(int connectfd){
 // - function to handle case client wants to register
 // - input: socket descriptor to client, register status (0 - fail, 1 - success)
 // - this function sends response in format: [1][status]
-void sendResponse1(int connectfd, char status){
+void sendResponse1(int connectfd, int status){
     char data[5];
     int sendBytes;
 
     data[0] = '1';
-    data[1] = status;
+    data[1] = status + '0';
 
     // send to client (2 bytes)
     if( (sendBytes = send(connectfd, data, 2, 0)) < 0){
@@ -72,14 +76,14 @@ void sendResponse1(int connectfd, char status){
 // - function to handle case client wants to login
 // - input: socket descriptor to client, login status (0 - fail, 1 - success), user id of the loggin client
 // - this function sends response in format: [2][status][user_id], where user_id only exists when logging in successfully
-void sendResponse2(int connectfd, char status, char user_id){
+void sendResponse2(int connectfd, int status, int user_id){
     char data[5];
     int sendBytes;
 
     data[0] = '2';
-    data[1] = status;
+    data[1] = status + '0';
     if (user_id > 0) { //login succesfully
-        data[2] = user_id;
+        data[2] = (char) user_id;
         // send to client (3 bytes)
         if( (sendBytes = send(connectfd, data, 3, 0)) < 0){
             perror("Error");
@@ -223,7 +227,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
     // print request type
     printf(BLUE "[+] Request type %c from [%s:%d]\n" RESET, message_type, cli_addr, ntohs(cliaddr.sin_port));
 
-    if(message_type == 1){
+    if(message_type == '1'){
         // register request from client
         char username[200];
         int username_length;
@@ -270,20 +274,21 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
             strcpy(password, buff);
         }
 
-        //connect database
-        char status;
+        int status;
+
+        //connect to users db
         PGconn *conn = connect_db();
+
         if (add_user(username, password, conn)) { //register succesfully
             status = 1;
         }
         else status = 0; //register fail
         // send response back to client
         sendResponse1(connectfd, status);
-        // close db
-        close_db(conn);
 
+        close_db(conn);
         
-    } else if(message_type == 2){
+    } else if(message_type == '2'){
         // login request from client
         char username[200];
         int username_length;
@@ -331,9 +336,12 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
         }
 
         
-        char status;
-        char user_id;
+        int status;
+        int user_id;
+
+        //connect to users db
         PGconn *conn = connect_db();
+
         if (check_user(username, password, conn)) { //login succesfully
             status = 1;
             user_id = get_user_id(username, conn);
@@ -354,11 +362,12 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
 
         close_db(conn);
 
-    } else if(message_type == 3){
+
+    } else if(message_type == '3'){
         // get list room request from client
         sendResponse3(connectfd);
 
-    } else if(message_type == 4){
+    } else if(message_type == '4'){
         // create room request from client
         int room_id = roomCount; // set room_id
 
@@ -413,7 +422,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[]) {
 
             // exit function right after this
         }
-    } else if(message_type == 5){
+    } else if(message_type == '5'){
         // join room request from client
 
         // get player id
@@ -544,6 +553,7 @@ int main (int argc, char *argv[]) {
 
         // close connection with this client
         close(connectfd);
+
 
         // continue handle next request   
     }
