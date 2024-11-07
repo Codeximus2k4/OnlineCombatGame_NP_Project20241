@@ -112,9 +112,9 @@ class Game:
 
             # define request type
             if mode == "login":
-                request_type = "1"
-            else:
                 request_type = "2"
+            else:
+                request_type = "1"
 
             # Convert components to bytes
             request_type_byte = request_type.encode("ascii")
