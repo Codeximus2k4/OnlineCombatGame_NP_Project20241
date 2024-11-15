@@ -10,7 +10,7 @@
 
 # GCC command for Mac (Hieu): (after install postgres with brew)
 
-# g++ -I/usr/local//Cellar/libpq/16.4/include/ -L/usr/local/Cellar/libpq/16.4/lib/ -lpq -o server server.cpp
+# g++ -I/usr/local/Cellar/libpq/17.0_1/include/ -L/usr/local/Cellar/libpq/17.0_1/lib/ -lpq -o server server.cpp
  
 
 # Define color codes
