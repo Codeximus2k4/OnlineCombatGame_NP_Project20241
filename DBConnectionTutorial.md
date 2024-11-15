@@ -35,57 +35,40 @@ psql
 \i abosulute/path/to/script
 ```
 
-#### 4. Create a Database
-Now that you’re inside the PostgreSQL shell, create a new database:
+#### 4. Change postgres user password
+
 ```
-CREATE DATABASE users;
+ALTER USER postgres WITH PASSWORD 'postgres'
 ```
-You can verify that the database was created by listing all databases:
+
+### II. Init Database
+
 ```
-\l
-```
-exit viewing by 
-```
-q
-```
-#### 5. Create a Table in the Database
-Next, create a table inside your database. First, connect to the database:
-```
-\c users
-```
-Create the table
-```
+DROP DATABASE IF EXISTS game_users;
+
+-- create database
+CREATE DATABASE game_users;
+
+-- connect to this database 
+\c game_users;
+
+-- create table
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(50) NOT NULL
 );
-```
 
-List tables
-``` 
-\dt
-```
+-- init data
+INSERT INTO users (username, password) VALUES ('hieu', 'hieu');
+INSERT INTO users (username, password) VALUES ('duc', 'duc');
+INSERT INTO users (username, password) VALUES ('hoa', 'hoa');
+INSERT INTO users (username, password) VALUES ('hoang', 'hoang');
 
-#### 6. Insert Sample Data
-Insert some sample data into the table:
-```
-INSERT INTO users (username, password) VALUES ('ducngo', '123456'), (hihi123, 8386);
-```
-You can verify the data by querying the table:
-```
-SELECT * FROM users;
-```
-7. Exit from postgresql cli, type
-```
-\q
 ```
 
 
-
-
-
-### II. Set up connection
+### III. Set up connection
 
 #### 1. Install  libpq
 
@@ -101,17 +84,17 @@ gcc -o authen_server authen_server.cpp
 ```
 If u face the error: <libpq-fe.h> not found, then try:
 ```
-gcc -o authen_server authen_server.cpp -I/usr/include/postgresql -L/usr/lib -lpq
+gcc -o server server.cpp -I/usr/include/postgresql -L/usr/lib -lpq
 ```
 The reason u face this error is that postgresql is not stored in the standard location. U must find where it is located (in my case is /use/lib),then put it after the L flag
 
 then compile
 ```
-./authen_server
+./server
 ```
 U are required to fill in the username and password. U should fill in "postgres" for username and its corresponding password
 
-#### 3. Run client: game_process.py and try to login/register
+#### 3. Run client: client.py and try to login/register
 After you register successfully, u can check the database users to see the changes
 
 
