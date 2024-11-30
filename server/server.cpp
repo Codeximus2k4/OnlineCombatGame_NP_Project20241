@@ -6,8 +6,8 @@
 #include <libpq-fe.h> //library to connect to postgresql
 
 //ipc libraries
-#include <sys/ipc.h>
-#include <sys/msg.h>
+// #include <sys/ipc.h>
+// #include <sys/msg.h> // no need to include here (could cause error since we already included in game_room)
 
 #include<pthread.h>
 
