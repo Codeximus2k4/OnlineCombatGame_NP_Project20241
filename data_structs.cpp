@@ -32,17 +32,20 @@ struct hitBox {
 // Player *next; // next player in the list
 struct Player {
     int id; // id of player
-    float x, y; //position of player
-    int hp; //health point
-    int hit; //= 0 --> isnt' hit, = 1 --> is hit
-    float speed[2]; //speed_x, speed_y
-    int dmg; //sat thuong minh gay ra
+    int socket_descriptor; // socket descriptor corresponding for each player (to handle select())
+
+    float x, y; // position of player
+    int hp; // health point
+    int hit; // = 0 --> isnt' hit, = 1 --> is hit
+    float speed[2]; // speed_x, speed_y
+    int dmg; // sat thuong minh gay ra
     int jump_cool_down;
     int atk_cool_down;
     int ready;
     sockaddr_in cliaddr; // IPv4 address corresponding to each player
-    Player *next; // next player in the list
     hitBox *selfHitBox; //
+
+    Player *next; // next player in the list
 };
 
 
@@ -130,13 +133,24 @@ Player *addPlayerToPlayersInRoom(Player *head, Player *player){
 }
 
 // - make a new Player based on the information provided
-// - input: all player's information
+// - input: id, socket descriptor, IPv4 address of player, all other values will be set to 0 or NULL
 // - output: pointer to a new Player
 // - dependencies: none
-Player *makePlayer(int id, sockaddr_in cliaddr){
+Player *makePlayer(int id, int socket_descriptor, sockaddr_in cliaddr){
     Player *p = (Player*) malloc(sizeof(Player));
     p->id = id;
+    p->socket_descriptor = socket_descriptor;
     p->cliaddr = cliaddr;
+    p->x = 0;
+    p->y = 0;
+    p->hp = 0;
+    p->hit = 0;
+    memset(p->speed, 0, sizeof(p->speed));
+    p->dmg = 0;
+    p->jump_cool_down = 0;
+    p->atk_cool_down = 0;
+    p->ready = 0;
+    p->selfHitBox = NULL;
 
     p->next = NULL;
 
@@ -175,6 +189,7 @@ Room *makeRoom(int id, int tcp_port, int udp_port){
     p->id = id;
     p->tcp_port = udp_port;
     p->udp_port = udp_port;
+    p->started = 0; // when we create a room then this room must not be started yet
     p->next = NULL;
 
     return p;
@@ -263,8 +278,8 @@ void serializeRoomInformation(char result[], Room *head){
     // printf("result=%s\n", result);
 }
 
-//message format: [room_id][num_players_in_room][started]
-//input: the message, the room_id, the head of the player list, started
+// message format: [room_id][num_players_in_room][started]
+// input: the message, the room_id, the head of the player list, started
 void serializeIpcMsg(ipc_msg *message, int room_id, Player *head, int started) {
     message->type = 1;
     message->text[0] = room_id + '0';
@@ -290,3 +305,108 @@ Room *findRoomById(Room *head, int room_id){
     return p;
 }
 
+// - function to find player in list of players in the room by ID
+// - input: head pointer to list of players in room, player ID
+// - output: pointer to the corresponding player or NULL if not found
+Player *findPlayerInRoomById(Player *head, int player_id){
+    if(head == NULL) return NULL;
+
+    Player *p = head;
+    while(p != NULL){
+        if(p->id == player_id){
+            break;
+        }
+    }
+
+    return p;
+}
+
+// - function to find player in list of players in the room by corresponding socket descriptor 
+// - input: head pointer to list of players in room, socket descriptor
+// - output: pointer to the corresponding player or NULL if not found
+Player *findPlayerInRoomBySocketDescriptor(Player *head, int socket_descriptor){
+    if(head == NULL) return NULL;
+
+    Player *p = head;
+    while(p != NULL){
+        if(p->socket_descriptor == socket_descriptor){
+            break;
+        }
+    }
+
+    return p;
+}
+
+// - function to remove a player from the list of players in the room
+// - input: head pointer to the list of players, pointer to the player to remove
+// - output: updated head pointer of the list of players
+Player *removePlayerFromListPlayers(Player *head, Player *removePlayer){
+    // if list of players empty
+    if(head == NULL){
+        return NULL;
+    }
+
+    // if we need to remove head
+    if(head == removePlayer){
+        head = head->next;
+        free(removePlayer);
+
+        printf("List of players updated (player to remove was at the head of list)\n");
+        return head;
+    }
+
+    // traverse to find previous node 
+    Player *temp = head;
+    while(temp != NULL && temp->next != removePlayer){
+        temp = temp->next;
+    }
+
+    // if the player to remove is not found
+    if(temp == NULL){
+        printf("Player not found in the list, list unchanged\n");
+        return head;
+    }
+
+    // remove the node
+    temp->next = removePlayer->next;
+    free(removePlayer);
+    printf("List of players updated (player to remove was not at head of the list)\n");
+    return head;
+}
+
+// - function to remove a room from the list of rooms 
+// - input: head pointer to the list of rooms, pointer to the room to remove
+// - output: updated head pointer of the list of rooms
+Room *removeRoomFromListRooms(Room *head, Room *removeRoom){
+    // if list of room empty
+    if(head == NULL){
+        return NULL;
+    }
+
+    // if we need to remove head
+    if(head == removeRoom){
+        head = head->next;
+        free(removeRoom);
+
+        printf("List of rooms updated (room to remove was at the head of list)\n");
+        return head;
+    }
+
+    // traverse to find previous node 
+    Room *temp = head;
+    while(temp != NULL && temp->next != removeRoom){
+        temp = temp->next;
+    }
+
+    // if the player to remove is not found
+    if(temp == NULL){
+        printf("Room not found in the list, list unchanged\n");
+        return head;
+    }
+
+    // remove the node
+    temp->next = removeRoom->next;
+    free(removeRoom);
+    printf("List of rooms updated (room to remove was not at head of the list)\n");
+    return head;
+}
