@@ -308,7 +308,8 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                                 perror("Error");
                             } else if(nbytes == 0){
                                 fprintf(stdout, "Client closes connection\n");
-                                return;
+                                //return;
+                                continue;
                             }
                             int player_id = buff[0];
 
@@ -347,6 +348,16 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                                 );
 
                                 // send message to main server about this change 
+                                ipc_msg message;
+                                
+                                serializeIpcMsg(&message, room_id, players);
+                                
+                                // Send the message
+                                if (msgsnd(msgid, &message, sizeof(message.text), 0) == -1) {
+                                    perror("msgsnd failed");
+                                    exit(1);
+                                }
+                                printf("Child: Message sent to parent. %s\n", message.text);
                                 
                             } else {
                                 // if player cannot join (due to some constraints)
@@ -390,7 +401,16 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         players = removePlayerFromListPlayers(players, toRemovePlayer);
 
                         // send message to main server about this change 
+                        ipc_msg message;
+                        
+                        serializeIpcMsg(&message, room_id, players);
 
+                        // Send the message
+                        if (msgsnd(msgid, &message, sizeof(message.text), 0) == -1) {
+                            perror("msgsnd failed");
+                            exit(1);
+                        }
+                        printf("Child: Message sent to parent. %s\n", message.text);
 
                     } else {
                         // if we got some data from connected clients (i.e. handling ready state of players), process
