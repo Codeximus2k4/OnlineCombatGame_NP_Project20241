@@ -100,7 +100,7 @@ struct Room {
 // message format
 // message send from sub processes (game rooms) to main server
 // type = 1 (indicate that server receives)
-// text = [room_id][game_start_yet?][num_players_in_room]
+// text = [room_id][num_players_in_room][started]
 // game_start_yet? = '0' --> waiting, = '1' --> started, = '2' --> finish
 struct ipc_msg {
     long type;
