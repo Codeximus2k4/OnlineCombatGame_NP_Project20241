@@ -240,7 +240,7 @@ void *message_handler(void *arg) {
             Room *room_updated = findRoomById(rooms, room_id_updated); //find room
             room_updated->total_players = message.text[1] - '0'; //update num of players in room
             room_updated->started = message.text[2] - '0'; //update started status
-            printf("Total numbeer of player in room %d is %d\n", room_id_updated, room_updated->total_players);
+            printf("Total number of player in room %d is %d\n", room_id_updated, room_updated->total_players);
         }
     }
 }
@@ -275,7 +275,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
         char password[200];
         int password_length;
 
-        //get username_length
+        // get username_length
         if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
             perror("Error");
         } else if(recvBytes == 0){
