@@ -17,71 +17,101 @@ Defining Player structs
 -----------------------------------------------
 */
 
+//first node --> hit box of the player
+//from second node --> hit box of chieu thuc
+struct hitBox {
+    int x, y; //coordinate of the top left position
+    int width, height;
+    int buff; //an vat pham --> chieu dc buff
+    hitBox *next;
+};
+
+// the game room (sub process) manages the list of player in the room
 // int id; // id of player
 // sockaddr_in cliaddr; // IPv4 address corresponding to each player
 // Player *next; // next player in the list
 struct Player {
     int id; // id of player
+    float x, y; //position of player
+    int hp; //health point
+    int hit; //= 0 --> isnt' hit, = 1 --> is hit
+    float speed[2]; //speed_x, speed_y
+    int dmg; //sat thuong minh gay ra
+    int jump_cool_down;
+    int atk_cool_down;
+    int ready;
     sockaddr_in cliaddr; // IPv4 address corresponding to each player
     Player *next; // next player in the list
+    hitBox *selfHitBox; //
 };
 
+
+
+//linked list of items
+//each item is at different pos on the screen
+struct items {
+    int x, y; //position
+    int type; //type = 0 --> buff hp, type = 1 --> buff dame chieu
+    int buff_amount;
+    items *next;
+};
+
+//there are trap doors on the map. when player hits it, a projectile is fired
+//speed and direction of the projectile
+struct projectile {
+    float speed[2]; 
+    int dmg;
+    projectile *next;
+};
+
+//
+struct tile {
+    int x, y; //position
+    int grid_tile ; //0: off_grid tile, 1: grid_tile
+    tile *next;
+};
+
+// struct npc {
+
+// }
+
+struct vfx {
+    int x, y;
+    int type;
+    int duration; //theo vong lap
+    vfx *next;
+};
+
+
+// the room list is managed in main server, while list of players in a room is managed in sub process
 // int id;
 // int tcp_port; // TCP port assign for each game room to handle client connection
 // int udp_port; // UDP port assign for each game room to transfer data
-// Player *players; // store the head pointer to the list of Players in this room
 // Room *next;
 struct Room {
     int id;
     int tcp_port; // TCP port assign for each game room to handle client connection
     int udp_port; // UDP port assign for each game room to transfer data
-
-    Player *players; // store the head pointer to the list of Players in this room
+    int started; 
+    int total_players;
     Room *next;
 };
 
-// - add a player to a room
-// - input: head pointer to list of rooms, id of room to add, pointer to a Player
-// - output: head of list of rooms, NULL if operation unsuccessful
+// message format
+// message send from sub processes (game rooms) to main server
+// type = 1 (indicate that server receives)
+// text = [room_id][game_start_yet?][num_players_in_room]
+// game_start_yet? = '0' --> waiting, = '1' --> started, = '2' --> finish
+struct ipc_msg {
+    long type;
+    char text[4];
+};
+
+// - add a player to list of players in the room
+// - input: head pointer to list of players in the room, pointer to a Player
+// - output: head of list of players
 // - dependencies: none
-Room *addPlayerToRoom(Room *rooms, int room_id, Player *player){
-    // find room to add
-    Room *room = rooms;
-    int found = 0;
-
-    while(room != NULL){
-        if(room->id == room_id){
-            break; 
-            found = 1;
-        }
-        room = room->next;
-    }
-
-    if(found == 0) return NULL;
-
-    // if there are no players yet
-    if(room->players == NULL){
-        room->players = player;
-
-        return room;
-    }
-
-    // else add to the end of the linked list
-    Player *p = room->players;
-    while(p->next != NULL){
-        p = p->next;
-    }
-
-    p->next = player;
-
-    return rooms;
-}
-
-// - add a player to list of logged in players
-// - input: head pointer to list of logged in players, pointer to a Player
-// - output: head of list of logged in players
-// - dependencies: none
-Player *addPlayerToLoginList(Player *head, Player *player){
+Player *addPlayerToPlayersInRoom(Player *head, Player *player){
     // if there are no players yet
     if(head == NULL){
         head = player;
@@ -145,20 +175,17 @@ Room *makeRoom(int id, int tcp_port, int udp_port){
     p->id = id;
     p->tcp_port = udp_port;
     p->udp_port = udp_port;
-
-    p->players = NULL;
-
     p->next = NULL;
 
     return p;
 }
 
 // - function to count total number of players in a room
-// - input: a pointer to a room
+// - input: the head of the player list in the room
 // - output: number of players in the room
 // - dependencies: none
-int countPlayerInRoom(Room *room){
-    Player *p = room->players;
+int countPlayerInRoom(Player *head){
+    Player *p = head;
     int totalPlayerCount = 0;
 
     if(p == NULL) return 0;
@@ -219,7 +246,7 @@ void serializeRoomInformation(char result[], Room *head){
         strcat(result, strnum);
 
         // count players in room
-        int totalPlayerInRoom = countPlayerInRoom(p);
+        int totalPlayerInRoom = p->total_players;
 
         // printf("Total players in room %d is: %d\n", p->id, totalPlayerInRoom);
 
@@ -234,6 +261,16 @@ void serializeRoomInformation(char result[], Room *head){
 
     // printf("totalRooms=%d\n", totalRooms);
     // printf("result=%s\n", result);
+}
+
+//message format: [room_id][num_players_in_room][started]
+//input: the message, the room_id, the head of the player list, started
+void serializeIpcMsg(ipc_msg *message, int room_id, Player *head, int started) {
+    message->type = 1;
+    message->text[0] = room_id + '0';
+    message->text[1] = countPlayerInRoom(head) + '0';
+    message->text[2] = started + '0';
+    message->text[3] = '\0';
 }
 
 // - function to find room by id

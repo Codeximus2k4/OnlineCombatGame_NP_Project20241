@@ -12,7 +12,13 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <errno.h> // use of errno variable
+
+//ipc libraries
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
 #include "data_structs.cpp"
+
 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 
@@ -80,10 +86,10 @@ Main function to handle game room logic
 */
 
 // - function for each game room
-// - input: tcp port, udp port for this game room
+// - input: room_id, tcp port, udp port for this game room, msgid: id of the message queue used for ipc
 // - output: 0 when room closes, 1 on error creating room
 // - will run until the room closes
-int gameRoom(int TCP_SERV_PORT, int UDP_SERV_PORT) {
+int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     pid_t pid; // test pid
     int recvBytes, sendBytes;
     int connectfd;
@@ -97,7 +103,7 @@ int gameRoom(int TCP_SERV_PORT, int UDP_SERV_PORT) {
     int status;
     char data_client[100][500];
     int sent = 0; // check if we received data from at least one of the clients
-
+    int started = 0;
 
     // ------------------------ CONSTRUCT TCP SOCKET -----------------------------
     // Construct tcp socket using SOCK_STREAM (TCP)
@@ -195,13 +201,32 @@ int gameRoom(int TCP_SERV_PORT, int UDP_SERV_PORT) {
             }
             int player_id = buff[0];
 
-            // add this client to list of players
-            Player *p = makePlayer(player_id, cliaddr);
-            players = addPlayerToLoginList(players, p);
+            // Child process: sends a message
+            ipc_msg message;
+
+            //make a new player
+            Player *newPlayer = makePlayer(player_id, cliaddr);
+            players = addPlayerToPlayersInRoom(players, newPlayer);
+
+            int num_players = countPlayerInRoom(players);
+            printf("%d\n", num_players);
+            serializeIpcMsg(&message, room_id, players, started);
+
+            // Send the message
+            if (msgsnd(msgid, &message, sizeof(message.text), 0) == -1) {
+                perror("msgsnd failed");
+                exit(1);
+            }
+
+            printf("Child: Message sent to parent. %s\n", message.text);
+
 
             // close connection to this client
             close(connectfd);
         }
+
+        
+
 
         // ------------------------ RECEIVE DATA AND TRANSFER -----------------------------
         // receive data from list of clients connected
