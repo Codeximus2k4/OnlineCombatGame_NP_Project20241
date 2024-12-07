@@ -152,10 +152,10 @@ void sendResponse6(int connectfd, int status){
     memset(data, 0, sizeof(data));
 
     // init data
-    data[0] = '6'; // first byte is request type
+    data[0] = '6'; // first byte is response type
     data[1] = status + '0'; // second byte is status
 
-    // send to client (5 bytes)
+    // send to client (2 bytes)
     if( (sendBytes = send(connectfd, data, 2, 0)) < 0){
         perror("Error");
     };
@@ -199,6 +199,27 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
     correspondingPlayer->ready = ready;
 }
 
+// - function to send number of players in the room 
+// - input: socket descriptor connected to client, head of the players list
+// - IMPORTANT NOTE: request type is in char, num_player is in char
+void sendResponse8(int connectfd, Player *players){
+    char data[500];
+    int sendBytes;
+
+    memset(data, 0, sizeof(data));
+
+    // init data
+    data[0] = '8'; // first byte is response type
+    data[1] = countPlayerInRoom(players) + '0'; 
+
+    // send to client (2 bytes)
+    if( (sendBytes = send(connectfd, data, 2, 0)) < 0){
+        perror("Error");
+    };
+    
+    // print to check
+    printf(YELLOW "Bytes sent to client=%d, type=%c, num_players=%c\n" RESET, sendBytes, data[0], data[1]);
+}
 
 
 /*---------------------------------------------
@@ -292,19 +313,19 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         );
 
                         // receive data from this new connection to check if it is authorized to join game room
-                        if( (nbytes = recv(i, buff, 1, 0)) <= 0){ // get one byte only (which is opcode, so we can process)
+                        if( (nbytes = recv(newfd, buff, 1, 0)) <= 0){ // get one byte only (which is opcode, so we can process)
                             // got error or connection closed by client
                             if(nbytes == 0){
                                 // connection closed
                                 printf(YELLOW "Gameroom [%d]: socket %d hung up\n" RESET, room_id, i);
                             } else {
-                                perror("recv");
+                                perror("recv hihi");
                             }
                         } else { // check if we can accept this new connection or not 
                             int can_join = 1;
 
                             // get user_id
-                            if( (nbytes = recv(connectfd, buff, 1, 0)) < 0){
+                            if( (nbytes = recv(newfd, buff, 1, 0)) < 0){
                                 perror("Error");
                             } else if(nbytes == 0){
                                 fprintf(stdout, "Client closes connection\n");
@@ -376,7 +397,16 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                             }
 
                             // send response back to client
-                            sendResponse6(i, can_join);
+                            sendResponse6(newfd, can_join);
+
+                            //broadcast number of players in4 to all players in the room
+                            for (int j = 0; j <= fdmax; j++) {
+                                if (FD_ISSET(j, &master)) {
+                                    if (j != listener && j != i) {//except the listener and ourselves
+                                        sendResponse8(j, players);
+                                    }
+                                }
+                            }
                         }
                     }
                 } else {
@@ -417,6 +447,16 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         
                         handleConnectedClients(i, buff);
                     }
+
+                    //broadcast number of players in4 to all players in the room
+                    for (int j = 0; j <= fdmax; j++) {
+                        if (FD_ISSET(j, &master)) {
+                            if (j != listener && j != i) {//except the listener and ourselves
+                                sendResponse8(j, players);
+                            }
+                        }
+                    }
+
                 } // END handle data from client
             } // END got new incoming connections
         } // END looping through file descriptors
