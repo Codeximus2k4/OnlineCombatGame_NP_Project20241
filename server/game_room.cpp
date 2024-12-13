@@ -157,7 +157,7 @@ void sendResponse6(int connectfd, int status){
 
     // send to client (2 bytes)
     if( (sendBytes = send(connectfd, data, 2, 0)) < 0){
-        perror("Error");
+        perror("Error inside sendResponse6()");
     };
     
     // print to check
@@ -178,7 +178,7 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
 
     // get user_id
     if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
-        perror("Error");
+        perror("Error inside handleConnectedClients() getting `user_id`");
     } else if(recvBytes == 0){
         fprintf(stdout, "Client closes connection\n");
         return;
@@ -187,7 +187,7 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
 
     // get ready
     if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
-        perror("Error");
+        perror("Error inside handleConnectedClients() getting `ready`");
     } else if(recvBytes == 0){
         fprintf(stdout, "Client closes connection\n");
         return;
@@ -214,7 +214,7 @@ void sendResponse8(int connectfd, Player *players){
 
     // send to client (2 bytes)
     if( (sendBytes = send(connectfd, data, 2, 0)) < 0){
-        perror("Error");
+        perror("Error inside sendResponse8()");
     };
     
     // print to check
@@ -280,7 +280,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         // note that select() hanldes from file descriptor 0 -> fdmax (if arguments are provided as below)
         // however, select() will only handle those that have been added to `read_fds`
         if(select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1){
-            perror("select");
+            perror("Error in waiting room, select period");
             exit(4);
         }
 
@@ -298,7 +298,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     newfd = accept(listener, (struct sockaddr*) &remoteaddr, &addrlen);
 
                     if(newfd == -1){
-                        perror("accept");
+                        perror("Error in waiting room, accept");
                     } else {
                         // notify
                         printf(YELLOW "Gameroom [%d]: a new connection from %s:%d on socket %d\n" RESET, 
@@ -319,14 +319,14 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                                 // connection closed
                                 printf(YELLOW "Gameroom [%d]: socket %d hung up\n" RESET, room_id, i);
                             } else {
-                                perror("recv hihi");
+                                perror("Error in waiting room, receive data");
                             }
                         } else { // check if we can accept this new connection or not 
                             int can_join = 1;
 
                             // get user_id
                             if( (nbytes = recv(newfd, buff, 1, 0)) < 0){
-                                perror("Error");
+                                perror("Error in waiting room, new connection");
                             } else if(nbytes == 0){
                                 fprintf(stdout, "Client closes connection\n");
                                 //return;
@@ -375,7 +375,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                                 
                                 // Send the message
                                 if (msgsnd(msgid, &message, sizeof(message.text), 0) == -1) {
-                                    perror("msgsnd failed");
+                                    perror("Error, msgsnd failed");
                                     exit(1);
                                 }
                                 printf("Child: Message sent to parent. %s\n", message.text);
@@ -418,7 +418,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                             // connection closed
                             printf("gameroom server: socket %d hung up\n", i);
                         } else {
-                            perror("recv");
+                            perror("Error in waiting room, receive data from connected clients");
                         }
 
                         close(i); // close this socket
@@ -437,7 +437,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
 
                         // Send the message
                         if (msgsnd(msgid, &message, sizeof(message.text), 0) == -1) {
-                            perror("msgsnd failed");
+                            perror("Error in waiting room, msgsnd failed");
                             exit(1);
                         }
                         printf("Child: Message sent to parent. %s\n", message.text);
