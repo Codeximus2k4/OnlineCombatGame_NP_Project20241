@@ -28,6 +28,4 @@ fork_server_test
 
 fork_server_test.cpp
 
-server
-
 jmeter.log
