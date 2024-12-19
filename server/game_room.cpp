@@ -199,10 +199,10 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
     correspondingPlayer->ready = ready;
 }
 
-// - function to send number of players in the room 
-// - input: socket descriptor connected to client, head of the players list
+// - function to send player id 
+// - input: socket descriptor connected to client, the player
 // - IMPORTANT NOTE: request type is in char, num_player is in char
-void sendResponse8(int connectfd, Player *players){
+void sendResponse8(int connectfd, Player *player){
     char data[500];
     int sendBytes;
 
@@ -210,7 +210,7 @@ void sendResponse8(int connectfd, Player *players){
 
     // init data
     data[0] = '8'; // first byte is response type
-    data[1] = countPlayerInRoom(players) + '0'; 
+    data[1] = player->id; 
 
     // send to client (2 bytes)
     if( (sendBytes = send(connectfd, data, 2, 0)) < 0){
@@ -218,7 +218,7 @@ void sendResponse8(int connectfd, Player *players){
     };
     
     // print to check
-    printf(YELLOW "Bytes sent to client=%d, type=%c, num_players=%c\n" RESET, sendBytes, data[0], data[1]);
+    printf(YELLOW "Bytes sent to client=%d, type=%c, player_id=%c\n" RESET, sendBytes, data[0], data[1] + '0');
 }
 
 
@@ -439,6 +439,15 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         handleConnectedClients(i, buff);
                     }
                 } // END handle data from client
+                
+                //send response 8 to all players in the room
+                Player *p = players;
+                while (p != NULL) {
+                    int fd = p->socket_descriptor;
+                    sendResponse8(fd, p);
+                    p = p->next;
+                }
+
             } // END got new incoming connections
         } // END looping through file descriptors
     } // END for(;;)
