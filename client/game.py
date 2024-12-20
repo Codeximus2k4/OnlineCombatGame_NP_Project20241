@@ -33,8 +33,7 @@ class GameManager:
         # self.load_assets()
         
         # Players
-        self.player = None
-        self.player2 = None
+        self.player1 = None
         self.entities = []
     
     def load_assets(self):
@@ -356,7 +355,7 @@ class GameManager:
                     
                     if host_button.checkForInput(mouse_pos):
                         # Implement host room logic
-                        self.host_room_screen(1)
+                        self.waiting_room_screen(1)
                         return
                     
                     if back_button.checkForInput(mouse_pos):
@@ -364,7 +363,7 @@ class GameManager:
             
             pygame.display.update()
     
-    def host_room_screen(self, user_id):
+    def waiting_room_screen(self, user_id):
         """Waiting room screen for host"""
         # Send the request to the server to get the room information
         status, room_id, tcp_port = host_room_request(user_id=user_id)
@@ -382,6 +381,26 @@ class GameManager:
                                      host_room_socket=host_room_tcp_socket)
         print("Join room response: " + response)
 
+        # Buttons
+        ready = False
+        ready_button = Button(
+            image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"), 
+            pos=(config.SCREEN_WIDTH-config.SCREEN_WIDTH//5, config.SCREEN_HEIGHT-100),
+            text_input="READY", 
+            font=get_font(20), 
+            base_color=config.COLORS['GREEN'], 
+            hovering_color="White"
+        )     
+
+        back_button = Button(
+            image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"), 
+            pos=(config.SCREEN_WIDTH//5, config.SCREEN_HEIGHT-100),
+            text_input="BACK", 
+            font=get_font(20), 
+            base_color=config.COLORS['BUTTON_BASE'], 
+            hovering_color="White"
+        )  
+
         print(1)
         if status == '1':
             while True:
@@ -393,19 +412,10 @@ class GameManager:
                 title_text = self.title_font.render(text, True, config.COLORS['MENU_TEXT'])
                 title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH//2, 100))
                 
-                # Buttons
-                start_button = Button(
-                    image=pygame.image.load("data/images/menuAssets/Options Rect.png"), 
-                    pos=(config.SCREEN_WIDTH//2, 500),
-                    text_input="START_GAME", 
-                    font=get_font(30), 
-                    base_color=config.COLORS['BUTTON_BASE'], 
-                    hovering_color="White"
-                )            
                 
                 self.screen.blit(title_text, title_rect)
                 
-                for button in [start_button]:
+                for button in [ready_button, back_button]:
                     button.changeColor(mouse_pos)
                     button.update(self.screen)
                 
@@ -416,12 +426,23 @@ class GameManager:
                         sys.exit()
                     
                     if event.type == pygame.MOUSEBUTTONDOWN:                  
-                        if start_button.checkForInput(mouse_pos):
-                            self.run()
+                        if ready_button.checkForInput(mouse_pos):
+                            if ready == False:
+                                ready_button.text_input = "CANCEL"
+                                ready_button.base_color = config.COLORS["RED"]
+                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                                ready = True
+                            else:
+                                ready_button.text_input = "READY"
+                                ready_button.base_color = config.COLORS["GREEN"]
+                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                                ready = False
+                        if back_button.checkForInput(mouse_pos):
+                            return
                 pygame.display.update()
 
     def list_of_room_screen(self):
-        """Display the room selection screen."""
+        """Display the room selection screen with pagination and a refresh option."""
 
         def fetch_room_list():
             """Fetch the list of available rooms from the server."""
@@ -456,8 +477,12 @@ class GameManager:
             return room_list
 
 
-        # Fetch room list from the server
+        # Fetch initial room list
         room_list = fetch_room_list()
+
+        # Pagination variables
+        rooms_per_page = 4
+        current_page = 0
 
         while True:
             self.screen.blit(self.background, (0, 0))
@@ -468,10 +493,57 @@ class GameManager:
             title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
             self.screen.blit(title_text, title_rect)
 
+            # Pagination Buttons
+            left_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Buttons Rect.png"),
+                pos=(config.SCREEN_WIDTH // 10, config.SCREEN_HEIGHT // 2),
+                text_input="<-",
+                font=get_font(30),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            right_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Buttons Rect.png"),
+                pos=(config.SCREEN_WIDTH - config.SCREEN_WIDTH // 10, config.SCREEN_HEIGHT // 2),
+                text_input="->",
+                font=get_font(30),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+
+            refresh_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH-config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+                text_input="REFRESH",
+                font=get_font(20),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+
+            back_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+                text_input="BACK",
+                font=get_font(20),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+
+            # Draw all control buttons
+            control_buttons = [left_button, right_button, back_button, refresh_button]
+            for button in control_buttons:
+                button.changeColor(mouse_pos)
+                button.update(self.screen)
+
+            # Calculate rooms to display on the current page
+            start_index = current_page * rooms_per_page
+            end_index = start_index + rooms_per_page
+            current_rooms = room_list[start_index:end_index]
+
             # Room Buttons
             buttons = []
             y_offset = 200
-            for room in room_list:
+            for room in current_rooms:
                 button_text = f"Room {room['room_id']} ({room['total_players']} players)"
                 button = Button(
                     image=pygame.image.load("data/images/menuAssets/Options Rect.png"),
@@ -484,7 +556,7 @@ class GameManager:
                 buttons.append((button, room['room_id']))
                 y_offset += 100  # Adjust button spacing
 
-            # Draw buttons
+            # Draw room buttons
             for button, _ in buttons:
                 button.changeColor(mouse_pos)
                 button.update(self.screen)
@@ -496,11 +568,29 @@ class GameManager:
                     sys.exit()
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
+                    # Pagination button logic
+                    if left_button.checkForInput(mouse_pos) and current_page > 0:
+                        current_page -= 1
+                    if right_button.checkForInput(mouse_pos) and end_index < len(room_list):
+                        current_page += 1
+
+                    # Refresh button logic
+                    if refresh_button.checkForInput(mouse_pos):
+                        room_list = fetch_room_list()  # Refresh room data
+                        current_page = 0  # Reset to the first page
+                    
+                    if back_button.checkForInput(mouse_pos):
+                        return # Return to the menu
+
+                    # Room button logic
                     for button, room_id in buttons:
                         if button.checkForInput(mouse_pos):
+                            print(f"Connect to the game room ID: {room_id}")
                             return room_id  # Return selected room ID
 
             pygame.display.update()
+
+
 
 
     def run(self):
