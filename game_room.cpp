@@ -667,7 +667,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
             else if (byteReceived[each]>0 && client_responded==0) client_responded=1;
             if (byteReceived[each]>0)
             {
-                Player *player = findPlayerInRoomById(game->players,buffer[0]);
+                Player *player = findPlayerInRoomById(game->players,input_buffer[each][0]);
                 if (player==NULL) printf("Error : received from unknown client\n");
                 else 
                 {
