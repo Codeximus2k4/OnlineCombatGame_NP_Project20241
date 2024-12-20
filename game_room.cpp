@@ -611,137 +611,139 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         if (!finished_sent_UDP) continue;
                         else 
                         {
-                //------------------ Initialize the game first -------------------
-                Game *game =  (Game*) malloc(sizeof(Game));
-                game->game_loop=0;
-                game->game_mode=0; //game mode 0  for deathmatch, game mode 1 for capture the flag
-                game->gravity=-1;
-                game->items = NULL;
-                game->players =  players;
-                if (game->game_mode==1){
-                    game->Score_team1 = 0;
-                    game->Score_team2 = 0;
-                    }
-                game->traps= NULL;
-                total_players =  countPlayerInRoom(players);
-                characterSpawner(game->players);
-                // set up a number of buffer for each client
-                char buffer[total_players][1024];
-                int byteReceived[total_players];
-                char send_buffer[1024];
-                int byteSerialized;
-                int fresh_start =1;
-                        while (true)
-                        {
-                   // printf("Game Running\n");
-
-//----------------------------------Main Game--------------------------------------//
-                // Listen from each client
-                int client_responded =0;
-                for (int each =0;each<total_players;each++)
-                {
-                    memset(buffer[each],0, BUFF_SIZE);
-                    addrlen =  sizeof(client_addr);
-                    byteReceived[each]=0;
-                    byteReceived[each] =  recvfrom(UDP_server_socket, buffer[each], BUFF_SIZE,0,(struct sockaddr*)&client_addr,&addrlen);
-                    if (byteReceived[each]<0)
-                        {
-                            if (errno == EWOULDBLOCK || errno ==EAGAIN) 
-                            {
-                                continue;
-                            }
-                            else 
-                            {
-                                perror("Receive failed");
-                                continue;
-                            }
-                        } 
-                    else if (byteReceived[each]>0 && client_responded==0) client_responded=1;
-                    if (byteReceived[each]>0)
-                    {
-                        Player *player = findPlayerInRoomById(game->players,buffer[each][0]);
-                        if (player==NULL) printf("Error : received from unknown client\n");
-                        else 
-                        {
-                            player->udp_clientaddr= client_addr;
-                            player->addrlen= addrlen;
-                        }
-                    }
-                }
-                if (!client_responded)
-                {
-                     // if no client has responded do not move the game state forward
-                    //printf("No client has responded yet\n");
-                    continue;
-                }
-                //printf("Someone said something !!!\n");
-                fresh_start=0;
-                // Parsing message from player input and update player state
-                for (int each =0;each<total_players;each++)
-                {
-                    if (byteReceived[each]!=5)  continue; //payload is always 5 bytes for each player
-                    else 
-                    {
-                        int id =  buffer[each][0];
-                        int movementx = buffer[each][1];
-                        int movementy =  buffer[each][2];
-                        int action =  buffer[each][3];
-                        int interaction =  buffer[each][4];
-
-                        Player* player =  findPlayerInRoomById(game->players, id);
-                        if (player ==NULL) 
-                        {
-                            printf("Player ID %d not found\n",id);
-                            continue;                            
-                        }
-                        else
-                        {
-                            player->movement_x=movementx;
-                            handleActionChangeFromInput(player, action); // handle change in animation first
-                            //if (movementy!=0) handleJumpCrouch(player, movementy);
-                            //handleInteraction(player, interaction);
-                        }
-
-                    }            
-                }
-
-                // update and serialize players' info
-                memset(send_buffer, 0, BUFF_SIZE);
-                byteSerialized=0;
-                Player *temp;
-                for (temp=game->players;temp!=NULL;temp= temp->next)
-                {
-                    update_player(temp);
-                    byteSerialized = serialize_player_info(send_buffer, byteSerialized, temp);
-                }
-                printf("Payload size is %d bytes\n",byteSerialized);
-                //Let's send to each
-                int byteSent = 0;
-                for (temp=game->players;temp!=NULL;temp= temp->next)
-                {
-                    addrlen =  sizeof(temp->cliaddr);
-                    byteSent =sendto(UDP_server_socket, send_buffer, byteSerialized,0, (const struct sockaddr *)&temp->udp_clientaddr,temp->addrlen);
-                    if (byteSent<=0)
-                        {
-                            char message[100];
-                            sprintf(message, "Send failed for player id %d",temp->id);
-                            perror(message);
-                        }  
-                    else 
-                    {
-                        printf("well, obviously server sent %d bytes ?\n",byteSent);
-                    }
-                        
-                }
-
-            }                           
+                        break;    
                 
 
             } // END got new incoming connections
         } // END looping through file descriptors
+    } //END of first connection loop
 
- // END for(;;)
-    }
+
+     //------------------ Initialize the game first ------------------
+    Game *game =  (Game*) malloc(sizeof(Game));
+    game->game_loop=0;
+    game->game_mode=0; //game mode 0  for deathmatch, game mode 1 for capture the flag
+    game->gravity=-1;
+    game->items = NULL;
+    game->players =  players;
+    if (game->game_mode==1){
+        game->Score_team1 = 0;
+        game->Score_team2 = 0;
+        }
+    game->traps= NULL;
+    total_players =  countPlayerInRoom(players);
+    characterSpawner(game->players);
+    // set up a number of buffer for each client
+    char input_buffer[total_players][BUFF_SIZE];
+    int byteReceived[total_players];
+    char send_buffer[1024];
+    int byteSerialized;
+    int fresh_start =1;
+    while (true)
+                {
+            // printf("Game Running\n");
+
+//----------------------------------Main Game--------------------------------------//
+        // Listen from each client
+        int client_responded =0;
+        for (int each =0;each<total_players;each++)
+        {
+            memset(input_buffer[each],0, 5);
+            addrlen =  sizeof(client_addr);
+            byteReceived[each]=0;
+            byteReceived[each] =  recvfrom(UDP_server_socket, input_buffer[each], BUFF_SIZE ,0,(struct sockaddr*)&client_addr,&addrlen);
+            if (byteReceived[each]<0)
+                {
+                    if (errno == EWOULDBLOCK || errno ==EAGAIN) 
+                    {
+                        continue;
+                    }
+                    else 
+                    {
+                        perror("Receive failed");
+                        continue;
+                    }
+                } 
+            else if (byteReceived[each]>0 && client_responded==0) client_responded=1;
+            if (byteReceived[each]>0)
+            {
+                Player *player = findPlayerInRoomById(game->players,buffer[0]);
+                if (player==NULL) printf("Error : received from unknown client\n");
+                else 
+                {
+                    player->udp_clientaddr= client_addr;
+                    player->addrlen= addrlen;
+                }
+            }
+        }
+        if (!client_responded)
+        {
+                // if no client has responded do not move the game state forward
+            //printf("No client has responded yet\n");
+            continue;
+        }
+        //printf("Someone said something !!!\n");
+        fresh_start=0;
+        // Parsing message from player input and update player state
+        for (int each =0;each<total_players;each++)
+        {
+            if (byteReceived[each]!=5)  continue; //payload is always 5 bytes for each player
+            else 
+            {
+                int id =  input_buffer[each][0];
+                int movementx = input_buffer[each][1];
+                int movementy =  input_buffer[each][2];
+                int action =  input_buffer[each][3];
+                int interaction =  input_buffer[each][4];
+
+                Player* player =  findPlayerInRoomById(game->players, id);
+                if (player ==NULL) 
+                {
+                    printf("Player ID %d not found\n",id);
+                    continue;                            
+                }
+                else
+                {
+                    player->movement_x=movementx;
+                    handleActionChangeFromInput(player, action); // handle change in animation first
+                    //if (movementy!=0) handleJumpCrouch(player, movementy);
+                    //handleInteraction(player, interaction);
+                }
+
+            }            
+        }
+
+        // update and serialize players' info
+        memset(send_buffer, 0, BUFF_SIZE);
+        byteSerialized=0;
+        Player *temp;
+        for (temp=game->players;temp!=NULL;temp= temp->next)
+        {
+            update_player(temp);
+            byteSerialized = serialize_player_info(send_buffer, byteSerialized, temp);
+        }
+        printf("Payload size is %d bytes\n",byteSerialized);
+        //Let's send to each
+        int byteSent = 0;
+        for (temp=game->players;temp!=NULL;temp= temp->next)
+        {
+            addrlen =  sizeof(temp->cliaddr);
+            byteSent =sendto(UDP_server_socket, send_buffer, byteSerialized,0, (const struct sockaddr *)&temp->udp_clientaddr,temp->addrlen);
+            if (byteSent<=0)
+                {
+                    char message[100];
+                    sprintf(message, "Send failed for player id %d",temp->id);
+                    perror(message);
+                }  
+            else 
+            {
+                printf("well, obviously server sent %d bytes ?\n",byteSent);
+            }
+                
+        }
+
+        }     
+
  return 0;
 }    
     // ------------------------ INGAME PERIOD -----------------------------
