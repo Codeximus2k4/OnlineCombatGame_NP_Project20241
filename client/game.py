@@ -351,6 +351,7 @@ class GameManager:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if join_button.checkForInput(mouse_pos):
                         # Implement join room logic
+                        self.list_of_room_screen()
                         return
                     
                     if host_button.checkForInput(mouse_pos):
@@ -375,6 +376,12 @@ class GameManager:
         )
         time.sleep(1)
         host_room_tcp_socket.connect()
+        
+        # Join the room (send message type 6)
+        response = join_room_request(user_id=user_id, 
+                                     host_room_socket=host_room_tcp_socket)
+        print("Join room response: " + response)
+
         print(1)
         if status == '1':
             while True:
@@ -412,6 +419,89 @@ class GameManager:
                         if start_button.checkForInput(mouse_pos):
                             self.run()
                 pygame.display.update()
+
+    def list_of_room_screen(self):
+        """Display the room selection screen."""
+
+        def fetch_room_list():
+            """Fetch the list of available rooms from the server."""
+            # Connect to the server to request room information
+            room_network = NetworkManager(
+                server_addr=config.SERVER_ADDR,
+                server_port=config.SERVER_PORT
+            )
+            room_network.connect()
+
+            # Request room data
+            message = "3"
+            room_network.send_tcp_message(message.encode())  # Send request code for room data
+            response = room_network.receive_tcp_message()  # Receive room data
+            room_network.close()
+            print(response)
+            return parse_room_data(response)
+
+
+        def parse_room_data(response):
+            """Parse serialized room data from the server."""
+            room_list = []
+            total_rooms = int(response[1])-48  # First byte indicates total rooms
+            print(total_rooms)
+            index = 2  # Start reading after the first byte
+            for _ in range(total_rooms):
+                room_id = int(response[index])-48
+                total_players = int(response[index+1])-48
+                room_list.append({"room_id": room_id, "total_players": total_players})
+                index += 2
+
+            return room_list
+
+
+        # Fetch room list from the server
+        room_list = fetch_room_list()
+
+        while True:
+            self.screen.blit(self.background, (0, 0))
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Title
+            title_text = self.title_font.render("SELECT ROOM", True, config.COLORS['MENU_TEXT'])
+            title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
+            self.screen.blit(title_text, title_rect)
+
+            # Room Buttons
+            buttons = []
+            y_offset = 200
+            for room in room_list:
+                button_text = f"Room {room['room_id']} ({room['total_players']} players)"
+                button = Button(
+                    image=pygame.image.load("data/images/menuAssets/Options Rect.png"),
+                    pos=(config.SCREEN_WIDTH // 2, y_offset),
+                    text_input=button_text,
+                    font=get_font(30),
+                    base_color=config.COLORS['BUTTON_BASE'],
+                    hovering_color="White"
+                )
+                buttons.append((button, room['room_id']))
+                y_offset += 100  # Adjust button spacing
+
+            # Draw buttons
+            for button, _ in buttons:
+                button.changeColor(mouse_pos)
+                button.update(self.screen)
+
+            # Event handling
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    for button, room_id in buttons:
+                        if button.checkForInput(mouse_pos):
+                            return room_id  # Return selected room ID
+
+            pygame.display.update()
+
 
     def run(self):
         """Main game loop"""

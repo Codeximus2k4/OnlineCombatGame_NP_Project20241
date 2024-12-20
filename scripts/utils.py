@@ -30,9 +30,9 @@ def login_register_request(username, password, mode):
     Sending login/register request and information to server
     Handling response from server
 
-    username: The username of client
-    password: The password of client
-    mode: login or register
+    :param username: The username of client
+    :param password: The password of client
+    :param mode: login or register
     """
     # message components
     request_type = ""
@@ -103,7 +103,7 @@ def host_room_request(user_id: int):
     host_room_socket.send_tcp_message(message) 
 
     # Receive the response 
-    response = host_room_socket.receive_tcp_message()
+    response = host_room_socket.receive_tcp_message(buff_size=6)
 
     # Close the socket
     host_room_socket.close()
@@ -115,6 +115,28 @@ def host_room_request(user_id: int):
     tcp_port = struct.unpack("!H", response[3:5].encode("utf-8"))[0] # Last 2 bytes: TCP port (network byte order)
     print(status, room_id, tcp_port)
     return status, room_id, tcp_port
+
+def join_room_request(user_id: int, host_room_socket: NetworkManager):
+    """Send the join room request to the game room server"""
+    # Message component
+    request_type = "6"
+    user_id = user_id
+
+    # Convert components into bytes
+    request_type_byte = request_type.encode("ascii")
+    user_id_byte = user_id.to_bytes(1, "big")
+
+    # Combine
+    message = request_type_byte + user_id_byte
+
+    # Send the message to the room server
+    host_room_socket.send_tcp_message(message)
+
+    # Receive the response
+    response = host_room_socket.receive_tcp_message(buff_size=2)
+    return response.decode()
+    
+
 
 class Animation:
     def __init__(self, images ,img_dur = 5, loop =True):

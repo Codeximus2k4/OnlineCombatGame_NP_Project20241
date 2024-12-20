@@ -21,25 +21,19 @@ BLUE   = \033[34m
 RESET  = \033[0m
 
 # Rule to build executables
-all: server authen_server
+all: server
 	@echo "$(BLUE)*****Online combat game*****$(RESET)";
 	@echo "How to play: "; 
 	@echo "1. Start C server"; 
 	@echo "2. Start Python client"; 
 	@echo "$(BLUE)****************************$(RESET)";
 
-server: server.cpp
+server: server/server.cpp
 	@echo "$(GREEN)Compiling C server code...$(RESET)"; 
-	@g++ -o server server.cpp;
-
-authen_server: authen_server.cpp
-	@echo  "$(RED)INFO: For compiling authen_server.cpp you need to manually use gcc because of different OS$(RESET)" 
+	@g++ -o server.o server/server.cpp -I/usr/include/postgresql -L/usr/lib -lpq
 
 # Clean rule to remove the executable
 clean:
 	@echo "\n$(GREEN)Cleaning all C binaries..."; 
-	@rm -rf server;
-	@rm -rf fork_server_test;
-	@rm -rf test;
-	@rm -rf authen_server;
+	@rm -rf server.o;
 	@echo "Completed cleaning$(RESET)";
