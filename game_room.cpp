@@ -12,6 +12,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <errno.h> // use of errno variable
+#include<pthread.h>
 
 //ipc libraries
 #include <sys/ipc.h>
@@ -38,6 +39,7 @@ Defining global variables
 -----------------------------------------------
 */
 Player *players = NULL; // list of players in this room
+char input_buffer[5][BUFF_SIZE]; // hold data received from calling recvfrom() UDP
 
 /*---------------------------------------------
 Defining functions
@@ -317,6 +319,52 @@ int sent_UDP_port(Player *head, int udp_port)
 
 }
 
+// - function to handle listening data from client using thread
+// - input: udp_server_socket that is used for communicating with clients
+// 
+void *listenFromClients(void *arg){
+    // get udp_server_socket
+    int udp_server_socket = *(int *) arg;
+
+    char buff[BUFF_SIZE + 1];
+    int rcvBytes;
+    sockaddr_in clientAddr;
+    int len = sizeof(clientAddr);
+
+
+    // detach this thread so that it terminates upon finishes
+    pthread_detach(pthread_self());
+
+    // main loop: listen and store data from clients
+    while(1){
+        // reset the buff
+        memset(buff, BUFF_SIZE, 0);
+
+        // receive data from client
+        rcvBytes = recvfrom(udp_server_socket, buff, BUFF_SIZE, 0, (struct sockaddr *) &clientAddr, &len);
+        if(rcvBytes < 0){
+            perror("Error: ");
+            return 0;
+        }
+        buff[rcvBytes] = '\0';
+
+        // get player_id of this data
+        int player_id = buff[0];
+        
+        Player *player = findPlayerInRoomById(players, player_id);
+
+        // update UDP address of this client
+        player->cliaddr = clientAddr;
+
+        // copy the data received corresponds to this player
+        strcpy(player->input_buffer, buff);
+        player->bytes_received = rcvBytes;
+    }
+
+
+    pthread_exit(NULL);
+}
+
 /*---------------------------------------------
 Main function to handle game room logic
 -----------------------------------------------
@@ -348,53 +396,12 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     char remoteIP[INET6_ADDRSTRLEN];
     int nbytes;
     int total_players = 0;
+    pthread_t tid;
 
-    // convert port to string
+    // convert TCP port to string
     char CHAR_TCP_PORT[BUFF_SIZE + 1];
     sprintf(CHAR_TCP_PORT, "%d", TCP_SERV_PORT);
 
-
-    // ------------------------SET UP UDP PORT -----------------------------
-    int UDP_server_socket ;
-    char buffer[BUFF_SIZE];
-    struct sockaddr_in server_addr, client_addr;
-    socklen_t udp_addr_len;
-    // Create UDP socket, maximum attempt to recreate is 5 times, if fails more then delete the room -> will implement this later on
-    if ((UDP_server_socket =  socket(AF_INET, SOCK_DGRAM,0))<0)
-    {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
-
-    // Set the socket to non-blocking mode
-    int flags =  fcntl(UDP_server_socket, F_GETFL,0);
-    if (flags<0)
-    {
-        perror("Failed to get socket flags");
-        exit(EXIT_FAILURE);        
-    }
-    if (fcntl(UDP_server_socket, F_SETFL, flags | O_NONBLOCK)<0)
-    {
-        perror("Failed to set non-blocking mode");
-        close(UDP_server_socket);
-        exit(EXIT_FAILURE);        
-    }
-
-    // configure server address structure
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family =  AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port =  htons(UDP_SERV_PORT);
-
-    // Bind the socket to the server address
-    if (bind(UDP_server_socket, (const struct sockaddr *)&server_addr, sizeof(server_addr))<0)
-    {
-        perror("Bind failed");
-        close(UDP_server_socket);
-        exit(EXIT_FAILURE);
-    }
-
-    printf(YELLOW "Non-blocking UDP Echo Server is running on port %d\n" RESET, UDP_SERV_PORT);
 
     // ------------------------ WAITING PERIOD -----------------------------
     // use select() to handle new connections
@@ -618,8 +625,38 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         } // END looping through file descriptors
     } //END of first connection loop
 
+    // ---------------------- END OF WAITING PERIOD ------------------------
 
-     //------------------ Initialize the game first ------------------
+    // ------------------------SET UP UDP PORT -----------------------------
+    int UDP_server_socket ;
+    char buffer[BUFF_SIZE];
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t udp_addr_len;
+    // Create UDP socket, maximum attempt to recreate is 5 times, if fails more then delete the room -> will implement this later on
+    if ((UDP_server_socket =  socket(AF_INET, SOCK_DGRAM,0))<0)
+    {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // configure server address structure
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family =  AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port =  htons(UDP_SERV_PORT);
+
+    // Bind the socket to the server address
+    if (bind(UDP_server_socket, (const struct sockaddr *)&server_addr, sizeof(server_addr))<0)
+    {
+        perror("Bind failed");
+        close(UDP_server_socket);
+        exit(EXIT_FAILURE);
+    }
+
+    printf(YELLOW "UDP Server is running on port %d\n" RESET, UDP_SERV_PORT);
+
+
+    //------------------ Initialize the game first ------------------
     Game *game =  (Game*) malloc(sizeof(Game));
     game->game_loop=0;
     game->game_mode=0; //game mode 0  for deathmatch, game mode 1 for capture the flag
@@ -634,48 +671,28 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     total_players =  countPlayerInRoom(players);
     characterSpawner(game->players);
     // set up a number of buffer for each client
-    char input_buffer[total_players][BUFF_SIZE];
+    
     int byteReceived[total_players];
     char send_buffer[1024];
     int byteSerialized;
     int fresh_start =1;
+
+    //----------------------------------Main Game--------------------------------------//
+
+    // create a thread to handle listening from client (and broadcasting) data 
+    if(pthread_create(&tid, NULL, listenFromClients, &UDP_server_socket) != 0){
+        perror(RED "Error creating thread ");
+    }
+
     while (true)
                 {
             // printf("Game Running\n");
 
-//----------------------------------Main Game--------------------------------------//
         // Listen from each client
         int client_responded =0;
-        for (int each =0;each<total_players;each++)
-        {
-            memset(input_buffer[each],0, 5);
-            addrlen =  sizeof(client_addr);
-            byteReceived[each]=0;
-            byteReceived[each] =  recvfrom(UDP_server_socket, input_buffer[each], BUFF_SIZE ,0,(struct sockaddr*)&client_addr,&addrlen);
-            if (byteReceived[each]<0)
-                {
-                    if (errno == EWOULDBLOCK || errno ==EAGAIN) 
-                    {
-                        continue;
-                    }
-                    else 
-                    {
-                        perror("Receive failed");
-                        continue;
-                    }
-                } 
-            else if (byteReceived[each]>0 && client_responded==0) client_responded=1;
-            if (byteReceived[each]>0)
-            {
-                Player *player = findPlayerInRoomById(game->players,input_buffer[each][0]);
-                if (player==NULL) printf("Error : received from unknown client\n");
-                else 
-                {
-                    player->cliaddr= client_addr;
-                    player->addrlen= addrlen;
-                }
-            }
-        }
+        
+        
+
         if (!client_responded)
         {
                 // if no client has responded do not move the game state forward

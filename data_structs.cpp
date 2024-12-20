@@ -107,6 +107,8 @@ struct Player {
     sockaddr_in cliaddr; // IPv4 address corresponding to each player
     socklen_t addrlen;
     Hitbox *selfHitBox; //
+    char input_buffer[256]; // input buffer of each player
+    int bytes_received;
 
     Player *next; // next player in the list
 
@@ -357,6 +359,7 @@ Player *makePlayer(int id, int socket_descriptor, sockaddr_in cliaddr){
     p->posx = -1; // just enter the game
     p->posy = -1; // just enter the game
     p->selfHitBox = NULL;
+    p->bytes_received = 0;
 
     p->next = NULL;
 
