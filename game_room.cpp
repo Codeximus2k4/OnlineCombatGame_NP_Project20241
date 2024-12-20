@@ -671,7 +671,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                 if (player==NULL) printf("Error : received from unknown client\n");
                 else 
                 {
-                    player->udp_clientaddr= client_addr;
+                    player->cliaddr= client_addr;
                     player->addrlen= addrlen;
                 }
             }
@@ -728,7 +728,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         for (temp=game->players;temp!=NULL;temp= temp->next)
         {
             addrlen =  sizeof(temp->cliaddr);
-            byteSent =sendto(UDP_server_socket, send_buffer, byteSerialized,0, (const struct sockaddr *)&temp->udp_clientaddr,temp->addrlen);
+            byteSent =sendto(UDP_server_socket, send_buffer, byteSerialized,0, (const struct sockaddr *)&temp->cliaddr,temp->addrlen);
             if (byteSent<=0)
                 {
                     char message[100];
