@@ -44,6 +44,27 @@ Defining functions
 -----------------------------------------------
 */
 
+//function to check the condition to start the game (as of now it is that all players including the host are ready)
+// -  input: head pointer of Players linked list and the total number of player
+// -  output: 1 for game ready to start , 0 for not ready
+int check_gameStart_condition(Player *head, int total_player_count)
+{
+    Player *p = head;
+    int readyPlayerCount = 0;
+
+    if(p == NULL || total_player_count==0) return 0;
+
+    while(p != NULL){
+        if (p->ready) readyPlayerCount++;
+        p = p->next;
+    }
+
+    if (readyPlayerCount== total_player_count) 
+    {
+        return 1;
+    }
+    else return 0;    
+}
 // function to get a TCP listening socket
 // - input: server port in string type
 // - output: file descriptor of listening socket
@@ -155,7 +176,7 @@ void sendResponse6(int connectfd, int status){
     data[0] = '6'; // first byte is request type
     data[1] = status + '0'; // second byte is status
 
-    // send to client (5 bytes)
+    // send to client (2 bytes)
     if( (sendBytes = send(connectfd, data, 2, 0)) < 0){
         perror("Error");
     };
@@ -166,40 +187,135 @@ void sendResponse6(int connectfd, int status){
 
 // function to handle data when connected clients want to send something to server (for e.g: player ready state)
 // - handle request type 7 from clients
+struct Message_holder
+{
+    int clientfd;
+    char message[6];
+    int length;   
+    Message_holder *next; 
+};
+Message_holder *message =  NULL,*tail = NULL; 
+Message_holder* find_holder(int clientfd, Message_holder *start)
+{
+    if (start==NULL) return NULL;
+    else
+    {
+        while (start!=NULL)
+        {
+            if (start->clientfd==clientfd) return start;
+            else start = start->next;
+        }
+    }
+    return start;
+}
 void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
-    char key;
-    char payload[BUFF_SIZE + 1];
-    char packet[BUFF_SIZE + 1];
+    Message_holder *temp =  find_holder(clientfd, message);
+    if (temp==NULL)
+    {
+        Message_holder *new_holder =  (Message_holder*) malloc(sizeof(Message_holder));
+        new_holder->clientfd= clientfd;
+        new_holder->next =NULL;
+        new_holder->length = 0;
+        if (message==NULL) 
+        {
+            message= new_holder;
+            tail =  new_holder;
+        }
+        else 
+        {
+            tail->next =  new_holder;
+            tail  = new_holder;
+        }
+        temp = new_holder;
+    }
     int sendBytes;
     int recvBytes;
-
-    // get opcode 
-    int opcode = buff[0];
-
-    // get user_id
-    if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
+    //printf("OK\n");
+    if( (recvBytes = recv(clientfd, buff, 2, 0)) < 0){
         perror("Error");
     } else if(recvBytes == 0){
         fprintf(stdout, "Client closes connection\n");
         return;
     }
-    int player_id = buff[0];
-
-    // get ready
-    if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
-        perror("Error");
-    } else if(recvBytes == 0){
-        fprintf(stdout, "Client closes connection\n");
-        return;
+    //printf("%d\n",recvBytes);
+    for (int i=0;i<recvBytes;i++)
+    {
+        temp->message[temp->length+i]= buff[i];
+        temp->length+=1;
     }
-    int ready = buff[0];
-
+    //printf("length: %d\n",temp->length);
+    if (temp->length==2)
+    {
+        int player_id =  temp->message[0];
+        //printf("id: %d\n",player_id);
+        int ready =  temp->message[1];
+        Player *correspondingPlayer = findPlayerInRoomById(players, player_id);
+        // if (correspondingPlayer ==NULL) printf("Not found player\n");
+        // else printf("Found player ID: %d\n", correspondingPlayer->id);
+        correspondingPlayer->ready = ready;
+        printf(GREEN "Player with id %d on has ready status : %d\n"RESET,correspondingPlayer->id, ready);
+        correspondingPlayer->udp_port_byte_sent = 0;
+        temp->length = 0;
+    }
+    //printf("Message is incomplete\n");
+    //printf("Received %d status from players\n",ready);
     // update internal linked list
-    Player *correspondingPlayer = findPlayerInRoomById(players, player_id);
-    correspondingPlayer->ready = ready;
+
 }
 
+// - function : sending the game UDP port to all clients
+// - input    : linked list of players
+// - output   : 1 if finished sending, 0 if not finished or error occured
+int sent_UDP_port(Player *head, int udp_port)
+{
+    // implementing non-blocking send using select
+    fd_set writefds;
+    struct timeval timeout; //timeout for each client is 1 second
+    timeout.tv_sec = 1;
+    timeout.tv_usec= 0;
+    char message[3];
+    message[0]=7;
+    message[1]= udp_port/256;
+    message[2]= udp_port%256; 
+    int finished_sending = 1;
+    // first we check the writability of each socket first
+    for (Player *p=head; p!=NULL;p=p->next)
+    {
+        int total_message_length =3; // we have to send 3 bytes to each client
+        int port_bytes_sent =  p->udp_port_byte_sent;
+        int tcp_client_sockfd =  p->socket_descriptor;
+        if (port_bytes_sent==total_message_length) continue;
+        else
+        {
+            finished_sending=0;
+            FD_ZERO(&writefds);
+            FD_SET(tcp_client_sockfd, &writefds);
+            
+            int activity =  select(tcp_client_sockfd+1, NULL, &writefds, NULL, &timeout);
+            if (activity >0)
+            {
+                int bytes_sent = send(tcp_client_sockfd, message+port_bytes_sent,3- port_bytes_sent, 0);
+                if (bytes_sent<0)
+                {
+                    char err_message[80];
+                    sprintf(err_message,"Error with Room message type 7 at client %d:",p->id);
+                    perror(err_message);
+                }
+                else p->udp_port_byte_sent+=bytes_sent;
+            }
+            else if (activity==0)
+            {
+                printf(YELLOW "Server: timeout occur when sending udp port to clients\n"RESET);                
+            }
+            else 
+            {
+                perror("Server: select failed while sending udp port");                
+            }
+        }
+    }
+    return finished_sending;
 
+}
 
 /*---------------------------------------------
 Main function to handle game room logic
@@ -211,6 +327,7 @@ Main function to handle game room logic
 // - output: 0 when room closes, 1 on error creating room
 // - will run until the room closes
 int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
+    int gameStart =0; // has the game started yet?
     fd_set master; // master file descriptor list 
     fd_set read_fds; // temp file descriptor list for select()
     int connectfd;
@@ -237,6 +354,48 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     sprintf(CHAR_TCP_PORT, "%d", TCP_SERV_PORT);
 
 
+    // ------------------------SET UP UDP PORT -----------------------------
+    int UDP_server_socket ;
+    char buffer[BUFF_SIZE];
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t udp_addr_len;
+    // Create UDP socket, maximum attempt to recreate is 5 times, if fails more then delete the room -> will implement this later on
+    if ((UDP_server_socket =  socket(AF_INET, SOCK_DGRAM,0))<0)
+    {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Set the socket to non-blocking mode
+    int flags =  fcntl(UDP_server_socket, F_GETFL,0);
+    if (flags<0)
+    {
+        perror("Failed to get socket flags");
+        exit(EXIT_FAILURE);        
+    }
+    if (fcntl(UDP_server_socket, F_SETFL, flags | O_NONBLOCK)<0)
+    {
+        perror("Failed to set non-blocking mode");
+        close(UDP_server_socket);
+        exit(EXIT_FAILURE);        
+    }
+
+    // configure server address structure
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family =  AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port =  htons(UDP_SERV_PORT);
+
+    // Bind the socket to the server address
+    if (bind(UDP_server_socket, (const struct sockaddr *)&server_addr, sizeof(server_addr))<0)
+    {
+        perror("Bind failed");
+        close(UDP_server_socket);
+        exit(EXIT_FAILURE);
+    }
+
+    printf(YELLOW "Non-blocking UDP Echo Server is running on port %d\n" RESET, UDP_SERV_PORT);
+
     // ------------------------ WAITING PERIOD -----------------------------
     // use select() to handle new connections
 
@@ -251,25 +410,37 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
 
     // notify 
     printf(YELLOW "Gameroom Server [%d] listening on %s\n" RESET, room_id, CHAR_TCP_PORT);
-
+    //printf("OK\n");
+    struct timeval tv;
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
     // main loop
-    for(;;){
+    while(1){
+        // int choice =0;
+        // scanf("%d",choice);
+        // if (choice ==0)
+        // {
+        //     close(UDP_server_socket);
+        //     close(listener);
+        //     return 0;
+        // }
+        //fprintf(stdout,"Game room is running\n");
         read_fds = master; // copy master set so we don't modify it, we need original version of this set
 
         // note that select() hanldes from file descriptor 0 -> fdmax (if arguments are provided as below)
         // however, select() will only handle those that have been added to `read_fds`
-        if(select(fdmax + 1, &read_fds, NULL, NULL, NULL) == -1){
+        if(select(fdmax + 1, &read_fds, NULL, NULL, &tv) == -1){
             perror("select");
             exit(4);
         }
-
         // run through the existing connections looking for data to read
         for(int i = 0; i <= fdmax; i++){
+            total_players = countPlayerInRoom(players);
             memset(buff, 0, sizeof(buff));
 
             // if we have one (can be new connection or data from connected clients)
             if(FD_ISSET(i, &read_fds)){
-                // printf("socket %d has sth to talk\n", i);
+                //printf("socket %d has sth to talk\n", i);
 
                 if(i == listener){
                     // handle new connections
@@ -278,7 +449,8 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
 
                     if(newfd == -1){
                         perror("accept");
-                    } else {
+                    } 
+                    else {
                         // notify
                         printf(YELLOW "Gameroom [%d]: a new connection from %s:%d on socket %d\n" RESET, 
                             room_id,
@@ -292,7 +464,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         );
 
                         // receive data from this new connection to check if it is authorized to join game room
-                        if( (nbytes = recv(i, buff, 1, 0)) <= 0){ // get one byte only (which is opcode, so we can process)
+                        if( (nbytes = recv(newfd, buff, 1, 0)) <= 0){ // get one byte only (which is opcode, so we can process)
                             // got error or connection closed by client
                             if(nbytes == 0){
                                 // connection closed
@@ -304,17 +476,18 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                             int can_join = 1;
 
                             // get user_id
-                            if( (nbytes = recv(connectfd, buff, 1, 0)) < 0){
+                            //printf("ckpt1\n");
+                            if( (nbytes = recv(newfd, buff, 1, 0)) < 0){
                                 perror("Error");
                             } else if(nbytes == 0){
                                 fprintf(stdout, "Client closes connection\n");
                                 //return;
                                 continue;
                             }
+                            //printf("ckpt2\n");
                             int player_id = buff[0];
 
                             // check total players
-                            total_players = countPlayerInRoom(players);
 
                             if(total_players >= 4) {
                                 can_join = 0;
@@ -376,10 +549,14 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                             }
 
                             // send response back to client
-                            sendResponse6(i, can_join);
+                            sendResponse6(newfd, can_join);
                         }
                     }
-                } else {
+                } 
+                
+                else 
+                
+                {
                     // handle data from connected clients (players who have already successfully connected to game room)
                     if( (nbytes = recv(i, buff, 1, 0)) <= 0){ // get one byte only (which is opcode, so we can process)
                         // got error or connection closed by client (kick this client out of the game room)
@@ -391,6 +568,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                             perror("recv");
                         }
 
+                        printf("socket %d , for real?\n",i);
                         close(i); // close this socket
                         FD_CLR(i, &master); // remove from master set
 
@@ -412,19 +590,160 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         }
                         printf("Child: Message sent to parent. %s\n", message.text);
 
-                    } else {
+                    } 
+                    else 
+                    {
                         // if we got some data from connected clients (i.e. handling ready state of players), process
-                        
-                        handleConnectedClients(i, buff);
+                        printf("OK\n");
+                        //waiting room - main game handle
+                        handleConnectedClients(i,buff);
+                        if (!gameStart) gameStart = check_gameStart_condition(players,total_players);
                     }
-                } // END handle data from client
+                    }
+                
+                }
+                }// END handle data from client 
+           // printf("Has the game started? %d\n",gameStart);
+            if (!gameStart) continue; // if the starting condition is not satisfied continue to wait
+            else 
+                {
+                        int finished_sent_UDP = sent_UDP_port(players,UDP_SERV_PORT); // if all the clients have been sent the UDP port, then we start!!
+                        if (!finished_sent_UDP) continue;
+                        else 
+                        {
+                //------------------ Initialize the game first -------------------
+                Game *game =  (Game*) malloc(sizeof(Game));
+                game->game_loop=0;
+                game->game_mode=0; //game mode 0  for deathmatch, game mode 1 for capture the flag
+                game->gravity=-1;
+                game->items = NULL;
+                game->players =  players;
+                if (game->game_mode==1){
+                    game->Score_team1 = 0;
+                    game->Score_team2 = 0;
+                    }
+                game->traps= NULL;
+                total_players =  countPlayerInRoom(players);
+                characterSpawner(game->players);
+                // set up a number of buffer for each client
+                char buffer[total_players][1024];
+                int byteReceived[total_players];
+                char send_buffer[1024];
+                int byteSerialized;
+                int fresh_start =1;
+                        while (true)
+                        {
+                   // printf("Game Running\n");
+
+//----------------------------------Main Game--------------------------------------//
+                // Listen from each client
+                int client_responded =0;
+                for (int each =0;each<total_players;each++)
+                {
+                    memset(buffer[each],0, BUFF_SIZE);
+                    addrlen =  sizeof(client_addr);
+                    byteReceived[each]=0;
+                    byteReceived[each] =  recvfrom(UDP_server_socket, buffer[each], BUFF_SIZE,0,(struct sockaddr*)&client_addr,&addrlen);
+                    if (byteReceived[each]<0)
+                        {
+                            if (errno == EWOULDBLOCK || errno ==EAGAIN) 
+                            {
+                                continue;
+                            }
+                            else 
+                            {
+                                perror("Receive failed");
+                                continue;
+                            }
+                        } 
+                    else if (byteReceived[each]>0 && client_responded==0) client_responded=1;
+                    if (byteReceived[each]>0)
+                    {
+                        Player *player = findPlayerInRoomById(game->players,buffer[each][0]);
+                        if (player==NULL) printf("Error : received from unknown client\n");
+                        else 
+                        {
+                            player->udp_clientaddr= client_addr;
+                            player->addrlen= addrlen;
+                        }
+                    }
+                }
+                if (!client_responded)
+                {
+                     // if no client has responded do not move the game state forward
+                    //printf("No client has responded yet\n");
+                    continue;
+                }
+                //printf("Someone said something !!!\n");
+                fresh_start=0;
+                // Parsing message from player input and update player state
+                for (int each =0;each<total_players;each++)
+                {
+                    if (byteReceived[each]!=5)  continue; //payload is always 5 bytes for each player
+                    else 
+                    {
+                        int id =  buffer[each][0];
+                        int movementx = buffer[each][1];
+                        int movementy =  buffer[each][2];
+                        int action =  buffer[each][3];
+                        int interaction =  buffer[each][4];
+
+                        Player* player =  findPlayerInRoomById(game->players, id);
+                        if (player ==NULL) 
+                        {
+                            printf("Player ID %d not found\n",id);
+                            continue;                            
+                        }
+                        else
+                        {
+                            player->movement_x=movementx;
+                            handleActionChangeFromInput(player, action); // handle change in animation first
+                            //if (movementy!=0) handleJumpCrouch(player, movementy);
+                            //handleInteraction(player, interaction);
+                        }
+
+                    }            
+                }
+
+                // update and serialize players' info
+                memset(send_buffer, 0, BUFF_SIZE);
+                byteSerialized=0;
+                Player *temp;
+                for (temp=game->players;temp!=NULL;temp= temp->next)
+                {
+                    update_player(temp);
+                    byteSerialized = serialize_player_info(send_buffer, byteSerialized, temp);
+                }
+                printf("Payload size is %d bytes\n",byteSerialized);
+                //Let's send to each
+                int byteSent = 0;
+                for (temp=game->players;temp!=NULL;temp= temp->next)
+                {
+                    addrlen =  sizeof(temp->cliaddr);
+                    byteSent =sendto(UDP_server_socket, send_buffer, byteSerialized,0, (const struct sockaddr *)&temp->udp_clientaddr,temp->addrlen);
+                    if (byteSent<=0)
+                        {
+                            char message[100];
+                            sprintf(message, "Send failed for player id %d",temp->id);
+                            perror(message);
+                        }  
+                    else 
+                    {
+                        printf("well, obviously server sent %d bytes ?\n",byteSent);
+                    }
+                        
+                }
+
+            }                           
+                
+
             } // END got new incoming connections
         } // END looping through file descriptors
-    } // END for(;;)
 
-    
+ // END for(;;)
+    }
+ return 0;
+}    
     // ------------------------ INGAME PERIOD -----------------------------
     // not implemented
 
-    return 0;
-}
