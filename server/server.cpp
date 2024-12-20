@@ -461,6 +461,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
             return;
         }
         int player_id = buff[0];
+        printf("Player ID:%d\n", player_id);
 
         // get room id
         if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
@@ -469,8 +470,8 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
             fprintf(stdout, "Client closes connection\n");
             return;
         }
-        int room_id = buff[0] - '0';
-
+        int room_id = buff[0];
+        printf("Room ID: %d\n", room_id);
         // check if client can join this room
         Room *room = findRoomById(rooms, room_id);
         int status;
@@ -479,16 +480,15 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
         } else {
             status = 1;
         }
-
         // if player can join
         if(status == 1){
             // send response back to client
-            sendResponse5(connectfd, status, room_id, tcp_room_port);
+            sendResponse5(connectfd, status, room_id, room->tcp_port);
         } else {
             // player cannot join because room full
 
             // send response back to client
-            sendResponse5(connectfd, status, room_id, tcp_room_port);
+            sendResponse5(connectfd, status, room_id, room->tcp_port);
         }
     }
 

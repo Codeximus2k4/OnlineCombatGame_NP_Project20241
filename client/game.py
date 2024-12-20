@@ -35,6 +35,9 @@ class GameManager:
         # Players
         self.player1 = None
         self.entities = []
+
+        # User id
+        self.user_id = None
     
     def load_assets(self):
         """Load game assets"""
@@ -141,8 +144,9 @@ class GameManager:
                             response = login_register_request(username=username_text, 
                                                               password=password_text, 
                                                               mode=mode)
-                            print(response)
                             if response[1] == "1": 
+                                self.user_id = ord(response[2])
+                                print(f"Login successfully with user_id: {self.user_id}")
                                 self.main_menu()
                                 response_flag = True
                             else:
@@ -158,8 +162,8 @@ class GameManager:
                             response = login_register_request(username=username_text, 
                                                               password=password_text, 
                                                               mode=mode)
-                            print(response)
                             if response[1] == "1":
+                                print("Register successfully")
                                 mode = "login"
                                 response_flag = True
                             else:
@@ -355,7 +359,12 @@ class GameManager:
                     
                     if host_button.checkForInput(mouse_pos):
                         # Implement host room logic
-                        self.waiting_room_screen(1)
+                        # Send the request to the server to get the room information
+                        status, room_id, tcp_port = host_room_request(user_id=self.user_id)
+                        if status=="1":
+                            self.waiting_room_screen(user_id=self.user_id,
+                                                        room_id=room_id,
+                                                        room_tcp_port=tcp_port)
                         return
                     
                     if back_button.checkForInput(mouse_pos):
@@ -363,21 +372,19 @@ class GameManager:
             
             pygame.display.update()
     
-    def waiting_room_screen(self, user_id):
+    def waiting_room_screen(self, user_id, room_id, room_tcp_port):
         """Waiting room screen for host"""
-        # Send the request to the server to get the room information
-        status, room_id, tcp_port = host_room_request(user_id=user_id)
 
         # Connect to the room TCP network
         host_room_tcp_socket = NetworkManager(
             server_addr=config.SERVER_ADDR,
-            server_port=tcp_port
+            server_port=room_tcp_port
         )
         time.sleep(1)
         host_room_tcp_socket.connect()
         
         # Join the room (send message type 6)
-        response = join_room_request(user_id=user_id, 
+        response = connect_room_request(user_id=user_id, 
                                      host_room_socket=host_room_tcp_socket)
         print("Join room response: " + response)
 
@@ -401,44 +408,42 @@ class GameManager:
             hovering_color="White"
         )  
 
-        print(1)
-        if status == '1':
-            while True:
-                self.screen.blit(self.background, (0, 0))
-                mouse_pos = pygame.mouse.get_pos()
+        while True:
+            self.screen.blit(self.background, (0, 0))
+            mouse_pos = pygame.mouse.get_pos()
+            
+            # Title
+            text = f"ROOM {room_id}"
+            title_text = self.title_font.render(text, True, config.COLORS['MENU_TEXT'])
+            title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH//2, 100))
+            
+            
+            self.screen.blit(title_text, title_rect)
+            
+            for button in [ready_button, back_button]:
+                button.changeColor(mouse_pos)
+                button.update(self.screen)
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    host_room_tcp_socket.close()
+                    pygame.quit()
+                    sys.exit()
                 
-                # Title
-                text = f"ROOM {room_id}"
-                title_text = self.title_font.render(text, True, config.COLORS['MENU_TEXT'])
-                title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH//2, 100))
-                
-                
-                self.screen.blit(title_text, title_rect)
-                
-                for button in [ready_button, back_button]:
-                    button.changeColor(mouse_pos)
-                    button.update(self.screen)
-                
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        host_room_tcp_socket.close()
-                        pygame.quit()
-                        sys.exit()
-                    
-                    if event.type == pygame.MOUSEBUTTONDOWN:                  
-                        if ready_button.checkForInput(mouse_pos):
-                            if ready == False:
-                                ready_button.text_input = "CANCEL"
-                                ready_button.base_color = config.COLORS["RED"]
-                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
-                                ready = True
-                            else:
-                                ready_button.text_input = "READY"
-                                ready_button.base_color = config.COLORS["GREEN"]
-                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
-                                ready = False
-                        if back_button.checkForInput(mouse_pos):
-                            return
+                if event.type == pygame.MOUSEBUTTONDOWN:                  
+                    if ready_button.checkForInput(mouse_pos):
+                        if ready == False:
+                            ready_button.text_input = "CANCEL"
+                            ready_button.base_color = config.COLORS["RED"]
+                            ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                            ready = True
+                        else:
+                            ready_button.text_input = "READY"
+                            ready_button.base_color = config.COLORS["GREEN"]
+                            ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                            ready = False
+                    if back_button.checkForInput(mouse_pos):
+                        return
                 pygame.display.update()
 
     def list_of_room_screen(self):
@@ -472,7 +477,7 @@ class GameManager:
                 room_id = int(response[index])-48
                 total_players = int(response[index+1])-48
                 room_list.append({"room_id": room_id, "total_players": total_players})
-                index += 2
+                index += 4
 
             return room_list
 
@@ -497,7 +502,7 @@ class GameManager:
             left_button = Button(
                 image=pygame.image.load("data/images/menuAssets/Buttons Rect.png"),
                 pos=(config.SCREEN_WIDTH // 10, config.SCREEN_HEIGHT // 2),
-                text_input="<-",
+                text_input="<",
                 font=get_font(30),
                 base_color=config.COLORS['BUTTON_BASE'],
                 hovering_color="White"
@@ -505,7 +510,7 @@ class GameManager:
             right_button = Button(
                 image=pygame.image.load("data/images/menuAssets/Buttons Rect.png"),
                 pos=(config.SCREEN_WIDTH - config.SCREEN_WIDTH // 10, config.SCREEN_HEIGHT // 2),
-                text_input="->",
+                text_input=">",
                 font=get_font(30),
                 base_color=config.COLORS['BUTTON_BASE'],
                 hovering_color="White"
@@ -586,7 +591,14 @@ class GameManager:
                     for button, room_id in buttons:
                         if button.checkForInput(mouse_pos):
                             print(f"Connect to the game room ID: {room_id}")
-                            return room_id  # Return selected room ID
+                            room_tcp_port = join_room_request(user_id=self.user_id,
+                                                              room_id=room_id)
+                            print(f"Room TCP port: {room_tcp_port}")
+                            if room_tcp_port >= 10000:
+                                self.waiting_room_screen(user_id=self.user_id,
+                                                         room_id=room_id,
+                                                         room_tcp_port=room_tcp_port)
+                            
 
             pygame.display.update()
 

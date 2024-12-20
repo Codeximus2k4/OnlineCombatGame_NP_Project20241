@@ -188,7 +188,7 @@ Room *addRoom(Room *head, Room *room) {
 Room *makeRoom(int id, int tcp_port, int udp_port){
     Room *p = (Room *) malloc(sizeof(Room));
     p->id = id;
-    p->tcp_port = udp_port;
+    p->tcp_port = tcp_port;
     p->udp_port = udp_port;
     p->started = 0; // when we create a room then this room must not be started yet
     p->next = NULL;
