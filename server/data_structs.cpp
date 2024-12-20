@@ -259,6 +259,7 @@ int countRooms(Room *head) {
 void serializeRoomInformation(char result[], Room *head){
     int totalRooms = 0;
     char strnum[50]; // used for converting integer to array of char
+    int offset = 0; //offset of result[]
 
     // if list of rooms is empty
     if(head == NULL) {
@@ -270,13 +271,14 @@ void serializeRoomInformation(char result[], Room *head){
 
     // count total of available rooms and set it to first byte
     int totalRoom = countRooms(head);
-    snprintf(strnum, sizeof(strnum), "%d", totalRoom);
+    offset += snprintf(strnum, sizeof(strnum), "%d", totalRoom);
     strcpy(result, strnum);
 
     Room *p = head;
+
     while(p != NULL){
         // set first byte to room_id
-        snprintf(strnum, sizeof(strnum), "%d", p->id);
+        offset += snprintf(strnum, sizeof(strnum), "%d", p->id);
         strcat(result, strnum);
 
         // count players in room
@@ -285,12 +287,19 @@ void serializeRoomInformation(char result[], Room *head){
         // printf("Total players in room %d is: %d\n", p->id, totalPlayerInRoom);
 
         // set second byte to # of players
-        snprintf(strnum, sizeof(strnum), "%d", totalPlayerInRoom);
+        offset += snprintf(strnum, sizeof(strnum), "%d", totalPlayerInRoom);
         strcat(result, strnum);
+
+        int room_tcp_port = p->tcp_port;
+        // convert TCP port of room network byte (2 bytes) because there are 65536 ports
+        uint16_t byte_room_tcp_port = htons(room_tcp_port);
+        // append these 2 bytes to response packet
+        memcpy(result + offset, &byte_room_tcp_port, 2);
 
         // increment
         totalRooms++;
         p = p->next;
+        offset += 2;
     }
 
     // printf("totalRooms=%d\n", totalRooms);
