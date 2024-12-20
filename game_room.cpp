@@ -326,6 +326,7 @@ void *listenFromClients(void *arg){
     // get udp_server_socket
     int udp_server_socket = *(int *) arg;
 
+    // init other data
     char buff[BUFF_SIZE + 1];
     int rcvBytes;
     sockaddr_in clientAddr;
@@ -351,6 +352,7 @@ void *listenFromClients(void *arg){
         // get player_id of this data
         int player_id = buff[0];
         
+        // find the corresponding player in the linkedlist
         Player *player = findPlayerInRoomById(players, player_id);
 
         // update UDP address of this client
@@ -361,7 +363,7 @@ void *listenFromClients(void *arg){
         player->bytes_received = rcvBytes;
     }
 
-
+    
     pthread_exit(NULL);
 }
 
