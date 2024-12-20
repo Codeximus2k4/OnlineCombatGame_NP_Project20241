@@ -510,6 +510,7 @@ int main (int argc, char *argv[]) {
     int SERV_PORT;
     char cli_addr[100];
     int sockfd; // sockfd for listening on TCP on general server
+    int yes = 1; // to use for setsockopt()
 
     // check if user inputed port or not
     if(argc != 2){
@@ -538,6 +539,9 @@ int main (int argc, char *argv[]) {
         return 0;
     }
     fprintf(stdout, GREEN "[+] Successfully created TCP socket\n" RESET);
+
+    // lose the pesky "address already in use" error message
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
 
     //Step 2: Bind address to socket
     memset(&servaddr, 0, sizeof(servaddr));

@@ -330,7 +330,7 @@ void *listenFromClients(void *arg){
     char buff[BUFF_SIZE + 1];
     int rcvBytes;
     sockaddr_in clientAddr;
-    int len = sizeof(clientAddr);
+    socklen_t len = sizeof(clientAddr);
 
 
     // detach this thread so that it terminates upon finishes
@@ -692,28 +692,18 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
 
         // Listen from each client
         int client_responded =0;
-        
-        
-
-        if (!client_responded)
-        {
-                // if no client has responded do not move the game state forward
-            //printf("No client has responded yet\n");
-            continue;
-        }
-        //printf("Someone said something !!!\n");
-        fresh_start=0;
+        Player *each ;
         // Parsing message from player input and update player state
-        for (int each =0;each<total_players;each++)
+        for (each =players;each!=NULL;each=each->next)
         {
-            if (byteReceived[each]!=5)  continue; //payload is always 5 bytes for each player
+            if (each->bytes_received!=5)  continue; //payload is always 5 bytes for each player
             else 
             {
-                int id =  input_buffer[each][0];
-                int movementx = input_buffer[each][1];
-                int movementy =  input_buffer[each][2];
-                int action =  input_buffer[each][3];
-                int interaction =  input_buffer[each][4];
+                int id =  each->input_buffer[0];
+                int movementx = each->input_buffer[1];
+                int movementy =  each->input_buffer[2];
+                int action =  each->input_buffer[3];
+                int interaction =  each->input_buffer[4];
 
                 Player* player =  findPlayerInRoomById(game->players, id);
                 if (player ==NULL) 
@@ -728,7 +718,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     //if (movementy!=0) handleJumpCrouch(player, movementy);
                     //handleInteraction(player, interaction);
                 }
-
+                if (!client_responded) client_responded=1;
             }            
         }
 
@@ -747,7 +737,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         for (temp=game->players;temp!=NULL;temp= temp->next)
         {
             addrlen =  sizeof(temp->cliaddr);
-            byteSent =sendto(UDP_server_socket, send_buffer, byteSerialized,0, (const struct sockaddr *)&temp->cliaddr,temp->addrlen);
+            byteSent =sendto(UDP_server_socket, send_buffer, byteSerialized,0, (const struct sockaddr *)&temp->cliaddr,addrlen);
             if (byteSent<=0)
                 {
                     char message[100];

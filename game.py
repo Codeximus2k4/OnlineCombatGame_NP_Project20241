@@ -597,7 +597,6 @@ class Game:
                 if event.type ==pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                movement_x=0
                 movement_y = 0
                 action  = 0
                 interaction = 0

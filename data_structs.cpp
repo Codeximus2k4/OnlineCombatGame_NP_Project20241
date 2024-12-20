@@ -105,7 +105,6 @@ struct Player {
     int socket_descriptor; // socket descriptor corresponding for each player (to handle select())
     int ready;
     sockaddr_in cliaddr; // IPv4 address corresponding to each player
-    socklen_t addrlen;
     Hitbox *selfHitBox; //
     char input_buffer[256]; // input buffer of each player
     int bytes_received;
