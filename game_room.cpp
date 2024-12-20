@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <errno.h> // use of errno variable
 #include<pthread.h>
+#include<time.h>
 
 //ipc libraries
 #include <sys/ipc.h>
@@ -20,7 +21,7 @@
 
 #include "data_structs.cpp"
 
-
+#define TICK_RATE 60 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 
 // Define color escape codes for colorful text
@@ -340,13 +341,14 @@ void *listenFromClients(void *arg){
     while(1){
         // reset the buff
         memset(buff, BUFF_SIZE, 0);
-
+        //printf("Hello?\n");
         // receive data from client
         rcvBytes = recvfrom(udp_server_socket, buff, BUFF_SIZE, 0, (struct sockaddr *) &clientAddr, &len);
         if(rcvBytes < 0){
             perror("Error: ");
             return 0;
         }
+        //else printf("Received something\n");
         buff[rcvBytes] = '\0';
 
         // get player_id of this data
@@ -357,6 +359,7 @@ void *listenFromClients(void *arg){
 
         // update UDP address of this client
         player->cliaddr = clientAddr;
+        player->addrlen =  len;
 
         // copy the data received corresponds to this player
         strcpy(player->input_buffer, buff);
@@ -603,7 +606,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     else 
                     {
                         // if we got some data from connected clients (i.e. handling ready state of players), process
-                        printf("OK\n");
+                        //printf("OK\n");
                         //waiting room - main game handle
                         handleConnectedClients(i,buff);
                         if (!gameStart) gameStart = check_gameStart_condition(players,total_players);
@@ -674,32 +677,63 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     characterSpawner(game->players);
     // set up a number of buffer for each client
     
-    int byteReceived[total_players];
     char send_buffer[1024];
     int byteSerialized;
     int fresh_start =1;
 
     //----------------------------------Main Game--------------------------------------//
 
+    // ---------------------------------Test UDP --------------------------------------//
+    // socklen_t len = sizeof(client_addr);
+    // int rcvBytes = recvfrom(UDP_server_socket, buff, BUFF_SIZE, 0, (struct sockaddr *) &client_addr, &len);
+    //     if(rcvBytes < 0){
+    //         perror("Error: ");
+    //         return 0;
+    //     }
+    // int player_id = buff[0];
+        
+    //     // find the corresponding player in the linkedlist
+    // Player *player = findPlayerInRoomById(players, player_id);
+
+    //     // update UDP address of this client
+    // player->cliaddr = client_addr;
+    // player->addrlen = len;
+    // buff[0]=player_id;
+    // buff[1]=1;
+    // if (sendto(UDP_server_socket,buff, 2,0,(struct sockaddr *)&player->cliaddr, ))
+
+        // copy the data received corresponds to this player
+    
+
     // create a thread to handle listening from client (and broadcasting) data 
     if(pthread_create(&tid, NULL, listenFromClients, &UDP_server_socket) != 0){
         perror(RED "Error creating thread ");
     }
+    struct timespec last_tick, current_time;
+    clock_gettime(CLOCK_MONOTONIC, &last_tick);
 
     while (true)
                 {
-            // printf("Game Running\n");
+
+        clock_gettime(CLOCK_MONOTONIC, &current_time);
+        long elapsed_ms  =  (current_time.tv_sec - last_tick.tv_sec)*1000 
+                            + (current_time.tv_nsec - last_tick.tv_nsec)/1000000;
 
         // Listen from each client
+        if (elapsed_ms >TICK_RATE)
+        {
         int client_responded =0;
-        Player *each ;
+                // if no client has responded do not move the game state forward
+            //printf("No client has responded yet\n");
+        //printf("Someone said something !!!\n");
         // Parsing message from player input and update player state
-        for (each =players;each!=NULL;each=each->next)
+        Player *each;
+        for (each =game->players;each!=NULL;each=each->next)
         {
             if (each->bytes_received!=5)  continue; //payload is always 5 bytes for each player
             else 
             {
-                int id =  each->input_buffer[0];
+                int id = each->input_buffer[0];
                 int movementx = each->input_buffer[1];
                 int movementy =  each->input_buffer[2];
                 int action =  each->input_buffer[3];
@@ -718,10 +752,12 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     //if (movementy!=0) handleJumpCrouch(player, movementy);
                     //handleInteraction(player, interaction);
                 }
+                each->bytes_received=0;
                 if (!client_responded) client_responded=1;
+
             }            
         }
-
+        if (!client_responded) continue;
         // update and serialize players' info
         memset(send_buffer, 0, BUFF_SIZE);
         byteSerialized=0;
@@ -731,7 +767,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
             update_player(temp);
             byteSerialized = serialize_player_info(send_buffer, byteSerialized, temp);
         }
-        printf("Payload size is %d bytes\n",byteSerialized);
+        //printf("Payload size is %d bytes\n",byteSerialized);
         //Let's send to each
         int byteSent = 0;
         for (temp=game->players;temp!=NULL;temp= temp->next)
@@ -746,15 +782,19 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                 }  
             else 
             {
-                printf("well, obviously server sent %d bytes ?\n",byteSent);
+               //printf("well, obviously server sent %d bytes ?\n",byteSent);
             }
                 
         }
 
-        }     
+        }
+        else 
+        {
+            usleep(1000);
+        }  
+        }   
 
  return 0;
 }    
-    // ------------------------ INGAME PERIOD -----------------------------
-    // not implemented
+    
 
