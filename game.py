@@ -372,26 +372,16 @@ class Game:
         
     def test_udp(self):
         SERVER_ADDR = "127.0.0.1"
-        while True:
-            choice  =  int(input())
-            if (choice ==0):
-                break
-            elif choice ==1:
-                message =  "HELLO"
-                
+        message = self.client_id.to_bytes(1,"big")  
+        self.udp_room_socket.sendto(message, (SERVER_ADDR, self.udp_room_port))
+        data, address = self.udp_room_socket.recvfrom(1024)
+        if (len(data)<=0):
+            print("Error: test udp connection")
+        elif data[1]==1:
+            return 1
+        else:
+            return 0
 
-                #non-blocking send using select
-                _ , writefds, _ =  select.select([],[self.udp_room_socket,0],[],1)
-                for socket in writefds:
-                    if socket == self.udp_room_socket:
-                        self.udp_room_socket.sendto(message.encode(), (SERVER_ADDR, self.udp_room_port))
-                
-                readfds, _, _ =  select.select([self.udp_room_socket,0],[],[],1)
-                for socket in readfds:
-                    data, address = self.udp_room_socket.recvfrom(1024)
-                    print(f"Received from server: {data}")
-                if len(readfds)==0:
-                    print("Nothing to read yet")
         
 
     def menu(self):
@@ -505,8 +495,8 @@ class Game:
                     found_entity=True
                     each.pos = [posx,posy]
                     if entity_type==0:
-                        #each.flip = flip
-                        #each.action_type =  action_type -> will implement this specifically later
+                        each.flip = flip
+                        each.set_action(action_type,False)
                         each.health = health
                         each.stamina = stamina  
             if not found_entity:
@@ -515,7 +505,7 @@ class Game:
                                          , posy=posy, health=health, stamina=stamina)
                     new_player.set_action(0, True)
                     self.entities.append(new_player)
-        print(f"There are {len(self.entities)} in game")
+            #print(f"There are {len(self.entities)} in game")
          
 
     def run(self):
@@ -554,23 +544,29 @@ class Game:
 
         # create socket to send input/receive input to/from server
         input_socket = self.udp_room_socket
-        self.udp_room_socket.setblocking(False)
-        q = queue.Queue(maxsize= 10)
+        #self.udp_room_socket.setblocking(False)
+        q = queue.Queue(maxsize= 1)
 
         # 
         # ---------- MULTI-THREAD HANDLING---------
         # target function for multi-thread handling
-        def receive_messages(sock, queue):
+        def receive_messages(sock, q):
             while True:
                 try:
                     data, _ = sock.recvfrom(1024)
                     if (len(data)!=0):
-                        queue.put(data)
+                        try :
+                            q.get(block=False)
+                        except Exception as e:
+                            pass
+                        q.put(data)
                 except BlockingIOError as e:
                     continue
                     
         
         # # # Start a thread to handle incoming messages
+        #status = self.test_udp()
+        #print("Test udp stataus :",status)
         thread = threading.Thread(target=receive_messages, args = (self.udp_room_socket, q),daemon=True)
         # #thread.daemon = True # Allow thread to exit when main program exits
         thread.start()
@@ -587,19 +583,19 @@ class Game:
         #---------------------------------------------------------
             if self.player is None:
                 for each in self.entities:
-                    print(f"{each.id} - {self.client_id}")
                     if each.entity_type ==0 and each.id == self.client_id:
                         self.player = each
                         break
             
+            msg = self.client_id.to_bytes(1,"big")
+            movement_x=0
+            movement_y = 0
+            action  = 0
+            interaction = 0
             for event in pygame.event.get():
-                msg = self.client_id.to_bytes(1,"big")
                 if event.type ==pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                movement_y = 0
-                action  = 0
-                interaction = 0
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_w:
                         movement_y+=1
@@ -639,24 +635,25 @@ class Game:
                 
                 # correct the movement_x and movement_y and attack
                 
-                if self.horizontal_movement[0]-self.horizontal_movement[1]==-1:
-                    movement_x=1
-                elif self.horizontal_movement[0]-self.horizontal_movement[1]==1:
-                    movement_x=2
-                else:
-                    movement_x=0
-                if movement_y==-1:
-                    movement_y = 2
-                if action ==-1:
-                    action=2
+            if self.horizontal_movement[0]-self.horizontal_movement[1]==-1:
+                movement_x=1
+            elif self.horizontal_movement[0]-self.horizontal_movement[1]==1:
+                movement_x=2
+            else:
+                movement_x=0
+            if movement_y==-1:
+                movement_y = 2
+            if action ==-1:
+                action=2
 
-                msg += movement_x.to_bytes(1,"big") + movement_y.to_bytes(1,"big")+action.to_bytes(1,"big")+ interaction.to_bytes(1,"big")
-                byteSent = self.udp_room_socket.sendto(msg, (SERVER_ADDR, self.udp_room_port))
+            msg += movement_x.to_bytes(1,"big") + movement_y.to_bytes(1,"big")+action.to_bytes(1,"big")+ interaction.to_bytes(1,"big")
+            byteSent = self.udp_room_socket.sendto(msg, (SERVER_ADDR, self.udp_room_port))
 
-                if (byteSent<=0):
-                    print("Send payload: failed")
-                else:
-                    print(f"Send {byteSent} bytes to server")
+            if (byteSent<=0):
+                pass
+               # print("Send payload: failed")
+            else:
+                print(f"Send {byteSent} bytes to server")
                 #print(msg)
             
         
@@ -672,20 +669,20 @@ class Game:
                 self.de_serialize_entities(data)
         
             for each in self.entities:
+                each.update()
                 each.render(self.display)
-                if each is self.player:
-                    direction = self.horizontal_movement[0]-self.horizontal_movement[1]
-                    if direction==0:
-                        each.set_action(0,False)
-                    elif direction ==1:
-                        each.set_action(3,False)
-                        each.flip=1
-                    elif direction ==-1:
-                        each.set_action(3,False)
-                        each.flip=0
-                    each.update()
-                else:
-                    each.update()
+                # if each is self.player:
+                #     direction = self.horizontal_movement[0]-self.horizontal_movement[1]
+                #     if direction==0:
+                #         each.set_action(0,False)
+                #     elif direction ==1:
+                #         each.set_action(3,False)
+                #         each.flip=1
+                #     elif direction ==-1:
+                #         each.set_action(3,False)
+                #         each.flip=0
+                #     each.update()
+                # else:
             self.display_2.blit(self.display, (0,0))
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
             pygame.display.update()
