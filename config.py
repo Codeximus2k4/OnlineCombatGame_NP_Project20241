@@ -22,6 +22,7 @@ COLORS = {
     'BLACK': (0, 0, 0),
     'RED': (255, 0, 0),
     'GREEN': (0, 128, 0),
+    'BLUE': (0, 0, 128),
     'BROWN': (182, 143, 64),
     'MENU_TEXT': "#b68f40",
     'BUTTON_BASE': "#d7fcd4"
