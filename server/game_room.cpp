@@ -13,6 +13,9 @@
 #include <signal.h>
 #include <errno.h> // use of errno variable
 
+#include "db_connection.cpp"
+#include <libpq-fe.h> //library to connect to postgresql
+
 //ipc libraries
 #include <sys/ipc.h>
 #include <sys/msg.h>

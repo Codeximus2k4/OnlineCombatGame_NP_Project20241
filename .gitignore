@@ -32,4 +32,4 @@ jmeter.log
 
 Makefile
 
-./server/server
+server/server

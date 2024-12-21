@@ -2,8 +2,7 @@
 #include "game_room.cpp"
 //#include "data_structs.cpp"
 
-#include "db_connection.cpp"
-#include <libpq-fe.h> //library to connect to postgresql
+
 
 //ipc libraries
 // #include <sys/ipc.h>
@@ -31,6 +30,7 @@ Defining global variables
 -----------------------------------------------
 */
 int msgid; // messeage queue id 
+pthread_t thread_id; // thread id used for listening from child process in parent process 
 int tcp_room_port = 10000; // tcp port for each game room, first used port will be 10000
 int udp_room_port = 20000; // udp port for each game room, first used port will be 20000
 Room *rooms = NULL; // pointer to head of rooms created on server
@@ -56,11 +56,21 @@ does not handle logic
 // Signal handler for control + C case from user
 void handle_sigint(int sig) {
     printf(YELLOW "Caught signal %d (Ctrl + C), Cleaning up...\n" RESET, sig);
+
+    // clean message queue existing on our machine
     if (msgctl(msgid, IPC_RMID, NULL) == -1) {
         perror("msgctl (remove)");
     } else {
         printf("Message queue removed successfully.\n");
     }
+
+    // kill currently running msg queue listening thread (without waiting for it to finish)
+    if (pthread_cancel(thread_id) != 0) {
+        perror(RED "pthread_cancel" RESET);
+    } else {
+        printf(BLUE "(In main server) Listening thread killed successfully.\n" RED);
+    }
+
     exit(0); // Exit the program
 }
 
@@ -576,8 +586,6 @@ int main (int argc, char *argv[]) {
     printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP)\n" RESET, SERV_PORT);
 
     //-----------handle ipc-------------------------
-    
-    pthread_t thread_id;
 
     // Generate a unique key
     int key = ftok("progfile", 65);
