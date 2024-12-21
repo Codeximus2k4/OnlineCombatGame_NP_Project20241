@@ -5,6 +5,12 @@
 #include "db_connection.cpp"
 #include <libpq-fe.h> //library to connect to postgresql
 
+//ipc libraries
+// #include <sys/ipc.h>
+// #include <sys/msg.h> // no need to include here (could cause error since we already included in game_room)
+
+#include<pthread.h>
+
 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 
@@ -24,11 +30,10 @@
 Defining global variables
 -----------------------------------------------
 */
-
+int msgid; // messeage queue id 
 int tcp_room_port = 10000; // tcp port for each game room, first used port will be 10000
 int udp_room_port = 20000; // udp port for each game room, first used port will be 20000
 Room *rooms = NULL; // pointer to head of rooms created on server
-Player *logged_in_players = NULL; // pointer to head of logged in players linked list
 int roomCount = 0; // keep track of total rooms created
 
 /*---------------------------------------------
@@ -47,6 +52,18 @@ does not handle logic
     + id: int (eg: 1)
 -----------------------------------------------
 */
+
+// Signal handler for control + C case from user
+void handle_sigint(int sig) {
+    printf(YELLOW "Caught signal %d (Ctrl + C), Cleaning up...\n" RESET, sig);
+    if (msgctl(msgid, IPC_RMID, NULL) == -1) {
+        perror("msgctl (remove)");
+    } else {
+        printf("Message queue removed successfully.\n");
+    }
+    exit(0); // Exit the program
+}
+
 
 // - function to handle if client sends unauthorized request
 void sendNotLoggedInResponse(int connectfd){
@@ -123,7 +140,7 @@ void sendResponse3(int connectfd){
     };
     
     // print to check
-    printf(YELLOW "Number of bytes sent to client=%d\n" RESET, sendBytes);
+    printf(YELLOW "Number of bytes sent to client=%d\n" RESET, sendBytes, roomInformation, strlen(roomInformation));
 }
 
 // - function to handle case client wants to create room
@@ -203,12 +220,49 @@ void sendResponse5(int connectfd, int status, int room_id, int room_tcp_port){
 
 }
 
+// Thread function to handle ipc messages
+// input: id of the message queue 
+void *message_handler(void *arg) {
+    int msgid = *(int *)arg;
+    struct msqid_ds buf;
+
+    while (1) {
+        //--------------------IPC-------------------
+        // Get the status of the message queue and store into buf
+        if (msgctl(msgid, IPC_STAT, &buf) == -1) {
+            perror(RED "msgctl" RESET);
+            continue;
+        }
+
+        // Check if the queue is empty
+        if (buf.msg_qnum != 0) { //the queue is not empty
+            // receive message from child process
+            struct ipc_msg message;
+
+            // Receive the message
+            if (msgrcv(msgid, &message, sizeof(message.text), 1, 0) == -1) {
+                perror(RED "msgrcv failed" RESET);
+                continue;
+            }
+
+            printf("Parent: Message receive from child. %s\n", message.text);
+
+            //update room status
+            int room_id_updated = message.text[0] - '0';
+            Room *room_updated = findRoomById(rooms, room_id_updated); //find room
+            room_updated->total_players = message.text[1] - '0'; //update num of players in room
+            room_updated->ready = message.text[2] - '0'; //update ready status
+            printf("Total number of player in room %d is %d\n", room_id_updated, room_updated->total_players);
+            if (room_updated->total_players == 0) rooms = removeRoomFromListRooms(rooms, room_updated);
+        }
+    }
+}
 
 
 // - function to handle a request from client
-// - input: socket descriptor connected with client, users db connection
+// - input: socket descriptor connected with client, users db connection, the id of the message queue
 // - dependencies: sendResponse1, sendResponse2, sendResponse3, sendResponse4, sendResponse5
-void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *conn) {
+void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *conn, int msgid) {
     int recvBytes;
     char message_type;
     char buff[500];
@@ -234,7 +288,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
         char password[200];
         int password_length;
 
-        //get username_length
+        // get username_length
         if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
             perror("Error");
         } else if(recvBytes == 0){
@@ -340,10 +394,6 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
 
             // send response back to client
             sendResponse2(connectfd, status, user_id);
-
-            //add a new player to the logged_in_players list
-            Player *new_player = makePlayer(user_id, cliaddr);
-            logged_in_players = addPlayerToLoginList(logged_in_players, new_player);
         }
         else { //login fail
             status = 0; 
@@ -388,11 +438,13 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
             close(connectfd);
 
             printf(BLUE "[+] Created a new game room with id = %d, tcp_port is: %d, udp_port is: %d\n" RESET, roomCount, tcp_room_port, udp_room_port, cli_addr, ntohs(cliaddr.sin_port));
-
+            
             // ------------------------ GAME ROOM SERVER -----------------------------
             // now game room server is created, game room server will listen
             // on another socket with another port separated from main server
-            gameRoom(tcp_room_port, udp_room_port);
+            gameRoom(room_id, tcp_room_port, udp_room_port, msgid);
+
+
             
             // kill this subprocess after room closes
             exit(0);
@@ -401,10 +453,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
 
             // notify back to client
             sendResponse4(connectfd, room_id, tcp_room_port);
-
-            // add this player to the room
-            Player *p = makePlayer(player_id, cliaddr);
-            addPlayerToRoom(rooms, room_id, p);
+            
 
             // update room count and room ports
             roomCount++;
@@ -424,6 +473,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
             return;
         }
         int player_id = buff[0];
+        printf("Player ID:%d\n", player_id);
 
         // get room id
         if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
@@ -432,30 +482,25 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
             fprintf(stdout, "Client closes connection\n");
             return;
         }
-        int room_id = buff[0] - '0';
-
+        int room_id = buff[0];
+        printf("Room ID: %d\n", room_id);
         // check if client can join this room
         Room *room = findRoomById(rooms, room_id);
         int status;
-        if(countPlayerInRoom(room) >= 4){
+        if(room->total_players >= 4){
             status = 0;
         } else {
             status = 1;
         }
-
         // if player can join
         if(status == 1){
-            // add this player to the room
-            Player *p = makePlayer(player_id, cliaddr);
-            addPlayerToRoom(rooms, room_id, p);
-
             // send response back to client
-            sendResponse5(connectfd, status, room_id, tcp_room_port);
+            sendResponse5(connectfd, status, room_id, room->tcp_port);
         } else {
             // player cannot join because room full
 
             // send response back to client
-            sendResponse5(connectfd, status, room_id, tcp_room_port);
+            sendResponse5(connectfd, status, room_id, room->tcp_port);
         }
     }
 
@@ -477,6 +522,7 @@ int main (int argc, char *argv[]) {
     int SERV_PORT;
     char cli_addr[100];
     int sockfd; // sockfd for listening on TCP on general server
+    int yes = 1; // to use for setsockopt
 
     // check if user inputed port or not
     if(argc != 2){
@@ -506,6 +552,9 @@ int main (int argc, char *argv[]) {
     }
     fprintf(stdout, GREEN "[+] Successfully created TCP socket\n" RESET);
 
+    // lose the pesky "address already in use" error message
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+
     //Step 2: Bind address to socket
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET; // user IPv4
@@ -526,6 +575,34 @@ int main (int argc, char *argv[]) {
 
     printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP)\n" RESET, SERV_PORT);
 
+    //-----------handle ipc-------------------------
+    
+    pthread_t thread_id;
+
+    // Generate a unique key
+    int key = ftok("progfile", 65);
+
+    // Create or access a message queue
+    msgid = msgget(key, 0666 | IPC_CREAT);
+
+    if (msgid == -1) {
+        perror("Failed to create message queue");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Message queue created with ID: %d\n", msgid);
+
+    // register signal handler for SIGINT (case user press control + C to cancel program)
+    signal(SIGINT, handle_sigint);
+
+    // Create a thread to handle ipc messages
+    if (pthread_create(&thread_id, NULL, message_handler, (void *)&msgid) != 0) {
+        perror("Failed to create thread");
+        msgctl(msgid, IPC_RMID, NULL);  // Remove message queue
+        exit(EXIT_FAILURE);
+    }
+    
+
     //Step 4: Accept and handle client connections
     while(1){
         // ------------------------ ACCEPT NEXT CONNECTION -----------------------------
@@ -543,16 +620,24 @@ int main (int argc, char *argv[]) {
         printf(BLUE "[+] A new connection arrived from [%s:%d], handling this request\n" RESET, cli_addr, ntohs(cliaddr.sin_port));
 
         // handle this client's request
-        handleRequest(connectfd, cliaddr, cli_addr, conn);
+        handleRequest(connectfd, cliaddr, cli_addr, conn, msgid);
 
         // close connection with this client
         close(connectfd);
-
 
         // continue handle next request   
     }
 
     close_db(conn);
+
+    // Wait for the thread to finish
+    pthread_join(thread_id, NULL);
+
+    // Clean up the message queue
+    if (msgctl(msgid, IPC_RMID, NULL) == -1) {
+        perror("Failed to remove message queue");
+        exit(EXIT_FAILURE);
+    }
 
     return 0;
 }

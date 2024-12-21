@@ -29,3 +29,7 @@ fork_server_test
 fork_server_test.cpp
 
 jmeter.log
+
+Makefile
+
+./server/server

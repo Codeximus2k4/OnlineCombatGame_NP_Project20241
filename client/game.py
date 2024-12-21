@@ -1,6 +1,7 @@
 import pygame
 import sys
 import time
+import threading
 from scripts.utils import *
 from scripts.button import Button
 from scripts.entities import Player
@@ -33,9 +34,11 @@ class GameManager:
         # self.load_assets()
         
         # Players
-        self.player = None
-        self.player2 = None
+        self.player1 = None
         self.entities = []
+
+        # User id
+        self.user_id = None
     
     def load_assets(self):
         """Load game assets"""
@@ -142,8 +145,9 @@ class GameManager:
                             response = login_register_request(username=username_text, 
                                                               password=password_text, 
                                                               mode=mode)
-                            print(response)
                             if response[1] == "1": 
+                                self.user_id = ord(response[2])
+                                print(f"Login successfully with user_id: {self.user_id}")
                                 self.main_menu()
                                 response_flag = True
                             else:
@@ -159,8 +163,8 @@ class GameManager:
                             response = login_register_request(username=username_text, 
                                                               password=password_text, 
                                                               mode=mode)
-                            print(response)
                             if response[1] == "1":
+                                print("Register successfully")
                                 mode = "login"
                                 response_flag = True
                             else:
@@ -351,11 +355,17 @@ class GameManager:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if join_button.checkForInput(mouse_pos):
                         # Implement join room logic
+                        self.list_of_room_screen()
                         return
                     
                     if host_button.checkForInput(mouse_pos):
                         # Implement host room logic
-                        self.host_room_screen(1)
+                        # Send the request to the server to get the room information
+                        status, room_id, tcp_port = host_room_request(user_id=self.user_id)
+                        if status=="1":
+                            self.waiting_room_screen(user_id=self.user_id,
+                                                        room_id=room_id,
+                                                        room_tcp_port=tcp_port)
                         return
                     
                     if back_button.checkForInput(mouse_pos):
@@ -363,55 +373,294 @@ class GameManager:
             
             pygame.display.update()
     
-    def host_room_screen(self, user_id):
+    def waiting_room_screen(self, user_id, room_id, room_tcp_port):
         """Waiting room screen for host"""
-        # Send the request to the server to get the room information
-        status, room_id, tcp_port = host_room_request(user_id=user_id)
 
         # Connect to the room TCP network
         host_room_tcp_socket = NetworkManager(
             server_addr=config.SERVER_ADDR,
-            server_port=tcp_port
+            server_port=room_tcp_port
         )
         time.sleep(1)
         host_room_tcp_socket.connect()
-        print(1)
-        if status == '1':
+
+        # Join the room (send message type 6)
+        response = connect_room_request(user_id=user_id, 
+                                        host_room_socket=host_room_tcp_socket)
+        print("Join room response: " + response)
+
+        players = []  # Shared variable to store the current player list
+        stop_thread = threading.Event()  # Event to signal the update thread to stop
+
+        def fetch_player_list():
+            """Fetch the list of players in the room."""
+            try:
+                host_room_tcp_socket.tcp_socket.setblocking(False)
+                # Send a request to update the player list # Message type 8
+                response = host_room_tcp_socket.receive_tcp_message(buff_size=10)
+                print(f"Player list response: {response}")
+                host_room_tcp_socket.tcp_socket.setblocking(True)
+                # Parse the response
+                new_players = []
+                if len(response) > 2:
+                    num_players = int(response[1])  # Second byte indicates the number of players
+                    index = 2  # Start after [8][num_players_in_room]
+                    for _ in range(num_players):
+                        player_id = int(response[index])  # Player ID
+                        ready_status = int(response[index + 1])  # Ready status (0 or 1)
+                        new_players.append({"player_id": player_id, "ready": ready_status})
+                        index += 2
+                return new_players
+            except Exception as e:
+                print(f"Error fetching player list: {e}")
+                return []
+
+        def update_players():
+            """Background thread to update the player list."""
+            while not stop_thread.is_set():
+                new_players = fetch_player_list()
+                if new_players:
+                    nonlocal players
+                    players = new_players
+                time.sleep(2)  # Update every 2 seconds
+
+        # Start the update thread
+        update_thread = threading.Thread(target=update_players, daemon=True)
+        update_thread.start()
+
+        # Buttons
+        ready = False
+        ready_button = Button(
+            image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"), 
+            pos=(config.SCREEN_WIDTH - config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            text_input="READY", 
+            font=get_font(20), 
+            base_color=config.COLORS['GREEN'], 
+            hovering_color="White"
+        )
+
+        back_button = Button(
+            image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"), 
+            pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            text_input="BACK", 
+            font=get_font(20), 
+            base_color=config.COLORS['BUTTON_BASE'], 
+            hovering_color="White"
+        )
+
+        try:
             while True:
                 self.screen.blit(self.background, (0, 0))
                 mouse_pos = pygame.mouse.get_pos()
-                
+
                 # Title
                 text = f"ROOM {room_id}"
                 title_text = self.title_font.render(text, True, config.COLORS['MENU_TEXT'])
-                title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH//2, 100))
-                
-                # Buttons
-                start_button = Button(
-                    image=pygame.image.load("data/images/menuAssets/Options Rect.png"), 
-                    pos=(config.SCREEN_WIDTH//2, 500),
-                    text_input="START_GAME", 
-                    font=get_font(30), 
-                    base_color=config.COLORS['BUTTON_BASE'], 
-                    hovering_color="White"
-                )            
-                
+                title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
                 self.screen.blit(title_text, title_rect)
-                
-                for button in [start_button]:
+
+                # Display player list
+                y_offset = 200
+                for player in players:
+                    player_text = f"Player {player['player_id']} - {'Ready' if player['ready'] else 'Not Ready'}"
+                    player_text_rendered = get_font(25).render(player_text, True, config.COLORS['MENU_TEXT'])
+                    player_rect = player_text_rendered.get_rect(center=(config.SCREEN_WIDTH // 2, y_offset))
+                    self.screen.blit(player_text_rendered, player_rect)
+                    y_offset += 50  # Adjust spacing between players
+
+                # Buttons
+                for button in [ready_button, back_button]:
                     button.changeColor(mouse_pos)
                     button.update(self.screen)
-                
+
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
+                        stop_thread.set()  # Signal the update thread to stop
                         host_room_tcp_socket.close()
                         pygame.quit()
                         sys.exit()
-                    
-                    if event.type == pygame.MOUSEBUTTONDOWN:                  
-                        if start_button.checkForInput(mouse_pos):
-                            self.run()
+
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        if ready_button.checkForInput(mouse_pos):
+                            if not ready:
+                                ready_button.text_input = "CANCEL"
+                                ready_button.base_color = config.COLORS["RED"]
+                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                                ready = True
+                            else:
+                                ready_button.text_input = "READY"
+                                ready_button.base_color = config.COLORS["GREEN"]
+                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                                ready = False
+
+                        if back_button.checkForInput(mouse_pos):
+                            stop_thread.set()  # Signal the update thread to stop
+                            return
+
                 pygame.display.update()
+        finally:
+            stop_thread.set()  # Ensure the thread stops when leaving the function
+            update_thread.join()  # Wait for the thread to finish
+
+
+    def list_of_room_screen(self):
+        """Display the room selection screen with pagination and a refresh option."""
+
+        def fetch_room_list():
+            """Fetch the list of available rooms from the server."""
+            # Connect to the server to request room information
+            room_network = NetworkManager(
+                server_addr=config.SERVER_ADDR,
+                server_port=config.SERVER_PORT
+            )
+            room_network.connect()
+
+            # Request room data
+            message = "3"
+            room_network.send_tcp_message(message.encode())  # Send request code for room data
+            response = room_network.receive_tcp_message()  # Receive room data
+            room_network.close()
+            print(response)
+            return parse_room_data(response)
+
+
+        def parse_room_data(response):
+            """Parse serialized room data from the server."""
+            room_list = []
+            total_rooms = int(response[1])-48  # First byte indicates total rooms
+            print(total_rooms)
+            index = 2  # Start reading after the first byte
+            for _ in range(total_rooms):
+                room_id = int(response[index])-48
+                total_players = int(response[index+1])-48
+                room_list.append({"room_id": room_id, "total_players": total_players})
+                index += 4
+
+            return room_list
+
+
+        # Fetch initial room list
+        room_list = fetch_room_list()
+
+        # Pagination variables
+        rooms_per_page = 4
+        current_page = 0
+
+        while True:
+            self.screen.blit(self.background, (0, 0))
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Title
+            title_text = self.title_font.render("SELECT ROOM", True, config.COLORS['MENU_TEXT'])
+            title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
+            self.screen.blit(title_text, title_rect)
+
+            # Pagination Buttons
+            left_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Buttons Rect.png"),
+                pos=(config.SCREEN_WIDTH // 10, config.SCREEN_HEIGHT // 2),
+                text_input="<",
+                font=get_font(30),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            right_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Buttons Rect.png"),
+                pos=(config.SCREEN_WIDTH - config.SCREEN_WIDTH // 10, config.SCREEN_HEIGHT // 2),
+                text_input=">",
+                font=get_font(30),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+
+            refresh_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH-config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+                text_input="REFRESH",
+                font=get_font(20),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+
+            back_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+                text_input="BACK",
+                font=get_font(20),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+
+            # Draw all control buttons
+            control_buttons = [left_button, right_button, back_button, refresh_button]
+            for button in control_buttons:
+                button.changeColor(mouse_pos)
+                button.update(self.screen)
+
+            # Calculate rooms to display on the current page
+            start_index = current_page * rooms_per_page
+            end_index = start_index + rooms_per_page
+            current_rooms = room_list[start_index:end_index]
+
+            # Room Buttons
+            buttons = []
+            y_offset = 200
+            for room in current_rooms:
+                button_text = f"Room {room['room_id']} ({room['total_players']} players)"
+                button = Button(
+                    image=pygame.image.load("data/images/menuAssets/Options Rect.png"),
+                    pos=(config.SCREEN_WIDTH // 2, y_offset),
+                    text_input=button_text,
+                    font=get_font(30),
+                    base_color=config.COLORS['BUTTON_BASE'],
+                    hovering_color="White"
+                )
+                buttons.append((button, room['room_id']))
+                y_offset += 100  # Adjust button spacing
+
+            # Draw room buttons
+            for button, _ in buttons:
+                button.changeColor(mouse_pos)
+                button.update(self.screen)
+
+            # Event handling
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    # Pagination button logic
+                    if left_button.checkForInput(mouse_pos) and current_page > 0:
+                        current_page -= 1
+                    if right_button.checkForInput(mouse_pos) and end_index < len(room_list):
+                        current_page += 1
+
+                    # Refresh button logic
+                    if refresh_button.checkForInput(mouse_pos):
+                        room_list = fetch_room_list()  # Refresh room data
+                        current_page = 0  # Reset to the first page
+                    
+                    if back_button.checkForInput(mouse_pos):
+                        return # Return to the menu
+
+                    # Room button logic
+                    for button, room_id in buttons:
+                        if button.checkForInput(mouse_pos):
+                            print(f"Connect to the game room ID: {room_id}")
+                            room_tcp_port = join_room_request(user_id=self.user_id,
+                                                              room_id=room_id)
+                            print(f"Room TCP port: {room_tcp_port}")
+                            if room_tcp_port >= 10000:
+                                self.waiting_room_screen(user_id=self.user_id,
+                                                         room_id=room_id,
+                                                         room_tcp_port=room_tcp_port)
+                            
+
+            pygame.display.update()
+
+
+
 
     def run(self):
         """Main game loop"""
