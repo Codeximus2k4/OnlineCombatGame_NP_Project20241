@@ -302,6 +302,8 @@ void serializeRoomInformation(char result[], Room *head){
         offset += 2;
     }
 
+    result[strlen(result)] = '\0';
+
     // printf("totalRooms=%d\n", totalRooms);
     // printf("result=%s\n", result);
 }
