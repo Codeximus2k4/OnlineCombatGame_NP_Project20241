@@ -354,6 +354,7 @@ Room *findRoomById(Room *head, int room_id){
         if(p->id == room_id) {
             break;
         }
+        p=p->next;
     }
 
     return p;
