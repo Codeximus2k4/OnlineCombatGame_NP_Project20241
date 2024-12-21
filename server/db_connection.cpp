@@ -237,7 +237,7 @@ int update_player_score(PGconn *conn, int player_id, int score_previous_match) {
 // - The data will be populated in `result` string in following format: [username_length][username][games_played][score]x5
 // - input: a connection PGconn to postgres, char string to be populated
 // - output: 1 on successful, 0 otherwise
-int *get_top_players(PGconn *conn, char result[256]) {
+int get_top_players(PGconn *conn, char result[256]) {
     // Query to get the top 5 players ordered by highest score
     const char *query = "SELECT username, games_played, score FROM users ORDER BY score DESC LIMIT 5";
 
@@ -293,28 +293,3 @@ int *get_top_players(PGconn *conn, char result[256]) {
     return 1;
 }
 
-int main() {
-    // Example of how to use the get_top_players function
-    const char *conninfo = "dbname=game_users user=your_user password=your_password";
-    PGconn *conn = PQconnectdb(conninfo);
-
-    if (PQstatus(conn) != CONNECTION_OK) {
-        fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(conn));
-        PQfinish(conn);
-        return 1; // Return failure
-    }
-
-    // Get the top players
-    char *result = get_top_players(conn);
-    if (result != NULL) {
-        printf("Top players:\n%s\n", result);
-        free(result);  // Don't forget to free the allocated memory
-    } else {
-        printf("Failed to fetch top players.\n");
-    }
-
-    // Close the connection
-    PQfinish(conn);
-
-    return 0;
-}
