@@ -24,3 +24,4 @@ INSERT INTO users (username, password) VALUES ('hieu', 'hieu');
 INSERT INTO users (username, password) VALUES ('duc', 'duc');
 INSERT INTO users (username, password) VALUES ('hoa', 'hoa');
 INSERT INTO users (username, password) VALUES ('hoang', 'hoang');
+INSERT INTO users (username, password) VALUES ('abc', 'abc');

@@ -150,7 +150,7 @@ void sendResponse3(int connectfd){
     };
     
     // print to check
-    printf(YELLOW "Number of bytes sent to client=%d\n" RESET, sendBytes, roomInformation, strlen(roomInformation));
+    printf(YELLOW "Number of bytes sent to client=%d (excluding first byte)\n" RESET, sendBytes, roomInformation, strlen(roomInformation));
 }
 
 // - function to handle case client wants to create room
@@ -227,6 +227,27 @@ void sendResponse5(int connectfd, int status, int room_id, int room_tcp_port){
     
     // print to check
     printf(YELLOW "Bytes sent to client=%d, type=%c, status=%c, room_id=%d, tcp_port=%d\n" RESET, sendBytes, data[0], data[1], data[2], room_tcp_port);
+}
+
+void sendResponse9(int connectfd, char data[BUFF_SIZE + 1]){
+    char packet[BUFF_SIZE + 1];
+    int sendBytes;
+
+    // init packet 
+    packet[0] = '9'; // set first byte of packet to request type
+
+    // copy data into packet
+    memcpy(packet + 1, data, strlen(data));
+
+    int number_of_bytes_to_send = 1 + strlen(data);
+
+    // send to client
+    if( (sendBytes = send(connectfd, data, number_of_bytes_to_send, 0)) < 0){
+        perror("Error");
+    };
+    
+    // print to check
+    printf(YELLOW "Number of bytes sent to client=%d (excluding first byte)\n" RESET, sendBytes, data, strlen(data));
 
 }
 
@@ -512,6 +533,15 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
             // send response back to client
             sendResponse5(connectfd, status, room_id, room->tcp_port);
         }
+    } else if(message_type == '9'){
+        // get top 5 players 
+        char data[256];
+        if(get_top_players(conn, data) == 0){
+            perror(RED "failed querying for top 5 players" RESET);
+        }
+        
+        // send response to client
+        sendResponse9(connectfd, data);
     }
 
     return;

@@ -1,4 +1,9 @@
 #include <libpq-fe.h> //library to connect to postgresql
+#include<string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>  // For htons()
 
 //function to establish a connection with the database
 //output: db connection
@@ -226,4 +231,90 @@ int update_player_score(PGconn *conn, int player_id, int score_previous_match) {
     PQclear(updateRes);
 
     return 1; // Success
+}
+
+// - Function to get the top 5 players with highest score
+// - The data will be populated in `result` string in following format: [username_length][username][games_played][score]x5
+// - input: a connection PGconn to postgres, char string to be populated
+// - output: 1 on successful, 0 otherwise
+int *get_top_players(PGconn *conn, char result[256]) {
+    // Query to get the top 5 players ordered by highest score
+    const char *query = "SELECT username, games_played, score FROM users ORDER BY score DESC LIMIT 5";
+
+    // Execute the query
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT query failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return 0;
+    }
+
+    // Calculate the total size required for the result string
+    int rows = PQntuples(res);
+    int total_length = 0;
+
+    // Format each player's data and append to the result string
+    for (int i = 0; i < rows; i++) {
+        const char *username = PQgetvalue(res, i, 0);
+        int username_length = strlen(username);
+        const char *games_played_str = PQgetvalue(res, i, 1);
+        const char *score_str = PQgetvalue(res, i, 2);
+
+        // Convert games_played and score from string to integer
+        int games_played = atoi(games_played_str);
+        int score = atoi(score_str);
+
+        // buff to temporary hold data for this player
+        char buff[256];
+        memset(buff, 0, sizeof(buff));
+
+        // set first byte to username_len
+        buff[0] = (char) username_length;
+        
+        // set next bytes as username
+        memcpy(buff + 1, username, username_length);
+
+        // set next byte as games_played
+        buff[1 + username_length] = (char) games_played;
+
+        // convert score to 2 network bytes
+        uint16_t byte_score = htons(score);
+
+        // set these 2 last bytes 
+        memcpy(buff + username_length + 2, &byte_score, 2);
+
+        // Append to the result string
+        strcat(result, buff);
+    }
+
+    // Clean up
+    PQclear(res);
+
+    return 1;
+}
+
+int main() {
+    // Example of how to use the get_top_players function
+    const char *conninfo = "dbname=game_users user=your_user password=your_password";
+    PGconn *conn = PQconnectdb(conninfo);
+
+    if (PQstatus(conn) != CONNECTION_OK) {
+        fprintf(stderr, "Connection to database failed: %s\n", PQerrorMessage(conn));
+        PQfinish(conn);
+        return 1; // Return failure
+    }
+
+    // Get the top players
+    char *result = get_top_players(conn);
+    if (result != NULL) {
+        printf("Top players:\n%s\n", result);
+        free(result);  // Don't forget to free the allocated memory
+    } else {
+        printf("Failed to fetch top players.\n");
+    }
+
+    // Close the connection
+    PQfinish(conn);
+
+    return 0;
 }
