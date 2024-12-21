@@ -199,26 +199,26 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
     correspondingPlayer->ready = ready;
 }
 
-// - function to send player id 
-// - input: socket descriptor connected to client, the player
+// - function to send players in the room in4 to clients
+// - input: socket descriptor connected to client, the head of the player list
 // - IMPORTANT NOTE: request type is in char, num_player is in char
-void sendResponse8(int connectfd, Player *player){
+void sendResponse8(int connectfd, Player *players){
     char data[500];
     int sendBytes;
 
     memset(data, 0, sizeof(data));
 
-    // init data
-    data[0] = '8'; // first byte is response type
-    data[1] = player->id; 
+    serializePlayersInRoomInformation(data, players);
+
+    int data_length = strlen(data);
 
     // send to client (2 bytes)
-    if( (sendBytes = send(connectfd, data, 2, 0)) < 0){
+    if( (sendBytes = send(connectfd, data, data_length, 0)) < 0){
         perror(RED "Error inside sendResponse8()" RESET);
     };
     
     // print to check
-    printf(YELLOW "Bytes sent to client=%d, type=%c, player_id=%c\n" RESET, sendBytes, data[0], data[1] + '0');
+    printf(YELLOW "Bytes sent to client=%d, type=%c\n" RESET, sendBytes, data[0]);
 }
 
 

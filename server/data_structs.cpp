@@ -320,6 +320,25 @@ void serializeIpcMsg(ipc_msg *message, int room_id, Player *head) {
     message->text[3] = '\0';
 }
 
+//message format: [type = '8'][num_of_players_in_room][player_id1][ready_1][,,.]
+//input: result string, head of the player list of the room
+void serializePlayersInRoomInformation(char result[], Player *head) {
+    result[0] = '8';
+    result[1] = countPlayerInRoom(head);
+    if (result[1] == 0) {
+        result[2] = '\0';
+        return;
+    }
+    Player *p = head;
+    int offset = 2; 
+    while (p != NULL) {
+        result[offset++] = p->id;
+        result[offset++] = p->ready;
+        p = p->next;
+    }
+    result[offset] = '\0';
+}
+
 // - function to find room by id
 // - input: head pointer to list of rooms, room_id
 // - output: pointer to the room, NULL if doesn't exist room with the id
