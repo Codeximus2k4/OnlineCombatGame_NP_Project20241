@@ -395,30 +395,22 @@ class GameManager:
 
         def fetch_my_stats(user_id):
             """Fetch the stats for the current user."""
-            return None
-            # return my_stats_request(user_id)  # Replace with actual implementation
+            # return None
+            return my_stats_request(self.user_id)  # Replace with actual implementation
 
         # Fetch the initial top 5 rankings
         top5 = fetch_top5()
 
-        # Example top5 data (mock for testing)
-        # top5 = [
-        #     {"username": "Player1", "num_game": 50, "score": 1200},
-        #     {"username": "Player2", "num_game": 45, "score": 1100},
-        #     {"username": "Player3", "num_game": 40, "score": 1000},
-        #     {"username": "Player4", "num_game": 30, "score": 900},
-        #     {"username": "Player5", "num_game": 25, "score": 850},
-        # ]
-
         my_stats = None  # Placeholder for the user's stats
+
+        title_text = self.title_font.render("TOP 5 PLAYERS", True, config.COLORS['MENU_TEXT'])
+        title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 50))
 
         while True:
             self.screen.blit(self.background, (0, 0))
             mouse_pos = pygame.mouse.get_pos()
 
             # Title
-            title_text = self.title_font.render("TOP 5 PLAYERS", True, config.COLORS['MENU_TEXT'])
-            title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 50))
             self.screen.blit(title_text, title_rect)
 
             # Header Row
@@ -451,10 +443,9 @@ class GameManager:
 
             # Display My Stats (if fetched)
             if my_stats:
-                y_offset += 20  # Add some spacing
-                my_stats_text = self.title_font.render("MY STATS", True, config.COLORS['MENU_TEXT'])
-                my_stats_rect = my_stats_text.get_rect(center=(config.SCREEN_WIDTH // 2, y_offset))
-                self.screen.blit(my_stats_text, my_stats_rect)
+                y_offset = 200  # Add some spacing
+                title_text = self.title_font.render("MY STATS", True, config.COLORS['MENU_TEXT'])
+                title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 50))
                 y_offset += 50
 
                 row_data = [
@@ -506,8 +497,12 @@ class GameManager:
                     if back_button.checkForInput(mouse_pos):
                         return  # Go back to the previous screen
                     if refresh_button.checkForInput(mouse_pos):
+                        my_stats = None
+                        title_text = self.title_font.render("TOP 5 PLAYERS", True, config.COLORS['MENU_TEXT'])
+                        title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 50))
                         top5 = fetch_top5()  # Refresh the top 5 data
                     if my_stats_button.checkForInput(mouse_pos):
+                        top5 = []
                         my_stats = fetch_my_stats(self.user_id)  # Fetch the current user's stats
 
             pygame.display.update()

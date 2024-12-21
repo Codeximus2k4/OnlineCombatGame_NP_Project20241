@@ -179,6 +179,7 @@ def join_room_request(user_id: int, room_id: int):
     return room_tcp_port
 
 def rank_request():
+    """Message type 9: Request top 5 players on server"""
     # Connect to the server TCP network
     rank_socket = NetworkManager(
         server_addr=config.SERVER_ADDR,
@@ -221,6 +222,53 @@ def rank_request():
     
     rank_socket.close()
     return top5
+
+def my_stats_request(user_id: int):
+    """Message type 10: Request my stats"""
+    # Connect the socket to the server
+    my_stats_socket = NetworkManager(
+        server_addr=config.SERVER_ADDR,
+        server_port=config.SERVER_PORT
+    )
+    my_stats_socket.connect()
+
+    # Send the request type 10 to the server
+    request_type = 58
+    user_id = user_id
+
+    # Convert to bytes
+    request_type_byte = bytes([request_type])
+    user_id = bytes([user_id])
+    message = request_type_byte + user_id
+    print(f"Message: {message}")
+    # Send the message request to the server
+    my_stats_socket.send_tcp_message(message=message)
+    print("Successfully sent the message")
+
+    # Receive the response
+    my_stats = []
+    # Get response type
+    response_type = my_stats_socket.receive_tcp_message(buff_size=1).decode() # 1 byte (response type)
+    
+    # Get username length
+    username_length = my_stats_socket.receive_tcp_message(buff_size=1).decode() # 1 byte (username length)
+    username_length = ord(username_length)
+    
+    # Get username
+    username = my_stats_socket.receive_tcp_message(buff_size=username_length).decode() # Max 127 byte
+    
+    # Get the number of game played
+    num_game = my_stats_socket.receive_tcp_message(buff_size=1).decode() # 1 byte (number of game playerd)
+    num_game = ord(num_game)
+
+    # Get the score
+    score = my_stats_socket.receive_tcp_message(buff_size=2).decode() # 2 byte (score)
+    score = struct.unpack("!H", score.encode("utf-8"))[0]
+
+    my_stats_socket.close()
+    my_stats = {"username": username, "num_game": num_game, "score": score}
+    
+    return my_stats
 
 class Animation:
     def __init__(self, images ,img_dur = 5, loop =True):
