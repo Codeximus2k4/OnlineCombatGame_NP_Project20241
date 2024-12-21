@@ -577,12 +577,21 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
         char data[256];
         int total_length = 0;
 
-        if( (total_length = get_personal_statistics(conn, data) ) == 0){
-            perror(RED "failed querying for top 5 players" RESET);
+        // get player_id 
+        if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+            perror("Error");
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int player_id = buff[0];
+
+        if( (total_length = get_personal_statistics(conn, player_id, data) ) == 0){
+            perror(RED "failed querying for statistics of player" RESET);
         }
         
         // send response to client
-        sendResponse9(connectfd, data, total_length);
+        sendResponse10(connectfd, data, total_length);
     }
 
     return;
