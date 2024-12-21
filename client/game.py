@@ -1,6 +1,7 @@
 import pygame
 import sys
 import time
+import threading
 from scripts.utils import *
 from scripts.button import Button
 from scripts.entities import Player
@@ -382,69 +383,125 @@ class GameManager:
         )
         time.sleep(1)
         host_room_tcp_socket.connect()
-        
+
         # Join the room (send message type 6)
         response = connect_room_request(user_id=user_id, 
-                                     host_room_socket=host_room_tcp_socket)
+                                        host_room_socket=host_room_tcp_socket)
         print("Join room response: " + response)
+
+        players = []  # Shared variable to store the current player list
+        stop_thread = threading.Event()  # Event to signal the update thread to stop
+
+        def fetch_player_list():
+            """Fetch the list of players in the room."""
+            try:
+                host_room_tcp_socket.tcp_socket.setblocking(False)
+                # Send a request to update the player list # Message type 8
+                response = host_room_tcp_socket.receive_tcp_message(buff_size=10)
+                print(f"Player list response: {response}")
+                host_room_tcp_socket.tcp_socket.setblocking(True)
+                # Parse the response
+                new_players = []
+                if len(response) > 2:
+                    num_players = int(response[1])  # Second byte indicates the number of players
+                    index = 2  # Start after [8][num_players_in_room]
+                    for _ in range(num_players):
+                        player_id = int(response[index])  # Player ID
+                        ready_status = int(response[index + 1])  # Ready status (0 or 1)
+                        new_players.append({"player_id": player_id, "ready": ready_status})
+                        index += 2
+                return new_players
+            except Exception as e:
+                print(f"Error fetching player list: {e}")
+                return []
+
+        def update_players():
+            """Background thread to update the player list."""
+            while not stop_thread.is_set():
+                new_players = fetch_player_list()
+                if new_players:
+                    nonlocal players
+                    players = new_players
+                time.sleep(2)  # Update every 2 seconds
+
+        # Start the update thread
+        update_thread = threading.Thread(target=update_players, daemon=True)
+        update_thread.start()
 
         # Buttons
         ready = False
         ready_button = Button(
             image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"), 
-            pos=(config.SCREEN_WIDTH-config.SCREEN_WIDTH//5, config.SCREEN_HEIGHT-100),
+            pos=(config.SCREEN_WIDTH - config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
             text_input="READY", 
             font=get_font(20), 
             base_color=config.COLORS['GREEN'], 
             hovering_color="White"
-        )     
+        )
 
         back_button = Button(
             image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"), 
-            pos=(config.SCREEN_WIDTH//5, config.SCREEN_HEIGHT-100),
+            pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
             text_input="BACK", 
             font=get_font(20), 
             base_color=config.COLORS['BUTTON_BASE'], 
             hovering_color="White"
-        )  
+        )
 
-        while True:
-            self.screen.blit(self.background, (0, 0))
-            mouse_pos = pygame.mouse.get_pos()
-            
-            # Title
-            text = f"ROOM {room_id}"
-            title_text = self.title_font.render(text, True, config.COLORS['MENU_TEXT'])
-            title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH//2, 100))
-            
-            
-            self.screen.blit(title_text, title_rect)
-            
-            for button in [ready_button, back_button]:
-                button.changeColor(mouse_pos)
-                button.update(self.screen)
-            
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    host_room_tcp_socket.close()
-                    pygame.quit()
-                    sys.exit()
-                
-                if event.type == pygame.MOUSEBUTTONDOWN:                  
-                    if ready_button.checkForInput(mouse_pos):
-                        if ready == False:
-                            ready_button.text_input = "CANCEL"
-                            ready_button.base_color = config.COLORS["RED"]
-                            ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
-                            ready = True
-                        else:
-                            ready_button.text_input = "READY"
-                            ready_button.base_color = config.COLORS["GREEN"]
-                            ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
-                            ready = False
-                    if back_button.checkForInput(mouse_pos):
-                        return
+        try:
+            while True:
+                self.screen.blit(self.background, (0, 0))
+                mouse_pos = pygame.mouse.get_pos()
+
+                # Title
+                text = f"ROOM {room_id}"
+                title_text = self.title_font.render(text, True, config.COLORS['MENU_TEXT'])
+                title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
+                self.screen.blit(title_text, title_rect)
+
+                # Display player list
+                y_offset = 200
+                for player in players:
+                    player_text = f"Player {player['player_id']} - {'Ready' if player['ready'] else 'Not Ready'}"
+                    player_text_rendered = get_font(25).render(player_text, True, config.COLORS['MENU_TEXT'])
+                    player_rect = player_text_rendered.get_rect(center=(config.SCREEN_WIDTH // 2, y_offset))
+                    self.screen.blit(player_text_rendered, player_rect)
+                    y_offset += 50  # Adjust spacing between players
+
+                # Buttons
+                for button in [ready_button, back_button]:
+                    button.changeColor(mouse_pos)
+                    button.update(self.screen)
+
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        stop_thread.set()  # Signal the update thread to stop
+                        host_room_tcp_socket.close()
+                        pygame.quit()
+                        sys.exit()
+
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        if ready_button.checkForInput(mouse_pos):
+                            if not ready:
+                                ready_button.text_input = "CANCEL"
+                                ready_button.base_color = config.COLORS["RED"]
+                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                                ready = True
+                            else:
+                                ready_button.text_input = "READY"
+                                ready_button.base_color = config.COLORS["GREEN"]
+                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                                ready = False
+
+                        if back_button.checkForInput(mouse_pos):
+                            stop_thread.set()  # Signal the update thread to stop
+                            return
+
                 pygame.display.update()
+        finally:
+            stop_thread.set()  # Ensure the thread stops when leaving the function
+            update_thread.join()  # Wait for the thread to finish
+
 
     def list_of_room_screen(self):
         """Display the room selection screen with pagination and a refresh option."""

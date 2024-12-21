@@ -210,7 +210,7 @@ void sendResponse8(int connectfd, Player *players){
 
     serializePlayersInRoomInformation(data, players);
 
-    int data_length = strlen(data);
+    int data_length = strlen(data)+1;
 
     // send to client (2 bytes)
     if( (sendBytes = send(connectfd, data, data_length, 0)) < 0){
@@ -442,9 +442,10 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                 
                 //send response 8 to all players in the room
                 Player *p = players;
+                Player *head = players;
                 while (p != NULL) {
                     int fd = p->socket_descriptor;
-                    sendResponse8(fd, p);
+                    sendResponse8(fd, head);
                     p = p->next;
                 }
 
