@@ -20,8 +20,8 @@ ALTER TABLE users
 ADD CONSTRAINT users_unique_username UNIQUE(username);
 
 -- init data
-INSERT INTO users (username, password) VALUES ('hieu', 'hieu');
-INSERT INTO users (username, password) VALUES ('duc', 'duc');
+INSERT INTO users (username, password) VALUES ('hieu', 'hieu', '15', '20');
+INSERT INTO users (username, password) VALUES ('duc', 'duc', '2', '1');
 INSERT INTO users (username, password) VALUES ('hoa', 'hoa');
-INSERT INTO users (username, password) VALUES ('hoang', 'hoang');
+INSERT INTO users (username, password) VALUES ('hoang', 'hoang', '3', '5');
 INSERT INTO users (username, password) VALUES ('abc', 'abc');
