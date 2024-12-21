@@ -30,7 +30,7 @@
 Defining global variables
 -----------------------------------------------
 */
-
+int msgid; // messeage queue id 
 int tcp_room_port = 10000; // tcp port for each game room, first used port will be 10000
 int udp_room_port = 20000; // udp port for each game room, first used port will be 20000
 Room *rooms = NULL; // pointer to head of rooms created on server
@@ -52,6 +52,18 @@ does not handle logic
     + id: int (eg: 1)
 -----------------------------------------------
 */
+
+// Signal handler for control + C case from user
+void handle_sigint(int sig) {
+    printf(YELLOW "Caught signal %d (Ctrl + C), Cleaning up...\n" RESET, sig);
+    if (msgctl(msgid, IPC_RMID, NULL) == -1) {
+        perror("msgctl (remove)");
+    } else {
+        printf("Message queue removed successfully.\n");
+    }
+    exit(0); // Exit the program
+}
+
 
 // - function to handle if client sends unauthorized request
 void sendNotLoggedInResponse(int connectfd){
@@ -113,8 +125,6 @@ void sendResponse3(int connectfd){
     char roomInformation[500];
     int sendBytes;
 
-    printf("1\n");
-
     memset(roomInformation, 0, sizeof(roomInformation));
 
     // init data to send
@@ -128,11 +138,9 @@ void sendResponse3(int connectfd){
     if( (sendBytes = send(connectfd, data, number_of_bytes_to_send, 0)) < 0){
         perror("Error");
     };
-
-    printf("2\n");
     
     // print to check
-    printf(YELLOW "Number of bytes sent to client=%d, data of rooms: %s\n" RESET, sendBytes, roomInformation);
+    printf(YELLOW "Number of bytes sent to client=%d\n" RESET, sendBytes, roomInformation, strlen(roomInformation));
 }
 
 // - function to handle case client wants to create room
@@ -568,7 +576,7 @@ int main (int argc, char *argv[]) {
     printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP)\n" RESET, SERV_PORT);
 
     //-----------handle ipc-------------------------
-    int msgid;
+    
     pthread_t thread_id;
 
     // Generate a unique key
@@ -583,6 +591,9 @@ int main (int argc, char *argv[]) {
     }
 
     printf("Message queue created with ID: %d\n", msgid);
+
+    // register signal handler for SIGINT (case user press control + C to cancel program)
+    signal(SIGINT, handle_sigint);
 
     // Create a thread to handle ipc messages
     if (pthread_create(&thread_id, NULL, message_handler, (void *)&msgid) != 0) {
