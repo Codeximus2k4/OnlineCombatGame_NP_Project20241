@@ -300,3 +300,69 @@ int get_top_players(PGconn *conn, char result[256]) {
     return total_length;
 }
 
+// - function to get personal statistics
+// - the data will be populated in `result` string with following format: [username_len][username][games_played][score]
+// - input: a connection to PGconn, player_id, result string for data to be populated
+// - output: length of data in `result` string, 0 on failure
+int get_personal_statistics(PGconn *conn, int player_id, char result[256]) {
+    // Query to get the user data based on user id
+    const char *query = "SELECT username, games_played, score FROM users WHERE id = $1";
+
+    // Prepare the query with the user_id
+    const char *paramValues[1];
+    char player_id_str[16];
+    snprintf(player_id_str, sizeof(player_id_str), "%d", player_id);
+    paramValues[0] = player_id_str;
+
+    // Execute the query
+    PGresult *res = PQexecParams(conn, query, 1, NULL, paramValues, NULL, NULL, 0);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT query failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return 0;
+    }
+
+    // If no results found, return 0
+    if (PQntuples(res) == 0) {
+        printf("No user found with id %d\n", player_id);
+        PQclear(res);
+        return 0;
+    }
+
+    // Extract data for the first user (i = 0)
+    const char *username = PQgetvalue(res, 0, 0);
+    int username_length = strlen(username);
+    const char *games_played_str = PQgetvalue(res, 0, 1);
+    const char *score_str = PQgetvalue(res, 0, 2);
+
+    // Convert games_played and score from string to integer
+    int games_played = atoi(games_played_str);
+    int score = atoi(score_str);
+
+    // Temporary buffer to hold the data for this user
+    char buff[256];
+
+    // Set first byte to username_len
+    buff[0] = (char) username_length;
+
+    // Set next bytes as username
+    memcpy(buff + 1, username, username_length);
+
+    // Set next byte as games_played
+    buff[1 + username_length] = (char) games_played;
+
+    // Convert score to 2 network bytes
+    uint16_t byte_score = htons(score);
+
+    // Set these 2 last bytes
+    memcpy(buff + username_length + 2, &byte_score, 2);
+
+    // Copy the result into the result string
+    memcpy(result, buff, 1 + username_length + 1 + 2);
+
+    // Clean up
+    PQclear(res);
+
+    // Return the total length of the data in result
+    return 1 + username_length + 1 + 2;
+}
