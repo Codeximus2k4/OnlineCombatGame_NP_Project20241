@@ -230,8 +230,8 @@ void *message_handler(void *arg) {
         //--------------------IPC-------------------
         // Get the status of the message queue and store into buf
         if (msgctl(msgid, IPC_STAT, &buf) == -1) {
-            perror("msgctl");
-            exit(1);
+            perror(RED "msgctl" RESET);
+            continue;
         }
 
         // Check if the queue is empty
@@ -241,8 +241,8 @@ void *message_handler(void *arg) {
 
             // Receive the message
             if (msgrcv(msgid, &message, sizeof(message.text), 1, 0) == -1) {
-                perror("msgrcv failed");
-                exit(1);
+                perror(RED "msgrcv failed" RESET);
+                continue;
             }
 
             printf("Parent: Message receive from child. %s\n", message.text);
