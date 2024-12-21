@@ -340,7 +340,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
 
         int status;
 
-        if (add_user(username, password, conn)) { //register succesfully
+        if (add_user(username, password, conn)) { // register succesfully
             status = 1;
         }
         else status = 0; //register fail

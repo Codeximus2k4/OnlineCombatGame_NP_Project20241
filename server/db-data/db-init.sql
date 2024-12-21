@@ -9,9 +9,15 @@ CREATE DATABASE game_users;
 -- create table
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(50) NOT NULL
+    username VARCHAR(50) NOT NULL,
+    password VARCHAR(50) NOT NULL,
+    games_played INT DEFAULT 0,
+    score INT DEFAULT 0
 );
+
+-- add constraint to table
+ALTER TABLE users 
+ADD CONSTRAINT users_unique_username UNIQUE(username);
 
 -- init data
 INSERT INTO users (username, password) VALUES ('hieu', 'hieu');
