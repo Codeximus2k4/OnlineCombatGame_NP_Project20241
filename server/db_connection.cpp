@@ -236,7 +236,7 @@ int update_player_score(PGconn *conn, int player_id, int score_previous_match) {
 // - Function to get the top 5 players with highest score
 // - The data will be populated in `result` string in following format: [username_length][username][games_played][score]x5
 // - input: a connection PGconn to postgres, char string to be populated
-// - output: 1 on successful, 0 otherwise
+// - output: number of bytes in `result` string successful, 0 on failure
 int get_top_players(PGconn *conn, char result[256]) {
     // Query to get the top 5 players ordered by highest score
     const char *query = "SELECT username, games_played, score FROM users ORDER BY score DESC LIMIT 5";
@@ -266,7 +266,6 @@ int get_top_players(PGconn *conn, char result[256]) {
 
         // buff to temporary hold data for this player
         char buff[256];
-        memset(buff, 0, sizeof(buff));
 
         // set first byte to username_len
         buff[0] = (char) username_length;
@@ -283,13 +282,21 @@ int get_top_players(PGconn *conn, char result[256]) {
         // set these 2 last bytes 
         memcpy(buff + username_length + 2, &byte_score, 2);
 
+        // set last byte of buff as '\0';
+        buff[1 + username_length + 1 + 2] = '\0';
+
+        printf("%d-th user: username_len=%d, username=%s, games_played=%d, score=%d\n", i, username_length, username, games_played, score);
+
         // Append to the result string
-        strcat(result, buff);
+        memcpy(result + total_length, buff, 1 + username_length + 1 + 2);
+
+        // update total_length
+        total_length = total_length + 1 + username_length + 1 + 2;
     }
 
     // Clean up
     PQclear(res);
 
-    return 1;
+    return total_length;
 }
 

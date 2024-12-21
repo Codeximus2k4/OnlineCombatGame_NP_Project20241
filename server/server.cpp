@@ -229,7 +229,7 @@ void sendResponse5(int connectfd, int status, int room_id, int room_tcp_port){
     printf(YELLOW "Bytes sent to client=%d, type=%c, status=%c, room_id=%d, tcp_port=%d\n" RESET, sendBytes, data[0], data[1], data[2], room_tcp_port);
 }
 
-void sendResponse9(int connectfd, char data[BUFF_SIZE + 1]){
+void sendResponse9(int connectfd, char data[BUFF_SIZE + 1], int total_length){
     char packet[BUFF_SIZE + 1];
     int sendBytes;
 
@@ -237,18 +237,17 @@ void sendResponse9(int connectfd, char data[BUFF_SIZE + 1]){
     packet[0] = '9'; // set first byte of packet to request type
 
     // copy data into packet
-    memcpy(packet + 1, data, strlen(data));
+    memcpy(packet + 1, data, total_length);
 
-    int number_of_bytes_to_send = 1 + strlen(data);
+    int number_of_bytes_to_send = 1 + total_length;
 
     // send to client
-    if( (sendBytes = send(connectfd, data, number_of_bytes_to_send, 0)) < 0){
+    if( (sendBytes = send(connectfd, packet, number_of_bytes_to_send, 0)) < 0){
         perror("Error");
     };
     
     // print to check
-    printf(YELLOW "Number of bytes sent to client=%d (excluding first byte)\n" RESET, sendBytes, data, strlen(data));
-
+    printf(YELLOW "Number of bytes sent to client=%d (excluding first byte)\n" RESET, sendBytes);
 }
 
 // Thread function to handle ipc messages
@@ -261,7 +260,7 @@ void *message_handler(void *arg) {
         //--------------------IPC-------------------
         // Get the status of the message queue and store into buf
         if (msgctl(msgid, IPC_STAT, &buf) == -1) {
-            perror(RED "msgctl" RESET);
+            // perror(RED "msgctl" RESET);
             continue;
         }
 
@@ -272,7 +271,7 @@ void *message_handler(void *arg) {
 
             // Receive the message
             if (msgrcv(msgid, &message, sizeof(message.text), 1, 0) == -1) {
-                perror(RED "msgrcv failed" RESET);
+                // perror(RED "msgrcv failed" RESET);
                 continue;
             }
 
@@ -536,12 +535,14 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
     } else if(message_type == '9'){
         // get top 5 players 
         char data[256];
-        if(get_top_players(conn, data) == 0){
+        int total_length = 0;
+
+        if( (total_length = get_top_players(conn, data) ) == 0){
             perror(RED "failed querying for top 5 players" RESET);
         }
         
         // send response to client
-        sendResponse9(connectfd, data);
+        sendResponse9(connectfd, data, total_length);
     }
 
     return;
