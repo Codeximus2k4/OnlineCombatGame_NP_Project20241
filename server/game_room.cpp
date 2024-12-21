@@ -208,10 +208,9 @@ void sendResponse8(int connectfd, Player *players){
 
     memset(data, 0, sizeof(data));
 
-    serializePlayersInRoomInformation(data, players);
+    int data_length = serializePlayersInRoomInformation(data, players);
 
-    int data_length = strlen(data)+1;
-
+    printf("Data length: %d\n", data_length);
     // send to client (2 bytes)
     if( (sendBytes = send(connectfd, data, data_length, 0)) < 0){
         perror(RED "Error inside sendResponse8()" RESET);

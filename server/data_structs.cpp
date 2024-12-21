@@ -322,12 +322,12 @@ void serializeIpcMsg(ipc_msg *message, int room_id, Player *head) {
 
 //message format: [type = '8'][num_of_players_in_room][player_id1][ready_1][,,.]
 //input: result string, head of the player list of the room
-void serializePlayersInRoomInformation(char result[], Player *head) {
+int serializePlayersInRoomInformation(char result[], Player *head) {
     result[0] = '8';
     result[1] = countPlayerInRoom(head);
     if (result[1] == 0) {
         result[2] = '\0';
-        return;
+        return 3;
     }
     Player *p = head;
     int offset = 2; 
@@ -337,6 +337,7 @@ void serializePlayersInRoomInformation(char result[], Player *head) {
         p = p->next;
     }
     result[offset] = '\0';
+    return offset+1;
 }
 
 // - function to find room by id
