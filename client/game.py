@@ -1,24 +1,17 @@
-import os
 import sys
-import math
 import pygame
 import socket
 import threading
 import time
 import queue
-import select
 import config
 from client.network import NetworkManager
 from pygame import SCRAP_TEXT
-
-FONT_PATH = "data/images/menuAssets/font.ttf"
-ADDRESS = "127.0.0.1"
-PORT = 7070
-
 from scripts.utils import *
 from scripts.entities import PhysicsEntity, Player
 from scripts.button import Button
 from scripts.tilemap  import Tilemap
+
 class GameManager:
     def __init__(self,network_manager: NetworkManager):
         self.network = network_manager
@@ -73,8 +66,6 @@ class GameManager:
             y_offset = -80 if count >=3 else 0
             self.game_background.blit(each, (0,y_offset))
     
-    def get_font(self, size):  # Returns Press-Start-2P in the desired size
-        return pygame.font.Font(FONT_PATH, size)
     
     def login_screen(self):
         """Render login/registration screen"""
@@ -82,11 +73,6 @@ class GameManager:
         BG_PATH = "data/images/menuAssets/Background.png"
         FONT_PATH = "data/images/menuAssets/font.ttf"
         SCREEN_WIDTH, SCREEN_HEIGHT = 400, 300
-        WHITE = (255, 255, 255)
-        RED = (255, 0, 0)
-        BLACK = (0, 0, 0)
-        GREEN = (0, 128, 0)
-        BROWN = (182,143,64)
         COLOR_ACTIVE = pygame.Color('lightskyblue3')
         COLOR_PASSIVE = pygame.Color('white')
         DISPLAY_LIMIT = 10  # Display only the last 10 characters
@@ -202,8 +188,8 @@ class GameManager:
             # Render text for input fields with DISPLAY_LIMIT
             username_display_text = username_text[-DISPLAY_LIMIT:]  # Display only the last 10 characters
             password_display_text = "*" * len(password_text[-DISPLAY_LIMIT:])
-            username_surface = base_font.render(username_display_text, True, BLACK)
-            password_surface = base_font.render(password_display_text, True, BLACK)
+            username_surface = base_font.render(username_display_text, True, config.COLORS["BLACK"])
+            password_surface = base_font.render(password_display_text, True, config.COLORS["BLACK"])
             screen.blit(username_surface, (username_rect.x + 5, username_rect.y + 10))
             screen.blit(password_surface, (password_rect.x + 5, password_rect.y + 10))
 
@@ -211,10 +197,10 @@ class GameManager:
             if cursor_visible:
                 if active_input == "username":
                     cursor_x = username_rect.x + 5 + username_surface.get_width() + 2
-                    pygame.draw.line(screen, WHITE, (cursor_x, username_rect.y + 5), (cursor_x, username_rect.y + 27), 2)
+                    pygame.draw.line(screen, config.COLORS["WHITE"], (cursor_x, username_rect.y + 5), (cursor_x, username_rect.y + 27), 2)
                 elif active_input == "password":
                     cursor_x = password_rect.x + 5 + password_surface.get_width() + 2
-                    pygame.draw.line(screen, WHITE, (cursor_x, password_rect.y + 5), (cursor_x, password_rect.y + 27), 2)
+                    pygame.draw.line(screen, config.COLORS["WHITE"], (cursor_x, password_rect.y + 5), (cursor_x, password_rect.y + 27), 2)
 
             # Draw buttons and labels
             # Create semi-transparent surfaces for the buttons
@@ -232,20 +218,20 @@ class GameManager:
             # Blit the semi-transparent button surfaces onto the main screen
             screen.blit(login_button_surface, (login_button_rect.x, login_button_rect.y))
             screen.blit(register_button_surface, (register_button_rect.x, register_button_rect.y))
-            login_label = render_text("Login", base_font, WHITE)
-            register_label = render_text("Register", base_font, WHITE)
+            login_label = render_text("Login", base_font, config.COLORS["WHITE"])
+            register_label = render_text("Register", base_font, config.COLORS["WHITE"])
             screen.blit(login_label, (login_button_rect.x + 30, login_button_rect.y + 10))
             screen.blit(register_label, (register_button_rect.x + 10, register_button_rect.y + 10))
 
             # Display login or register text
             title = mode
-            screen.blit(render_text(title.upper(), base_font, BROWN), (SCREEN_WIDTH // 2 - 30, 50))
+            screen.blit(render_text(title.upper(), base_font, config.COLORS["BROWN"]), (SCREEN_WIDTH // 2 - 30, 50))
 
             # Display response after login and register
             if response_flag:
-                screen.blit(render_text(response_text, response_font, GREEN), (120, 200))
+                screen.blit(render_text(response_text, response_font, config.COLORS["GREEN"]), (120, 200))
             else:
-                screen.blit(render_text(response_text, response_font, RED), (120, 200))
+                screen.blit(render_text(response_text, response_font, config.COLORS["RED"]), (120, 200))
             
             # Update screen and set frame rate
             pygame.display.update()
@@ -510,69 +496,65 @@ class GameManager:
         """Waiting room screen for host"""
 
         # Connect to the room TCP network
-        host_room_tcp_socket = NetworkManager(
+        room_tcp_socket = NetworkManager(
             server_addr=config.SERVER_ADDR,
             server_port=room_tcp_port
         )
         time.sleep(1)
-        host_room_tcp_socket.connect()
+        room_tcp_socket.connect()
 
         # Join the room (send message type 6)
         response = connect_room_request(user_id=user_id, 
-                                        host_room_socket=host_room_tcp_socket)
+                                        host_room_socket=room_tcp_socket)
         print("Create/Join room response: " + response)
 
         players = []  # Shared variable to store the current player list
         stop_thread = threading.Event()  # Event to signal the update thread to stop
+        is_ready = 0 # Store current ready state of the player
+        udp_room_port: int = None # udp room port for game play
+        
 
         def waiting_room_process():
             """Fetch the list of players in the room/Receive the tcp port"""
+            
+            new_players = [] # New players list
             try:
-                host_room_tcp_socket.tcp_socket.setblocking(False)
-                # Send a request to update the player list # Message type 8
-                response = host_room_tcp_socket.receive_tcp_message(buff_size=10)
-                print(f"Player list response: {response}")
-                # Parse the response
-                if int(response[0])==8:
-                    print("message type 8")
-                    new_players = []
-                    if len(response) > 2:
-                        num_players = int(response[1])  # Second byte indicates the number of players
-                        index = 2  # Start after [8][num_players_in_room]
-                        for _ in range(num_players):
-                            player_id = int(response[index])  # Player ID
-                            ready_status = int(response[index + 1])  # Ready status (0 or 1)
-                            new_players.append({"player_id": player_id, "ready": ready_status})
-                            index += 2
-                    return new_players
-                elif int(response[0])==7:
-                    print("message type 7")
-                    port = 0
-                    if len(response)>=3:
-                        port = response[1]*256+response[2]
-                    if port ==0:
-                        print("Message type 7 in wrong format")
-                    else:
-                        self.udp_room_port= port
-                        print(f"Room UDP port is {port}")
-                    return []
-
-
+                room_tcp_socket.tcp_socket.setblocking(False) # set non blocking for room socket
+                message_type = room_tcp_socket.receive_tcp_message(buff_size=1).decode() # Receive the message type
+                
+                if message_type == "7":
+                    udp_room_port = room_tcp_socket.receive_tcp_message(buff_size=2).decode()
+                    udp_room_port = struct("!H", udp_room_port.encode("utf-8"))[0]
+                elif message_type == "8":
+                    num_players = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
+                    num_players = ord(num_players)
+                    while num_players:
+                        player_id = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
+                        player_id = ord(player_id)
+                        ready_status = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
+                        ready_status = ord(ready_status)
+                        new_players.append({"player_id": player_id, "ready": ready_status})
+                        num_players = num_players - 1
+                return new_players
             except Exception as e:
                 print(f"Error when receiving message type 7/8: {e}")
-                return []
-        # def update_players():
-        #     """Background thread to update the player list."""
-        #     while not stop_thread.is_set():
-        #         new_players = waiting_room_process()
-        #         if new_players:
-        #             nonlocal players
-        #             players = new_players
-        #         #time.sleep(0.5)  # Update every 2 seconds
+            finally:
+                room_tcp_socket.tcp_socket.setblocking(True) # Set blocking for room socket
+                return new_players
+            
+        def update_players():
+            """Background thread to update the player list"""
+            while not stop_thread.is_set():
+                new_players = waiting_room_process()
+                if new_players:
+                    nonlocal players
+                    players = new_players
+                time.sleep(1) # Update every 1 second
 
-        # # Start the update thread
-        # update_thread = threading.Thread(target=update_players, daemon=True)
-        # update_thread.start()
+        # Start the update thread
+        update_thread = threading.Thread(target=update_players,
+                                         daemon=True)
+        update_thread.start()
 
         # Buttons
         ready = False
@@ -595,119 +577,79 @@ class GameManager:
         )
 
         try:
-            self.udp_room_socket = None
-            ready=0
             while True:
-                if self.udp_room_port ==-1:
-                    self.screen.blit(self.menu_background, (0, 0))
-                    mouse_pos = pygame.mouse.get_pos()
+                self.screen.blit(self.menu_background, (0, 0))
+                mouse_pos = pygame.mouse.get_pos()
 
-                    # Title
-                    text = f"ROOM {room_id}"
-                    title_text = self.title_font.render(text, True, config.COLORS['MENU_TEXT'])
-                    title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
-                    self.screen.blit(title_text, title_rect)
+                # Title
+                text = f"ROOM {room_id}"
+                title_text = self.title_font.render(text, True, config.COLORS['MENU_TEXT'])
+                title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
+                self.screen.blit(title_text, title_rect)
 
-                    # Display player list
-                    y_offset = 200
-                    for player in players:
-                        player_text = f"Player {player['player_id']} - {'Ready' if player['ready'] else 'Not Ready'}"
-                        player_text_rendered = get_font(25).render(player_text, True, config.COLORS['MENU_TEXT'])
-                        player_rect = player_text_rendered.get_rect(center=(config.SCREEN_WIDTH // 2, y_offset))
-                        self.screen.blit(player_text_rendered, player_rect)
-                        y_offset += 50  # Adjust spacing between players
+                # Display player list
+                y_offset = 200
+                for player in players:
+                    player_text = f"Player {player['player_id']} - {'Ready' if player['ready'] else 'Not Ready'}"
+                    player_text_rendered = get_font(25).render(player_text, True, config.COLORS['MENU_TEXT'])
+                    player_rect = player_text_rendered.get_rect(center=(config.SCREEN_WIDTH // 2, y_offset))
+                    self.screen.blit(player_text_rendered, player_rect)
+                    y_offset += 50  # Adjust spacing between players
 
-                    # Buttons
-                    for button in [ready_button, back_button]:
-                        button.changeColor(mouse_pos)
-                        button.update(self.screen)
+                # Buttons
+                for button in [ready_button, back_button]:
+                    button.changeColor(mouse_pos)
+                    button.update(self.screen)
 
-                    # Set up ready message format
-                    message_type =  "7"
-                    message_type_byte =  message_type.encode("ascii")
-                    user_id_byte =  self.user_id.to_bytes(1,"big")
+                # Set up ready message format
+                message_type =  "7"
+                message_type_byte =  message_type.encode("ascii")
+                user_id_byte =  self.user_id.to_bytes(1,"big")
 
-                    for event in pygame.event.get():
-                        if event.type == pygame.QUIT:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        stop_thread.set()  # Signal the update thread to stop
+                        room_tcp_socket.close()
+                        pygame.quit()
+                        sys.exit()
+
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        if ready_button.checkForInput(mouse_pos):
+                            if is_ready==0:
+                                is_ready = 1
+                                ready_button.text_input = "CANCEL"
+                                ready_button.base_color = config.COLORS["RED"]
+                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                                update_ready_request(user_id=self.user_id,
+                                                        is_ready=is_ready,
+                                                        update_ready_socket=room_tcp_socket)
+                            else:
+                                ready_button.text_input = "READY"
+                                ready_button.base_color = config.COLORS["GREEN"]
+                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                                is_ready = 0
+                                update_ready_request(user_id=self.user_id,
+                                                        is_ready=is_ready,
+                                                        update_ready_socket=room_tcp_socket)
+
+                        if back_button.checkForInput(mouse_pos):
                             stop_thread.set()  # Signal the update thread to stop
-                            host_room_tcp_socket.close()
-                            pygame.quit()
-                            sys.exit()
-
-                        if event.type == pygame.MOUSEBUTTONDOWN:
-                            if ready_button.checkForInput(mouse_pos):
-                                if ready==0:
-                                    ready_button.text_input = "CANCEL"
-                                    ready_button.base_color = config.COLORS["RED"]
-                                    ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
-                                    ready = 1
-                                    ready_byte =  ready.to_bytes(1, "big")
-                                    message =  message_type_byte+ user_id_byte + ready_byte
-                                    host_room_tcp_socket.send_tcp_message(message)
-                                else:
-                                    ready_button.text_input = "READY"
-                                    ready_button.base_color = config.COLORS["GREEN"]
-                                    ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
-                                    ready = 0
-                                    ready_byte =  ready.to_bytes(1, "big")
-                                    message =  message_type_byte+ user_id_byte + ready_byte
-                                    host_room_tcp_socket.send_tcp_message(message)
-
-                            if back_button.checkForInput(mouse_pos):
-                                stop_thread.set()  # Signal the update thread to stop
-                                return
-                            
-                    pygame.display.update()
-                    new_players = waiting_room_process()
-                    if new_players is not None:
-                        players = new_players
-                else :
+                            return
+                        
+                pygame.display.update()
+                if udp_room_port:
                     break
-            self.udp_room_socket =  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.run()
-
         finally:
-            pass
+            room_tcp_socket.close()
+            stop_thread.set() # Ensure the thread stops when leaving the function
+            update_thread.join() # Wait for the thread to finish
 
 
     def list_of_room_screen(self):
         """Display the room selection screen with pagination and a refresh option."""
 
-        def fetch_room_list():
-            """Fetch the list of available rooms from the server."""
-            # Connect to the server to request room information
-            room_network = NetworkManager(
-                server_addr=config.SERVER_ADDR,
-                server_port=config.SERVER_PORT
-            )
-            room_network.connect()
-
-            # Request room data
-            message = "3"
-            room_network.send_tcp_message(message.encode())  # Send request code for room data
-            response = room_network.receive_tcp_message()  # Receive room data
-            room_network.close()
-            print(response)
-            return parse_room_data(response)
-
-
-        def parse_room_data(response):
-            """Parse serialized room data from the server."""
-            room_list = []
-            total_rooms = int(response[1])-48  # First byte indicates total rooms
-            print(total_rooms)
-            index = 2  # Start reading after the first byte
-            for _ in range(total_rooms):
-                room_id = int(response[index])-48
-                total_players = int(response[index+1])-48
-                room_list.append({"room_id": room_id, "total_players": total_players})
-                index += 4
-
-            return room_list
-
-
         # Fetch initial room list
-        room_list = fetch_room_list()
+        room_list = fetch_room_list_request()
 
         # Pagination variables
         rooms_per_page = 4
@@ -805,7 +747,7 @@ class GameManager:
 
                     # Refresh button logic
                     if refresh_button.checkForInput(mouse_pos):
-                        room_list = fetch_room_list()  # Refresh room data
+                        room_list = fetch_room_list_request()  # Refresh room data
                         current_page = 0  # Reset to the first page
                     
                     if back_button.checkForInput(mouse_pos):
@@ -918,6 +860,7 @@ class GameManager:
     def load_level(self, map_id):
         self.tilemap.load('data/maps/' +str(map_id)+'.json')
         self.scroll= [0,0]
+    
     def check_collision(self,player: Player) -> list[int]:
         collisionx = 0
         collisiony = 0
@@ -936,7 +879,7 @@ class GameManager:
             if (player.collisions['up'] and player.collisions['down']):
                 collisionx = 3
         return [collisionx, collisiony]
-    def run(self):
+    def run(self, room_udp_port):
         print("Game is starting...")
         self.tilemap = Tilemap(self, tile_size=16)
         self.map = 2

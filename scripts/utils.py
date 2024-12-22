@@ -1,7 +1,5 @@
 import os
 import pygame
-import math
-import sys
 import struct
 from client.network import NetworkManager
 import config
@@ -73,6 +71,45 @@ def login_register_request(username, password, mode):
 
     return response.decode()
 
+def fetch_room_list_request():
+    """Message type 3: Fetch the list of available rooms from the server."""
+    # get message component and convert into byte
+    message = "3"
+    message = message.encode()
+
+    # Connect to the server
+    fetch_room_list_socket = NetworkManager(
+        server_addr=config.SERVER_ADDR,
+        server_port=config.SERVER_PORT
+    )
+    fetch_room_list_socket.connect()
+
+    # Send the message to the server
+    fetch_room_list_socket.send_tcp_message(message)
+
+    # Get the components
+    room_list = []
+    message_type = fetch_room_list_socket.receive_tcp_message(buff_size=1)
+    print(f"Message type: {message_type}" )
+
+    rooms_num = fetch_room_list_socket.receive_tcp_message(buff_size=1)
+    rooms_num = int(rooms_num)
+    print(f"Number of room: {rooms_num}")
+    while rooms_num:
+        room_id = fetch_room_list_socket.receive_tcp_message(buff_size=1)
+        room_id = int(room_id)
+        print(f"Room ID: {room_id}")
+
+        players_num = fetch_room_list_socket.receive_tcp_message(buff_size=1)
+        players_num = int(players_num)
+        print(f"Number of players: {players_num}")
+
+        room_list.append({"room_id": room_id, "total_players": players_num})
+        rooms_num = rooms_num - 1
+
+    fetch_room_list_socket.close()
+    print(room_list)
+    return room_list
 def host_room_request(user_id: int):
     """
     Send the host room request to server
@@ -117,7 +154,7 @@ def host_room_request(user_id: int):
     return status, room_id, tcp_port
 
 def connect_room_request(user_id: int, host_room_socket: NetworkManager):
-    """Send the connect room request to the game room server"""
+    """Message type 6: Send the connect room request to the game room server"""
     # Message component
     request_type = "6"
     user_id = user_id
@@ -269,6 +306,22 @@ def my_stats_request(user_id: int):
     my_stats = {"username": username, "num_game": num_game, "score": score}
     
     return my_stats
+
+def update_ready_request(user_id: int, is_ready:int, update_ready_socket: NetworkManager):
+    """Message type 7: Update the ready state of each player"""
+    # Message components
+    request_type = "7"
+    user_id = user_id
+    is_ready = is_ready
+
+    # Convert to bytes and combine into message
+    request_type_byte = request_type.encode("ascii")
+    user_id_byte = bytes([user_id])
+    is_ready_byte = bytes([is_ready_byte])
+    message = request_type_byte + user_id_byte + is_ready_byte
+
+    # Send the message
+    update_ready_socket.send_tcp_message(message)
 
 class Animation:
     def __init__(self, images ,img_dur = 5, loop =True):
