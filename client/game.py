@@ -881,149 +881,141 @@ class GameManager:
                 collisionx = 3
         return [collisionx, collisiony]
     def run(self, room_udp_port):
-        # Connect the game room server via UDP port
+        """Main game loop with refactored network management using NetworkManager"""
+
+        # Set up the NetworkManager for UDP communication
         print(f"Room UDP port: {room_udp_port}")
         room_udp_socket = NetworkManager(
             server_addr=config.SERVER_ADDR,
             server_port=room_udp_port
         )
         print("Game is starting...")
+
+        # Load the level and initialize entities
         self.tilemap = Tilemap(self, tile_size=16)
         self.map = 2
         self.load_level(self.map)
-        SERVER_ADDR = "127.0.0.1"
-        
         self.setup_background()
         self.entities = []
-        self.scroll = [0,0]
-        # set up queue for sharing data between threads
-        q = queue.Queue(maxsize= 1)
+        self.scroll = [0, 0]
 
-        # ---------- MULTI-THREAD HANDLING---------
-        # target function for multi-thread handling
-        def receive_messages(sock, q):
-            while True:
-                try:
-                    data, _ = sock.recvfrom(1024)
-                    if (len(data)!=0):
-                        try :
-                            q.get(block=False)
-                        except Exception as e:
-                            pass
-                        q.put(data)
-                except BlockingIOError as e:
-                    continue
-        thread = threading.Thread(target=receive_messages, args = (room_udp_socket.udp_socket, q),daemon=True)
-        thread.start()
+        # Set up the player
+        self.player = None
+        self.horizontal_movement = [0, 0]
 
-        self.player = None 
-        self.horizontal_movement = [0,0]
+        # Set up queue for shared data
+        q = queue.Queue(maxsize=1)
+
+        # Start the input listener
+        def udp_input_callback(data):
+            try:
+                q.get(block=False)  # Clear old data if present
+            except queue.Empty:
+                pass
+            q.put(data)
+
+        room_udp_socket.start_input_listener(udp_input_callback)
+
         while True:
-            self.display.fill(color = (0,0,0,0))
-            self.display_2.blit(pygame.transform.scale(self.game_background, self.display.get_size()), (0,0))
+            # Clear the display
+            self.display.fill(color=(0, 0, 0, 0))
+            self.display_2.blit(pygame.transform.scale(self.game_background, self.display.get_size()), (0, 0))
 
-        # --------Find the player in the list of entities ------------
+            # ------------ Identify player in the list of entities --------------
             if self.player is None:
                 for each in self.entities:
-                    if each.entity_type ==0 and each.id == self.user_id:
+                    if each.entity_type == 0 and each.id == self.user_id:
                         self.player = each
-                        print("found player")
+                        print("Found player")
                         break
+
             if self.player is not None:
-                    self.scroll[0] +=  (self.player.rect(size = (200,200),topleft =  self.player.pos).centerx -  self.display.get_width()/2 - self.scroll[0])/30
-            render_scroll =  (int(self.scroll[0]),int (self.scroll[1]))
-                
-            self.tilemap.render(self.display, offset =  render_scroll)
-            
-        # ------- Read inputs from player and send client to server --------
-            msg= self.user_id.to_bytes(1, "big")
-            movement_x=0
-            movement_y=0
-            action = 0
-            interaction= 0 
+                self.scroll[0] += (self.player.rect(size=(200, 200), topleft=self.player.pos).centerx -
+                                self.display.get_width() / 2 - self.scroll[0]) / 30
+            render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
+
+            # Render the tilemap
+            self.tilemap.render(self.display, offset=render_scroll)
+
+            #-------------- Collect input and construct the message -------------------
+            msg = self.user_id.to_bytes(1, "big")
+            movement_x, movement_y, action, interaction = 0, 0, 0, 0
             for event in pygame.event.get():
-                if event.type ==pygame.QUIT:
+                if event.type == pygame.QUIT:
+                    room_udp_socket.close()
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_w:
-                        movement_y+=1
+                        movement_y += 1
                     if event.key == pygame.K_s:
-                        movement_y-=1
+                        movement_y -= 1
                     if event.key == pygame.K_a:
-                        self.horizontal_movement[0]=1
+                        self.horizontal_movement[0] = 1
                     if event.key == pygame.K_d:
-                        self.horizontal_movement[1]=1
+                        self.horizontal_movement[1] = 1
                     if event.key == pygame.K_q:
-                        action +=1
+                        action += 1
                     if event.key == pygame.K_e:
-                        action -=1
-                    if event.key == pygame.K_SPACE: #blocking is prioritize above the other two attacks
+                        action -= 1
+                    if event.key == pygame.K_SPACE:
                         action = 3
-                    if event.key == pygame.K_k: #dashing is even more prioritize
-                        action= 4 
-                    if event.key == pygame.K_f: #activate trap or use item on the map
+                    if event.key == pygame.K_k:
+                        action = 4
+                    if event.key == pygame.K_f:
                         interaction = 1
-                    if event.key == pygame.K_g: #capture or submit the flag
+                    if event.key == pygame.K_g:
                         interaction = 2
-                elif event.type ==  pygame.KEYUP:
-                        if event.key == pygame.K_a:
-                            self.horizontal_movement[0]=0
-                        if event.key == pygame.K_d:
-                            self.horizontal_movement[1]=0
-                
-            # correct the movement_x and movement_y and attack     
-            if self.horizontal_movement[0]-self.horizontal_movement[1]==-1:
-                    movement_x=1
-            elif self.horizontal_movement[0]-self.horizontal_movement[1]==1:
-                    movement_x=2
-            else:
-                    movement_x=0
-            if movement_y==-1:
-                    movement_y = 2
-            if action ==-1:
-                    action=2
+                elif event.type == pygame.KEYUP:
+                    if event.key == pygame.K_a:
+                        self.horizontal_movement[0] = 0
+                    if event.key == pygame.K_d:
+                        self.horizontal_movement[1] = 0
 
-                
-            msg += movement_x.to_bytes(1,"big") + movement_y.to_bytes(1,"big")+action.to_bytes(1,"big")+ interaction.to_bytes(1,"big")
-            
-        # Check collision
-            collisions =  self.check_collision(self.player)
-            msg += collisions[0].to_bytes(1,"big") + collisions[1].to_bytes(1,"big")
-        
-        # Send message to server
-            byteSent = room_udp_socket.udp_socket.sendto(msg, (SERVER_ADDR, room_udp_port))
-            if (byteSent<=0):
-                pass
-                print("Send payload: failed")
+            # Process horizontal and vertical movements
+            movement_x = self.horizontal_movement[0] - self.horizontal_movement[1]
+            if movement_x == -1:
+                movement_x = 1
+            elif movement_x == 1:
+                movement_x = 2
             else:
-                pass
-        #Parse data
-            data = ""
+                movement_x = 0
+            movement_y = 2 if movement_y == -1 else movement_y
+            action = 2 if action == -1 else action
+
+            # Add movements and collisions to the message
+            msg += movement_x.to_bytes(1, "big") + movement_y.to_bytes(1, "big")
+            msg += action.to_bytes(1, "big") + interaction.to_bytes(1, "big")
+            collisions = self.check_collision(self.player)
+            msg += collisions[0].to_bytes(1, "big") + collisions[1].to_bytes(1, "big")
+
+            # Send the message to the server
+            room_udp_socket.send_udp_input(msg, (config.SERVER_ADDR, room_udp_port))
+
+            # Parse received data
             try:
                 data = q.get(block=False)
-            except Exception as e:
+                if data:
+                    self.de_serialize_entities(data)
+            except queue.Empty:
                 pass
-            if len(data)!=0:
-                print(data)
-                self.de_serialize_entities(data)
-           
-            
-        # Camera offset to get player to the center of the screen
-            #update and render each entity
-            if self.player is not None:
-                self.player.update(self.tilemap, [self.horizontal_movement[0]-self.horizontal_movement[1],0])
-                self.player.render(self.display,offset = render_scroll)
-            
+
+            # Update and render each entity
+            if self.player:
+                self.player.update(self.tilemap, [self.horizontal_movement[0] - self.horizontal_movement[1], 0])
+                self.player.render(self.display, offset=render_scroll)
+
             for each in self.entities:
                 if each is not self.player:
-                    each.update(self.tilemap, [0,0])
-                    each.render(self.display,offset = render_scroll)
+                    each.update(self.tilemap, [0, 0])
+                    each.render(self.display, offset=render_scroll)
 
-            self.display_2.blit(self.display, (0,0))
-            self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
+            # Render the final screen
+            self.display_2.blit(self.display, (0, 0))
+            self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest=(0, 0))
             pygame.display.update()
             self.clock.tick(60)
+
 
 if __name__ == "__main__":
     GameManager().menu()

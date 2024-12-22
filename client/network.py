@@ -55,9 +55,8 @@ class NetworkManager:
             while True:
                 try:
                     data, _ = self.udp_socket.recvfrom(self.buffer_size)
-                    decoded_data = data.decode()
                     if self.input_callback:
-                        self.input_callback(decoded_data)
+                        self.input_callback(data)
                 except Exception as e:
                     print(f"Receive error: {e}")
                     break
