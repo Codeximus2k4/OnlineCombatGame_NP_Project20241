@@ -1,9 +1,10 @@
 import os
-import sys
 import pygame
-import config
+import math
+import sys
 import struct
 from client.network import NetworkManager
+import config
 
 def load_image(path):
     img = pygame.image.load(config.BASE_IMG_PATH+path).convert_alpha()
@@ -20,10 +21,9 @@ def render_text(text, font, color):
     Render text in desired font and color
     """
     return font.render(text, True, color)
-
 def get_font(size):
-        """Returns font in desired size"""
-        return pygame.font.Font(config.FONT_PATH, size)
+    """Return font in desired size"""
+    return pygame.font.Font(config.FONT_PATH,size)
 
 def login_register_request(username, password, mode):
     """

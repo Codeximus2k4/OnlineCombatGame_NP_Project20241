@@ -1,82 +1,81 @@
-import pygame
+import os
 import sys
-import time
+import math
+import pygame
+import socket
 import threading
-from scripts.utils import *
-from scripts.button import Button
-from scripts.entities import Player
+import time
+import queue
+import select
 import config
-from .network import NetworkManager
+from client.network import NetworkManager
+from pygame import SCRAP_TEXT
 
+FONT_PATH = "data/images/menuAssets/font.ttf"
+ADDRESS = "127.0.0.1"
+PORT = 7070
+
+from scripts.utils import *
+from scripts.entities import PhysicsEntity, Player
+from scripts.button import Button
+from scripts.tilemap  import Tilemap
 class GameManager:
-    def __init__(self, network_manager: NetworkManager):
+    def __init__(self,network_manager: NetworkManager):
         self.network = network_manager
         self.screen = pygame.display.set_mode((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-        pygame.display.set_caption('Combat Game')
-        # self.ui_manager = ui_manager
+        pygame.display.set_caption('combat game')
+        
+        self.menu_background = pygame.image.load(config.BACKGROUND_PATH)
 
-        # Load background
-        self.background = pygame.image.load(config.BACKGROUND_PATH)
-
-        # Fonts
-        self.title_font = pygame.font.Font(config.FONT_PATH, 75)
+        self.title_font =  pygame.font.Font(config.FONT_PATH,75)
         self.button_font = pygame.font.Font(config.FONT_PATH, 50)
 
-        # Game display surfaces
-        self.display = pygame.Surface((640, 480), pygame.SRCALPHA)
-        self.display_2 = pygame.Surface((640, 480))
-        
-        # Game state
-        self.horizontal_movement = [False, False]
+        self.display =  pygame.Surface((640,480), pygame.SRCALPHA)
+        self.display_2 =  pygame.Surface((640,480))
+
+        self.horizontal_movement = [False,False]
         self.clock = pygame.time.Clock()
-        
-        # Load game assets
-        # self.load_assets()
-        
-        # Players
-        self.player1 = None
+
+        self.assets = {}
+        self.load_assets()
+        self.background_offset_y = -80
+
+        self.player = None
         self.entities = []
 
-        # User id
         self.user_id = None
-    
+        self.udp_room_socket =None
+        self.udp_room_port =-1
+
     def load_assets(self):
         """Load game assets"""
         self.assets = {
-            'player': load_image('entities/Samurai/Idle/Idle_1.png'),
-            'background': load_images('background'),
-            'player/idle': Animation(load_images('entities/Samurai/Idle'), img_dur=5, loop=True),
-            'player/attack1': Animation(load_images('entities/Samurai/Attack1'), img_dur=5, loop=False),
-            'player/attack2': Animation(load_images('entities/Samurai/Attack2'), img_dur=5, loop=False),
-            'player/death': Animation(load_images('entities/Samurai/Death'), img_dur=5, loop=False),
-            'player/run': Animation(load_images('entities/Samurai/Run'), img_dur=5, loop=True),
-            'player/jump': Animation(load_images('entities/Samurai/Jump'), img_dur=5, loop=False)
+                'decor': load_images('tiles/decor'),
+                'grass': load_images('tiles/grass'),
+                'large_decor': load_images('tiles/large_decor'),
+                'stone':  load_images('tiles/stone'),
+                'Samurai': load_image('entities/Samurai/Idle/Idle_1.png'),
+                'background': load_images('background'),
+                'Samurai/idle': Animation(load_images('entities/Samurai/Idle'), img_dur=5, loop = True),
+                'Samurai/attack1': Animation(load_images('entities/Samurai/Attack1'), img_dur = 5, loop =False),
+                'Samurai/attack2': Animation(load_images('entities/Samurai/Attack2'),img_dur = 5, loop = False),
+                'Samurai/death':Animation(load_images('entities/Samurai/Death'),img_dur = 5, loop = False),
+                'Samurai/run':Animation(load_images('entities/Samurai/Run'),img_dur=5, loop = True),
+                'Samurai/jump':Animation(load_images('entities/Samurai/Jump'),img_dur= 5, loop=False)
         }
     
     def setup_background(self):
         """Prepare game background"""
-        self.background = pygame.Surface(self.assets['background'][0].get_size())
+        self.game_background =  pygame.Surface(self.assets['background'][0].get_size())
         count = 0
         for each in self.assets['background']:
-            count += 1
-            y_offset = -80 if count >= 3 else 0
-            self.background.blit(each, (0, y_offset))
+            count+=1
+            y_offset = -80 if count >=3 else 0
+            self.game_background.blit(each, (0,y_offset))
     
-    def handle_input(self, input_data):
-        """Process received input data"""
-        if input_data == "d|l":
-            self.horizontal_movement[0] = True
-        elif input_data == "d|r":
-            self.horizontal_movement[1] = True
-        elif input_data == "d|q":
-            self.player.ground_attack("attack1", attack_cooldown=1)
-        elif input_data == "d|e":
-            self.player.ground_attack("attack2", attack_cooldown=1)
-        elif input_data == "u|l":
-            self.horizontal_movement[0] = False
-        elif input_data == "u|r":
-            self.horizontal_movement[1] = False
-
+    def get_font(self, size):  # Returns Press-Start-2P in the desired size
+        return pygame.font.Font(FONT_PATH, size)
+    
     def login_screen(self):
         """Render login/registration screen"""
         # Constants
@@ -256,7 +255,7 @@ class GameManager:
         """Main menu screen"""
         self.screen = pygame.display.set_mode((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
         while True:
-            self.screen.blit(self.background, (0, 0))
+            self.screen.blit(self.menu_background, (0, 0))
             mouse_pos = pygame.mouse.get_pos()
             
             # Menu Title
@@ -318,7 +317,7 @@ class GameManager:
     def game_mode_screen(self):
         """Game mode selection screen"""
         while True:
-            self.screen.blit(self.background, (0, 0))
+            self.screen.blit(self.menu_background, (0, 0))
             mouse_pos = pygame.mouse.get_pos()
             
             # Title
@@ -407,7 +406,7 @@ class GameManager:
         title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 50))
 
         while True:
-            self.screen.blit(self.background, (0, 0))
+            self.screen.blit(self.menu_background, (0, 0))
             mouse_pos = pygame.mouse.get_pos()
 
             # Title
@@ -521,46 +520,59 @@ class GameManager:
         # Join the room (send message type 6)
         response = connect_room_request(user_id=user_id, 
                                         host_room_socket=host_room_tcp_socket)
-        print("Join room response: " + response)
+        print("Create/Join room response: " + response)
 
         players = []  # Shared variable to store the current player list
         stop_thread = threading.Event()  # Event to signal the update thread to stop
 
-        def fetch_player_list():
-            """Fetch the list of players in the room."""
+        def waiting_room_process():
+            """Fetch the list of players in the room/Receive the tcp port"""
             try:
                 host_room_tcp_socket.tcp_socket.setblocking(False)
                 # Send a request to update the player list # Message type 8
                 response = host_room_tcp_socket.receive_tcp_message(buff_size=10)
                 print(f"Player list response: {response}")
-                host_room_tcp_socket.tcp_socket.setblocking(True)
                 # Parse the response
-                new_players = []
-                if len(response) > 2:
-                    num_players = int(response[1])  # Second byte indicates the number of players
-                    index = 2  # Start after [8][num_players_in_room]
-                    for _ in range(num_players):
-                        player_id = int(response[index])  # Player ID
-                        ready_status = int(response[index + 1])  # Ready status (0 or 1)
-                        new_players.append({"player_id": player_id, "ready": ready_status})
-                        index += 2
-                return new_players
+                if int(response[0])==8:
+                    print("message type 8")
+                    new_players = []
+                    if len(response) > 2:
+                        num_players = int(response[1])  # Second byte indicates the number of players
+                        index = 2  # Start after [8][num_players_in_room]
+                        for _ in range(num_players):
+                            player_id = int(response[index])  # Player ID
+                            ready_status = int(response[index + 1])  # Ready status (0 or 1)
+                            new_players.append({"player_id": player_id, "ready": ready_status})
+                            index += 2
+                    return new_players
+                elif int(response[0])==7:
+                    print("message type 7")
+                    port = 0
+                    if len(response)>=3:
+                        port = response[1]*256+response[2]
+                    if port ==0:
+                        print("Message type 7 in wrong format")
+                    else:
+                        self.udp_room_port= port
+                        print(f"Room UDP port is {port}")
+                    return []
+
+
             except Exception as e:
-                print(f"Error fetching player list: {e}")
+                print(f"Error when receiving message type 7/8: {e}")
                 return []
+        # def update_players():
+        #     """Background thread to update the player list."""
+        #     while not stop_thread.is_set():
+        #         new_players = waiting_room_process()
+        #         if new_players:
+        #             nonlocal players
+        #             players = new_players
+        #         #time.sleep(0.5)  # Update every 2 seconds
 
-        def update_players():
-            """Background thread to update the player list."""
-            while not stop_thread.is_set():
-                new_players = fetch_player_list()
-                if new_players:
-                    nonlocal players
-                    players = new_players
-                time.sleep(2)  # Update every 2 seconds
-
-        # Start the update thread
-        update_thread = threading.Thread(target=update_players, daemon=True)
-        update_thread.start()
+        # # Start the update thread
+        # update_thread = threading.Thread(target=update_players, daemon=True)
+        # update_thread.start()
 
         # Buttons
         ready = False
@@ -583,58 +595,79 @@ class GameManager:
         )
 
         try:
+            self.udp_room_socket = None
+            ready=0
             while True:
-                self.screen.blit(self.background, (0, 0))
-                mouse_pos = pygame.mouse.get_pos()
+                if self.udp_room_port ==-1:
+                    self.screen.blit(self.menu_background, (0, 0))
+                    mouse_pos = pygame.mouse.get_pos()
 
-                # Title
-                text = f"ROOM {room_id}"
-                title_text = self.title_font.render(text, True, config.COLORS['MENU_TEXT'])
-                title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
-                self.screen.blit(title_text, title_rect)
+                    # Title
+                    text = f"ROOM {room_id}"
+                    title_text = self.title_font.render(text, True, config.COLORS['MENU_TEXT'])
+                    title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
+                    self.screen.blit(title_text, title_rect)
 
-                # Display player list
-                y_offset = 200
-                for player in players:
-                    player_text = f"Player {player['player_id']} - {'Ready' if player['ready'] else 'Not Ready'}"
-                    player_text_rendered = get_font(25).render(player_text, True, config.COLORS['MENU_TEXT'])
-                    player_rect = player_text_rendered.get_rect(center=(config.SCREEN_WIDTH // 2, y_offset))
-                    self.screen.blit(player_text_rendered, player_rect)
-                    y_offset += 50  # Adjust spacing between players
+                    # Display player list
+                    y_offset = 200
+                    for player in players:
+                        player_text = f"Player {player['player_id']} - {'Ready' if player['ready'] else 'Not Ready'}"
+                        player_text_rendered = get_font(25).render(player_text, True, config.COLORS['MENU_TEXT'])
+                        player_rect = player_text_rendered.get_rect(center=(config.SCREEN_WIDTH // 2, y_offset))
+                        self.screen.blit(player_text_rendered, player_rect)
+                        y_offset += 50  # Adjust spacing between players
 
-                # Buttons
-                for button in [ready_button, back_button]:
-                    button.changeColor(mouse_pos)
-                    button.update(self.screen)
+                    # Buttons
+                    for button in [ready_button, back_button]:
+                        button.changeColor(mouse_pos)
+                        button.update(self.screen)
 
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        stop_thread.set()  # Signal the update thread to stop
-                        host_room_tcp_socket.close()
-                        pygame.quit()
-                        sys.exit()
+                    # Set up ready message format
+                    message_type =  "7"
+                    message_type_byte =  message_type.encode("ascii")
+                    user_id_byte =  self.user_id.to_bytes(1,"big")
 
-                    if event.type == pygame.MOUSEBUTTONDOWN:
-                        if ready_button.checkForInput(mouse_pos):
-                            if not ready:
-                                ready_button.text_input = "CANCEL"
-                                ready_button.base_color = config.COLORS["RED"]
-                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
-                                ready = True
-                            else:
-                                ready_button.text_input = "READY"
-                                ready_button.base_color = config.COLORS["GREEN"]
-                                ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
-                                ready = False
-
-                        if back_button.checkForInput(mouse_pos):
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
                             stop_thread.set()  # Signal the update thread to stop
-                            return
+                            host_room_tcp_socket.close()
+                            pygame.quit()
+                            sys.exit()
 
-                pygame.display.update()
+                        if event.type == pygame.MOUSEBUTTONDOWN:
+                            if ready_button.checkForInput(mouse_pos):
+                                if ready==0:
+                                    ready_button.text_input = "CANCEL"
+                                    ready_button.base_color = config.COLORS["RED"]
+                                    ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                                    ready = 1
+                                    ready_byte =  ready.to_bytes(1, "big")
+                                    message =  message_type_byte+ user_id_byte + ready_byte
+                                    host_room_tcp_socket.send_tcp_message(message)
+                                else:
+                                    ready_button.text_input = "READY"
+                                    ready_button.base_color = config.COLORS["GREEN"]
+                                    ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
+                                    ready = 0
+                                    ready_byte =  ready.to_bytes(1, "big")
+                                    message =  message_type_byte+ user_id_byte + ready_byte
+                                    host_room_tcp_socket.send_tcp_message(message)
+
+                            if back_button.checkForInput(mouse_pos):
+                                stop_thread.set()  # Signal the update thread to stop
+                                return
+                            
+                    pygame.display.update()
+                    new_players = waiting_room_process()
+                    if new_players is not None:
+                        players = new_players
+                else :
+                    break
+            self.udp_room_socket =  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.run()
+
         finally:
-            stop_thread.set()  # Ensure the thread stops when leaving the function
-            update_thread.join()  # Wait for the thread to finish
+            pass
 
 
     def list_of_room_screen(self):
@@ -681,7 +714,7 @@ class GameManager:
         current_page = 0
 
         while True:
-            self.screen.blit(self.background, (0, 0))
+            self.screen.blit(self.menu_background, (0, 0))
             mouse_pos = pygame.mouse.get_pos()
 
             # Title
@@ -793,59 +826,254 @@ class GameManager:
 
             pygame.display.update()
 
+                    
+    def de_serialize_entities(self, data):
+        index = 0
+        length =  len(data)
+    #print(f"Analyzing payload of length {length}")
+        while (1):
 
-
-
-    def run(self):
-        """Main game loop"""
-        # Setup game
-        self.load_assets()
-        self.setup_background()
-        
-        # Create players
-        self.player = Player(id=1, game=self, pos=(0, 280), size=(128, 128))
-        self.player2 = Player(id=2, game=self, pos=(30, 280), size=(128, 128))
-        self.entities = [self.player, self.player2]
-        
-        # Start network input listener
-        self.network.start_input_listener(self.handle_input)
-        
-        while True:
-            self.display.fill(color=(0, 0, 0, 0))
-            self.display_2.blit(pygame.transform.scale(self.background, self.display.get_size()), (0, 0))
+            if index >= length: 
+                #print("Payload finishes reading")
+                break
+            else:
+                id = data[index]
+                index+=1
             
+            if index >=length:
+                print("Payload is missing entity_type")
+                break
+            else:
+                entity_type =  data[index]
+                index+=1
+            
+            if entity_type==0:
+                if index >= length:
+                    print("Payload is missing entity_class")
+                    break
+                else:
+                    entity_class = data[index]
+                    index+=1
+
+                if index>=length-1:
+                    print("Payload is missing posx")
+                    break
+                else:
+                    posx =  data[index]*256 + data[index+1]
+                    index+=2
+
+                if index>= length-1:
+                    print("Payload is missing posy")
+                    break
+                else:
+                    posy = data[index]*256 + data[index+1]
+                    index+=2
+                
+                if index>=length:
+                    print("Payload is missing flip")
+                    break
+                else:
+                    flip =  data[index]
+                    index+=1
+
+                if index>=length:
+                    print("Payload is missing action type")
+                    break
+                else:
+                    action_type = data[index]
+                    index+=1
+
+                if index>=length:
+                    print("Payload is missing health")
+                    break
+                else:   
+                    health =  data[index]
+                    index+=1
+
+                if index>=length:
+                    print("Payload is missing stamina")
+                    break
+                else:   
+                    stamina =  data[index]
+                    index+=1
+            
+            found_entity = False
+            for each in self.entities:
+                if each.id == id and each.entity_type==entity_type:
+                    found_entity=True
+                    each.pos = [posx,posy]
+                    if entity_type==0:
+                        each.flip = flip
+                        each.set_action(action_type,False)
+                        each.health = health
+                        each.stamina = stamina  
+            if not found_entity:
+                if entity_type==0:
+                    new_player =  Player(game= self, id = id, entity_class=entity_class,posx = posx
+                                         , posy=posy, health=health, stamina=stamina)
+                    new_player.set_action(0, True)
+                    self.entities.append(new_player)
+            #print(f"There are {len(self.entities)} in game")
+         
+    def load_level(self, map_id):
+        self.tilemap.load('data/maps/' +str(map_id)+'.json')
+        self.scroll= [0,0]
+    def check_collision(self,player: Player) -> list[int]:
+        collisionx = 0
+        collisiony = 0
+        if (player is not None):
+            if (player.collisions['right']):
+                collisionx=1
+            if (player.collisions['left']):
+                collisionx= 2
+            if (player.collisions['left'] and player.collisions['right']):
+                collisionx = 3
+            
+            if (player.collisions['up']):
+                collisiony =1
+            if (player.collisions['down']):
+                collisiony = 2
+            if (player.collisions['up'] and player.collisions['down']):
+                collisionx = 3
+        return [collisionx, collisiony]
+    def run(self):
+        print("Game is starting...")
+        self.tilemap = Tilemap(self, tile_size=16)
+        self.map = 2
+        self.load_level(self.map)
+        SERVER_ADDR = "127.0.0.1"
+        
+        self.setup_background()
+        self.entities = []
+        self.scroll = [0,0]
+        # set up queue for sharing data between threads
+        q = queue.Queue(maxsize= 1)
+
+        # ---------- MULTI-THREAD HANDLING---------
+        # target function for multi-thread handling
+        def receive_messages(sock, q):
+            while True:
+                try:
+                    data, _ = sock.recvfrom(1024)
+                    if (len(data)!=0):
+                        try :
+                            q.get(block=False)
+                        except Exception as e:
+                            pass
+                        q.put(data)
+                except BlockingIOError as e:
+                    continue
+        thread = threading.Thread(target=receive_messages, args = (self.udp_room_socket, q),daemon=True)
+        thread.start()
+
+        self.player = None 
+        self.horizontal_movement = [0,0]
+        while True:
+            self.display.fill(color = (0,0,0,0))
+            self.display_2.blit(pygame.transform.scale(self.game_background, self.display.get_size()), (0,0))
+
+        # --------Find the player in the list of entities ------------
+            if self.player is None:
+                for each in self.entities:
+                    if each.entity_type ==0 and each.id == self.user_id:
+                        self.player = each
+                        print("found player")
+                        break
+            if self.player is not None:
+                    self.scroll[0] +=  (self.player.rect(size = (200,200),topleft =  self.player.pos).centerx -  self.display.get_width()/2 - self.scroll[0])/30
+            render_scroll =  (int(self.scroll[0]),int (self.scroll[1]))
+                
+            self.tilemap.render(self.display, offset =  render_scroll)
+            
+        # ------- Read inputs from player and send client to server --------
+            msg= self.user_id.to_bytes(1, "big")
+            movement_x=0
+            movement_y=0
+            action = 0
+            interaction= 0 
             for event in pygame.event.get():
-                if event.type == pygame.QUIT:
+                if event.type ==pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                
                 if event.type == pygame.KEYDOWN:
-                    msg = "d|"
+                    if event.key == pygame.K_w:
+                        movement_y+=1
+                    if event.key == pygame.K_s:
+                        movement_y-=1
                     if event.key == pygame.K_a:
-                        msg += "l"
-                    elif event.key == pygame.K_d:
-                        msg += "r"
-                    elif event.key == pygame.K_q:
-                        msg += "q"
-                    elif event.key == pygame.K_e:
-                        msg += "e"
-                    self.network.send_udp_input(msg, (config.SERVER_ADDR, config.INPUT_PORT))
-                
-                if event.type == pygame.KEYUP:
-                    msg = "u|"
-                    if event.key == pygame.K_a:
-                        msg += "l"
+                        self.horizontal_movement[0]=1
                     if event.key == pygame.K_d:
-                        msg += "r"
-                    self.network.send_udp_input(msg, (config.SERVER_ADDR, config.INPUT_PORT))
+                        self.horizontal_movement[1]=1
+                    if event.key == pygame.K_q:
+                        action +=1
+                    if event.key == pygame.K_e:
+                        action -=1
+                    if event.key == pygame.K_SPACE: #blocking is prioritize above the other two attacks
+                        action = 3
+                    if event.key == pygame.K_k: #dashing is even more prioritize
+                        action= 4 
+                    if event.key == pygame.K_f: #activate trap or use item on the map
+                        interaction = 1
+                    if event.key == pygame.K_g: #capture or submit the flag
+                        interaction = 2
+                elif event.type ==  pygame.KEYUP:
+                        if event.key == pygame.K_a:
+                            self.horizontal_movement[0]=0
+                        if event.key == pygame.K_d:
+                            self.horizontal_movement[1]=0
+                
+            # correct the movement_x and movement_y and attack     
+            if self.horizontal_movement[0]-self.horizontal_movement[1]==-1:
+                    movement_x=1
+            elif self.horizontal_movement[0]-self.horizontal_movement[1]==1:
+                    movement_x=2
+            else:
+                    movement_x=0
+            if movement_y==-1:
+                    movement_y = 2
+            if action ==-1:
+                    action=2
+
+                
+            msg += movement_x.to_bytes(1,"big") + movement_y.to_bytes(1,"big")+action.to_bytes(1,"big")+ interaction.to_bytes(1,"big")
             
-            for entity in self.entities:
-                entity.render(self.display)
-                if entity is self.player:
-                    entity.update((self.horizontal_movement[1] - self.horizontal_movement[0], 0))
+        # Check collision
+            collisions =  self.check_collision(self.player)
+            msg += collisions[0].to_bytes(1,"big") + collisions[1].to_bytes(1,"big")
+        
+        # Send message to server
+            byteSent = self.udp_room_socket.sendto(msg, (SERVER_ADDR, self.udp_room_port))
+            if (byteSent<=0):
+                pass
+                print("Send payload: failed")
+            else:
+                pass
+        #Parse data
+            data = ""
+            try:
+                data = q.get(block=False)
+            except Exception as e:
+                pass
+            if len(data)!=0:
+                print(data)
+                self.de_serialize_entities(data)
+           
             
-            self.display_2.blit(self.display, (0, 0))
-            self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest=(0, 0))
+        # Camera offset to get player to the center of the screen
+            #update and render each entity
+            if self.player is not None:
+                self.player.update(self.tilemap, [self.horizontal_movement[0]-self.horizontal_movement[1],0])
+                self.player.render(self.display,offset = render_scroll)
             
+            for each in self.entities:
+                if each is not self.player:
+                    each.update(self.tilemap, [0,0])
+                    each.render(self.display,offset = render_scroll)
+
+            self.display_2.blit(self.display, (0,0))
+            self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
             pygame.display.update()
-            self.clock.tick(config.FPS)
+            self.clock.tick(60)
+
+if __name__ == "__main__":
+    GameManager().menu()
