@@ -336,7 +336,6 @@ struct Room {
     int tcp_port; // TCP port assign for each game room to handle client connection
     int udp_port; // UDP port assign for each game room to transfer data
     int started; 
-    int ready;
     int total_players;
     Room *next;
 };
@@ -500,6 +499,7 @@ int countRooms(Room *head) {
 void serializeRoomInformation(char result[], Room *head){
     int totalRooms = 0;
     char strnum[50]; // used for converting integer to array of char
+    int count_available_rooms = 0; // used for counting rooms that have not started yet (available to join)
 
     // if list of rooms is empty
     if(head == NULL) {
@@ -516,6 +516,10 @@ void serializeRoomInformation(char result[], Room *head){
 
     Room *p = head;
     while(p != NULL){
+        if(p->started = 1) {
+            continue;
+        }
+
         // set first byte to room_id
         snprintf(strnum, sizeof(strnum), "%d", p->id);
         strcat(result, strnum);
@@ -532,6 +536,14 @@ void serializeRoomInformation(char result[], Room *head){
         // increment
         totalRooms++;
         p = p->next;
+
+        // calculate total number of not-started rooms
+        count_available_rooms++;
+    }
+
+    // if there are no available rooms, we reset result string
+    if(count_available_rooms == 0){
+        strcpy(result, "0");
     }
 
     // printf("totalRooms=%d\n", totalRooms);
