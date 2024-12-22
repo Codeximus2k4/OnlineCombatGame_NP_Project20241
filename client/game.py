@@ -37,8 +37,6 @@ class GameManager:
         self.entities = []
 
         self.user_id = None
-        self.udp_room_socket =None
-        self.udp_room_port =-1
 
     def load_assets(self):
         """Load game assets"""
@@ -521,10 +519,13 @@ class GameManager:
             try:
                 room_tcp_socket.tcp_socket.setblocking(False) # set non blocking for room socket
                 message_type = room_tcp_socket.receive_tcp_message(buff_size=1).decode() # Receive the message type
-                
+                print(f"Message type: {message_type}")
                 if message_type == "7":
+                    nonlocal udp_room_port
                     udp_room_port = room_tcp_socket.receive_tcp_message(buff_size=2).decode()
-                    udp_room_port = struct("!H", udp_room_port.encode("utf-8"))[0]
+                    print(udp_room_port)
+                    udp_room_port = struct.unpack("!H", udp_room_port.encode("utf-8"))[0]
+                    print(f"Room UDP port: {udp_room_port}")
                 elif message_type == "8":
                     num_players = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
                     num_players = ord(num_players)
@@ -549,7 +550,6 @@ class GameManager:
                 if new_players:
                     nonlocal players
                     players = new_players
-                time.sleep(1) # Update every 1 second
 
         # Start the update thread
         update_thread = threading.Thread(target=update_players,
@@ -643,6 +643,7 @@ class GameManager:
             room_tcp_socket.close()
             stop_thread.set() # Ensure the thread stops when leaving the function
             update_thread.join() # Wait for the thread to finish
+            self.run(room_udp_port=udp_room_port)
 
 
     def list_of_room_screen(self):
@@ -880,6 +881,12 @@ class GameManager:
                 collisionx = 3
         return [collisionx, collisiony]
     def run(self, room_udp_port):
+        # Connect the game room server via UDP port
+        print(f"Room UDP port: {room_udp_port}")
+        room_udp_socket = NetworkManager(
+            server_addr=config.SERVER_ADDR,
+            server_port=room_udp_port
+        )
         print("Game is starting...")
         self.tilemap = Tilemap(self, tile_size=16)
         self.map = 2
@@ -906,7 +913,7 @@ class GameManager:
                         q.put(data)
                 except BlockingIOError as e:
                     continue
-        thread = threading.Thread(target=receive_messages, args = (self.udp_room_socket, q),daemon=True)
+        thread = threading.Thread(target=receive_messages, args = (room_udp_socket.udp_socket, q),daemon=True)
         thread.start()
 
         self.player = None 
@@ -985,7 +992,7 @@ class GameManager:
             msg += collisions[0].to_bytes(1,"big") + collisions[1].to_bytes(1,"big")
         
         # Send message to server
-            byteSent = self.udp_room_socket.sendto(msg, (SERVER_ADDR, self.udp_room_port))
+            byteSent = room_udp_socket.udp_socket.sendto(msg, (SERVER_ADDR, room_udp_port))
             if (byteSent<=0):
                 pass
                 print("Send payload: failed")

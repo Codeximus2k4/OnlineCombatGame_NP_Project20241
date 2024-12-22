@@ -317,7 +317,7 @@ def update_ready_request(user_id: int, is_ready:int, update_ready_socket: Networ
     # Convert to bytes and combine into message
     request_type_byte = request_type.encode("ascii")
     user_id_byte = bytes([user_id])
-    is_ready_byte = bytes([is_ready_byte])
+    is_ready_byte = bytes([is_ready])
     message = request_type_byte + user_id_byte + is_ready_byte
 
     # Send the message
