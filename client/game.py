@@ -23,24 +23,11 @@ class GameManager:
         self.title_font =  pygame.font.Font(config.FONT_PATH,75)
         self.button_font = pygame.font.Font(config.FONT_PATH, 50)
 
-        self.display =  pygame.Surface((640,480), pygame.SRCALPHA)
-        self.display_2 =  pygame.Surface((640,480))
-
-        self.horizontal_movement = [False,False]
-        self.clock = pygame.time.Clock()
-
-        self.assets = {}
-        self.load_assets()
-        self.background_offset_y = -80
-
-        self.player = None
-        self.entities = []
-
         self.user_id = None
 
     def load_assets(self):
         """Load game assets"""
-        self.assets = {
+        return {
                 'decor': load_images('tiles/decor'),
                 'grass': load_images('tiles/grass'),
                 'large_decor': load_images('tiles/large_decor'),
@@ -55,7 +42,7 @@ class GameManager:
                 'Samurai/jump':Animation(load_images('entities/Samurai/Jump'),img_dur= 5, loop=False)
         }
     
-    def setup_background(self):
+    def setup_background(self, assets):
         """Prepare game background"""
         self.game_background =  pygame.Surface(self.assets['background'][0].get_size())
         count = 0
@@ -770,7 +757,7 @@ class GameManager:
             pygame.display.update()
 
                     
-    def de_serialize_entities(self, data):
+    def de_serialize_entities(self, data, entities):
         index = 0
         length =  len(data)
     #print(f"Analyzing payload of length {length}")
@@ -841,7 +828,7 @@ class GameManager:
                     index+=1
             
             found_entity = False
-            for each in self.entities:
+            for each in entities:
                 if each.id == id and each.entity_type==entity_type:
                     found_entity=True
                     each.pos = [posx,posy]
@@ -855,11 +842,11 @@ class GameManager:
                     new_player =  Player(game= self, id = id, entity_class=entity_class,posx = posx
                                          , posy=posy, health=health, stamina=stamina)
                     new_player.set_action(0, True)
-                    self.entities.append(new_player)
-            #print(f"There are {len(self.entities)} in game")
+                    entities.append(new_player)
+            #print(f"There are {len(entities)} in game")
          
-    def load_level(self, map_id):
-        self.tilemap.load('data/maps/' +str(map_id)+'.json')
+    def load_level(self, map_id, tilemap: Tilemap):
+        tilemap.load('data/maps/' +str(map_id)+'.json')
         self.scroll= [0,0]
     
     def check_collision(self,player: Player) -> list[int]:
@@ -881,7 +868,19 @@ class GameManager:
                 collisionx = 3
         return [collisionx, collisiony]
     def run(self, room_udp_port):
-        """Main game loop with refactored network management using NetworkManager"""
+        """Main game loop"""
+
+        display =  pygame.Surface((640,480), pygame.SRCALPHA)
+        display_2 =  pygame.Surface((640,480))
+
+        horizontal_movement = [False,False]
+        clock = pygame.time.Clock()
+
+        self.assets = self.load_assets()
+        self.background_offset_y = -80
+
+        player = None
+        entities = []
 
         # Set up the NetworkManager for UDP communication
         print(f"Room UDP port: {room_udp_port}")
@@ -892,16 +891,16 @@ class GameManager:
         print("Game is starting...")
 
         # Load the level and initialize entities
-        self.tilemap = Tilemap(self, tile_size=16)
-        self.map = 2
-        self.load_level(self.map)
-        self.setup_background()
-        self.entities = []
+        tilemap = Tilemap(self, tile_size=16)
+        map = 2
+        self.load_level(map, tilemap)
+        self.setup_background(self.assets)
+        entities = []
         self.scroll = [0, 0]
 
         # Set up the player
-        self.player = None
-        self.horizontal_movement = [0, 0]
+        player = None
+        horizontal_movement = [0, 0]
 
         # Set up queue for shared data
         q = queue.Queue(maxsize=1)
@@ -918,24 +917,24 @@ class GameManager:
 
         while True:
             # Clear the display
-            self.display.fill(color=(0, 0, 0, 0))
-            self.display_2.blit(pygame.transform.scale(self.game_background, self.display.get_size()), (0, 0))
+            display.fill(color=(0, 0, 0, 0))
+            display_2.blit(pygame.transform.scale(self.game_background, display.get_size()), (0, 0))
 
             # ------------ Identify player in the list of entities --------------
-            if self.player is None:
-                for each in self.entities:
+            if player is None:
+                for each in entities:
                     if each.entity_type == 0 and each.id == self.user_id:
-                        self.player = each
+                        player = each
                         print("Found player")
                         break
 
-            if self.player is not None:
-                self.scroll[0] += (self.player.rect(size=(200, 200), topleft=self.player.pos).centerx -
-                                self.display.get_width() / 2 - self.scroll[0]) / 30
+            if player is not None:
+                self.scroll[0] += (player.rect(size=(200, 200), topleft=player.pos).centerx -
+                                display.get_width() / 2 - self.scroll[0]) / 30
             render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
 
             # Render the tilemap
-            self.tilemap.render(self.display, offset=render_scroll)
+            tilemap.render(display, offset=render_scroll)
 
             #-------------- Collect input and construct the message -------------------
             msg = self.user_id.to_bytes(1, "big")
@@ -951,9 +950,9 @@ class GameManager:
                     if event.key == pygame.K_s:
                         movement_y -= 1
                     if event.key == pygame.K_a:
-                        self.horizontal_movement[0] = 1
+                        horizontal_movement[0] = 1
                     if event.key == pygame.K_d:
-                        self.horizontal_movement[1] = 1
+                        horizontal_movement[1] = 1
                     if event.key == pygame.K_q:
                         action += 1
                     if event.key == pygame.K_e:
@@ -968,12 +967,12 @@ class GameManager:
                         interaction = 2
                 elif event.type == pygame.KEYUP:
                     if event.key == pygame.K_a:
-                        self.horizontal_movement[0] = 0
+                        horizontal_movement[0] = 0
                     if event.key == pygame.K_d:
-                        self.horizontal_movement[1] = 0
+                        horizontal_movement[1] = 0
 
             # Process horizontal and vertical movements
-            movement_x = self.horizontal_movement[0] - self.horizontal_movement[1]
+            movement_x = horizontal_movement[0] - horizontal_movement[1]
             if movement_x == -1:
                 movement_x = 1
             elif movement_x == 1:
@@ -986,7 +985,7 @@ class GameManager:
             # Add movements and collisions to the message
             msg += movement_x.to_bytes(1, "big") + movement_y.to_bytes(1, "big")
             msg += action.to_bytes(1, "big") + interaction.to_bytes(1, "big")
-            collisions = self.check_collision(self.player)
+            collisions = self.check_collision(player)
             msg += collisions[0].to_bytes(1, "big") + collisions[1].to_bytes(1, "big")
 
             # Send the message to the server
@@ -996,25 +995,25 @@ class GameManager:
             try:
                 data = q.get(block=False)
                 if data:
-                    self.de_serialize_entities(data)
+                    self.de_serialize_entities(data, entities)
             except queue.Empty:
                 pass
 
             # Update and render each entity
-            if self.player:
-                self.player.update(self.tilemap, [self.horizontal_movement[0] - self.horizontal_movement[1], 0])
-                self.player.render(self.display, offset=render_scroll)
+            if player:
+                player.update(tilemap, [horizontal_movement[0] - horizontal_movement[1], 0])
+                player.render(display, offset=render_scroll)
 
-            for each in self.entities:
-                if each is not self.player:
-                    each.update(self.tilemap, [0, 0])
-                    each.render(self.display, offset=render_scroll)
+            for each in entities:
+                if each is not player:
+                    each.update(tilemap, [0, 0])
+                    each.render(display, offset=render_scroll)
 
             # Render the final screen
-            self.display_2.blit(self.display, (0, 0))
-            self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest=(0, 0))
+            display_2.blit(display, (0, 0))
+            self.screen.blit(pygame.transform.scale(display_2, self.screen.get_size()), dest=(0, 0))
             pygame.display.update()
-            self.clock.tick(60)
+            clock.tick(60)
 
 
 if __name__ == "__main__":
