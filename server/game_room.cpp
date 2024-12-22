@@ -630,7 +630,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
 
     while (1)
     {
-        int sent_udp_port = sent_UDP_port(players, UDP_SERV_PORT);
+        int sent_udp_port = sendResponse7(players, UDP_SERV_PORT);
         if (sent_udp_port) break;
         else continue;
     }
