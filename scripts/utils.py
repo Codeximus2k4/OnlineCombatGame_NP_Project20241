@@ -178,6 +178,98 @@ def join_room_request(user_id: int, room_id: int):
         room_tcp_port = -1
     return room_tcp_port
 
+def rank_request():
+    """Message type 9: Request top 5 players on server"""
+    # Connect to the server TCP network
+    rank_socket = NetworkManager(
+        server_addr=config.SERVER_ADDR,
+        server_port=config.SERVER_PORT
+    )
+    rank_socket.connect()
+
+    # Request message type 9 from server
+    message = '9'
+    message = message.encode()
+    rank_socket.send_tcp_message(message=message)
+
+    # Receive the response
+    top5 = []
+    
+    response = rank_socket.receive_tcp_message(buff_size=1) # Receive the message type (9)
+    num_players=5
+    while num_players:
+        # Get the username length of the player
+        username_length = rank_socket.receive_tcp_message(buff_size=1).decode() # 1 byte
+        username_length = ord(username_length)
+
+        # Get the username of the player
+        username = rank_socket.receive_tcp_message(buff_size=username_length).decode() # max 127 bytes
+
+        # Get the number of games which the player played
+        num_game_played= rank_socket.receive_tcp_message(buff_size=1).decode() # 1 byte
+        num_game_played = ord(num_game_played)
+
+        # Get the score of the player
+        score = rank_socket.receive_tcp_message(buff_size=2).decode() # 2 bytes
+        score = struct.unpack("!H", score.encode("utf-8"))[0]
+        
+        # Add to the list
+        top5.append({"username": username, "num_game": num_game_played, "score": score})
+
+        print(f"Username: {username} | Number of games: {num_game_played} | Score: {score}\n")
+
+        num_players = num_players - 1
+    
+    rank_socket.close()
+    return top5
+
+def my_stats_request(user_id: int):
+    """Message type 10: Request my stats"""
+    # Connect the socket to the server
+    my_stats_socket = NetworkManager(
+        server_addr=config.SERVER_ADDR,
+        server_port=config.SERVER_PORT
+    )
+    my_stats_socket.connect()
+
+    # Send the request type 10 to the server
+    request_type = 58
+    user_id = user_id
+
+    # Convert to bytes
+    request_type_byte = bytes([request_type])
+    user_id = bytes([user_id])
+    message = request_type_byte + user_id
+    print(f"Message: {message}")
+    # Send the message request to the server
+    my_stats_socket.send_tcp_message(message=message)
+    print("Successfully sent the message")
+
+    # Receive the response
+    my_stats = []
+    # Get response type
+    response_type = my_stats_socket.receive_tcp_message(buff_size=1).decode() # 1 byte (response type)
+    
+    # Get username length
+    username_length = my_stats_socket.receive_tcp_message(buff_size=1).decode() # 1 byte (username length)
+    username_length = ord(username_length)
+    
+    # Get username
+    username = my_stats_socket.receive_tcp_message(buff_size=username_length).decode() # Max 127 byte
+    
+    # Get the number of game played
+    num_game = my_stats_socket.receive_tcp_message(buff_size=1).decode() # 1 byte (number of game playerd)
+    num_game = ord(num_game)
+
+    # Get the score
+    score = my_stats_socket.receive_tcp_message(buff_size=2).decode() # 2 byte (score)
+    score = struct.unpack("!H", score.encode("utf-8"))[0]
+
+    my_stats_socket.close()
+    my_stats = {"username": username, "num_game": num_game, "score": score}
+    
+    return my_stats
+
 class Animation:
     def __init__(self, images ,img_dur = 5, loop =True):
         self.images=  images

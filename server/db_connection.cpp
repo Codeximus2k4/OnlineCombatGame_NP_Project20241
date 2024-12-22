@@ -1,4 +1,9 @@
 #include <libpq-fe.h> //library to connect to postgresql
+#include<string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>  // For htons()
 
 //function to establish a connection with the database
 //output: db connection
@@ -156,4 +161,208 @@ int get_user_id(const char *username, PGconn *conn) {
 void close_db (PGconn *conn) {
 
     PQfinish(conn);
+}
+
+// - function to update users' statistics to database
+// - input: a PGconn connection, player_id, and the score of the match
+// - output: 1 if successful, 0 otherwise
+int update_player_score(PGconn *conn, int player_id, int score_previous_match) {
+    // Convert player_id to a string
+    char player_id_str[20];  // Array to hold the string representation of the integer
+    snprintf(player_id_str, sizeof(player_id_str), "%d", player_id);
+
+    // Query to get current games_played of this player_id
+    const char *query = "SELECT games_played FROM users WHERE id = $1";
+    const char *paramValues[1] = {player_id_str}; // pass the string version of player_id
+
+    // Execute the query to get games_played
+    PGresult *res = PQexecParams(conn, query, 1, NULL, paramValues, NULL, NULL, 0);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT query failed (games_played): %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return 0; // Failure
+    }
+
+    // Retrieve the current games_played value
+    int games_played = atoi(PQgetvalue(res, 0, 0));  
+    printf("Current games_played for player %d: %d\n", player_id, games_played);
+
+    // Increment this value
+    games_played++;
+
+    // Query to get the current score of this player_id
+    const char *query_score = "SELECT score FROM users WHERE id = $1";
+    PGresult *res_score = PQexecParams(conn, query_score, 1, NULL, paramValues, NULL, NULL, 0);
+    if (PQresultStatus(res_score) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT query failed (score): %s\n", PQerrorMessage(conn));
+        PQclear(res_score);
+        PQclear(res);
+        return 0; // Failure
+    }
+
+    // Retrieve the current score value
+    int score = atoi(PQgetvalue(res_score, 0, 0));  
+    printf("Current score for player %d: %d\n", player_id, score);
+
+    // Augment this value with the score of the previous match
+    score += score_previous_match;
+
+    // Prepare the update query
+    const char *updateQuery = "UPDATE users SET games_played = $1, score = $2 WHERE id = $3";
+    char games_played_str[20], score_str[20];
+    snprintf(games_played_str, sizeof(games_played_str), "%d", games_played); // Convert to string
+    snprintf(score_str, sizeof(score_str), "%d", score); // Convert to string
+
+    const char *updateParams[3] = {games_played_str, score_str, player_id_str};
+
+    // Execute the update query
+    PGresult *updateRes = PQexecParams(conn, updateQuery, 3, NULL, updateParams, NULL, NULL, 0);
+    if (PQresultStatus(updateRes) != PGRES_COMMAND_OK) {
+        fprintf(stderr, "UPDATE query failed: %s\n", PQerrorMessage(conn));
+        PQclear(res_score);
+        PQclear(res);
+        PQclear(updateRes);
+        return 0; // Failure
+    }
+
+    // Clean up all result sets
+    PQclear(res_score);
+    PQclear(res);
+    PQclear(updateRes);
+
+    return 1; // Success
+}
+
+// - Function to get the top 5 players with highest score
+// - The data will be populated in `result` string in following format: [username_length][username][games_played][score]x5
+// - input: a connection PGconn to postgres, char string to be populated
+// - output: number of bytes in `result` string successful, 0 on failure
+int get_top_players(PGconn *conn, char result[256]) {
+    // Query to get the top 5 players ordered by highest score
+    const char *query = "SELECT username, games_played, score FROM users ORDER BY score DESC LIMIT 5";
+
+    // Execute the query
+    PGresult *res = PQexec(conn, query);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT query failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return 0;
+    }
+
+    // Calculate the total size required for the result string
+    int rows = PQntuples(res);
+    int total_length = 0;
+
+    // Format each player's data and append to the result string
+    for (int i = 0; i < rows; i++) {
+        const char *username = PQgetvalue(res, i, 0);
+        int username_length = strlen(username);
+        const char *games_played_str = PQgetvalue(res, i, 1);
+        const char *score_str = PQgetvalue(res, i, 2);
+
+        // Convert games_played and score from string to integer
+        int games_played = atoi(games_played_str);
+        int score = atoi(score_str);
+
+        // buff to temporary hold data for this player
+        char buff[256];
+
+        // set first byte to username_len
+        buff[0] = (char) username_length;
+        
+        // set next bytes as username
+        memcpy(buff + 1, username, username_length);
+
+        // set next byte as games_played
+        buff[1 + username_length] = (char) games_played;
+
+        // convert score to 2 network bytes
+        uint16_t byte_score = htons(score);
+
+        // set these 2 last bytes 
+        memcpy(buff + username_length + 2, &byte_score, 2);
+
+        // set last byte of buff as '\0';
+        buff[1 + username_length + 1 + 2] = '\0';
+
+        printf("%d-th user: username_len=%d, username=%s, games_played=%d, score=%d\n", i, username_length, username, games_played, score);
+
+        // Append to the result string
+        memcpy(result + total_length, buff, 1 + username_length + 1 + 2);
+
+        // update total_length
+        total_length = total_length + 1 + username_length + 1 + 2;
+    }
+
+    // Clean up
+    PQclear(res);
+
+    return total_length;
+}
+
+// - function to get personal statistics
+// - the data will be populated in `result` string with following format: [username_len][username][games_played][score]
+// - input: a connection to PGconn, player_id, result string for data to be populated
+// - output: length of data in `result` string, 0 on failure
+int get_personal_statistics(PGconn *conn, int player_id, char result[256]) {
+    // Query to get the user data based on user id
+    const char *query = "SELECT username, games_played, score FROM users WHERE id = $1";
+
+    // Prepare the query with the user_id
+    const char *paramValues[1];
+    char player_id_str[16];
+    snprintf(player_id_str, sizeof(player_id_str), "%d", player_id);
+    paramValues[0] = player_id_str;
+
+    // Execute the query
+    PGresult *res = PQexecParams(conn, query, 1, NULL, paramValues, NULL, NULL, 0);
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT query failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return 0;
+    }
+
+    // If no results found, return 0
+    if (PQntuples(res) == 0) {
+        printf("No user found with id %d\n", player_id);
+        PQclear(res);
+        return 0;
+    }
+
+    // Extract data for the first user (i = 0)
+    const char *username = PQgetvalue(res, 0, 0);
+    int username_length = strlen(username);
+    const char *games_played_str = PQgetvalue(res, 0, 1);
+    const char *score_str = PQgetvalue(res, 0, 2);
+
+    // Convert games_played and score from string to integer
+    int games_played = atoi(games_played_str);
+    int score = atoi(score_str);
+
+    // Temporary buffer to hold the data for this user
+    char buff[256];
+
+    // Set first byte to username_len
+    buff[0] = (char) username_length;
+
+    // Set next bytes as username
+    memcpy(buff + 1, username, username_length);
+
+    // Set next byte as games_played
+    buff[1 + username_length] = (char) games_played;
+
+    // Convert score to 2 network bytes
+    uint16_t byte_score = htons(score);
+
+    // Set these 2 last bytes
+    memcpy(buff + username_length + 2, &byte_score, 2);
+
+    // Copy the result into the result string
+    memcpy(result, buff, 1 + username_length + 1 + 2);
+
+    // Clean up
+    PQclear(res);
+
+    // Return the total length of the data in result
+    return 1 + username_length + 1 + 2;
 }

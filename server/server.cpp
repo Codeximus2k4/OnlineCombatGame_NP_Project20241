@@ -2,8 +2,7 @@
 #include "game_room.cpp"
 //#include "data_structs.cpp"
 
-#include "db_connection.cpp"
-#include <libpq-fe.h> //library to connect to postgresql
+
 
 //ipc libraries
 // #include <sys/ipc.h>
@@ -31,6 +30,7 @@ Defining global variables
 -----------------------------------------------
 */
 int msgid; // messeage queue id 
+pthread_t thread_id; // thread id used for listening from child process in parent process 
 int tcp_room_port = 10000; // tcp port for each game room, first used port will be 10000
 int udp_room_port = 20000; // udp port for each game room, first used port will be 20000
 Room *rooms = NULL; // pointer to head of rooms created on server
@@ -56,11 +56,21 @@ does not handle logic
 // Signal handler for control + C case from user
 void handle_sigint(int sig) {
     printf(YELLOW "Caught signal %d (Ctrl + C), Cleaning up...\n" RESET, sig);
+
+    // clean message queue existing on our machine
     if (msgctl(msgid, IPC_RMID, NULL) == -1) {
         perror("msgctl (remove)");
     } else {
         printf("Message queue removed successfully.\n");
     }
+
+    // kill currently running msg queue listening thread (without waiting for it to finish)
+    if (pthread_cancel(thread_id) != 0) {
+        perror(RED "pthread_cancel" RESET);
+    } else {
+        printf(BLUE "(In main server) Listening thread killed successfully.\n" RED);
+    }
+
     exit(0); // Exit the program
 }
 
@@ -140,7 +150,7 @@ void sendResponse3(int connectfd){
     };
     
     // print to check
-    printf(YELLOW "Number of bytes sent to client=%d\n" RESET, sendBytes, roomInformation, strlen(roomInformation));
+    printf(YELLOW "Number of bytes sent to client=%d (excluding first byte)\n" RESET, sendBytes, roomInformation, strlen(roomInformation));
 }
 
 // - function to handle case client wants to create room
@@ -217,7 +227,56 @@ void sendResponse5(int connectfd, int status, int room_id, int room_tcp_port){
     
     // print to check
     printf(YELLOW "Bytes sent to client=%d, type=%c, status=%c, room_id=%d, tcp_port=%d\n" RESET, sendBytes, data[0], data[1], data[2], room_tcp_port);
+}
 
+// - function to send response 9 to client
+// - input: socket descriptor connected to client, data string to send, and total of bytes in that data string
+// - output: none
+// - dependencies: none
+void sendResponse9(int connectfd, char data[BUFF_SIZE + 1], int total_length){
+    char packet[BUFF_SIZE + 1];
+    int sendBytes;
+
+    // init packet 
+    packet[0] = '9'; // set first byte of packet to request type
+
+    // copy data into packet
+    memcpy(packet + 1, data, total_length);
+
+    int number_of_bytes_to_send = 1 + total_length;
+
+    // send to client
+    if( (sendBytes = send(connectfd, packet, number_of_bytes_to_send, 0)) < 0){
+        perror("Error");
+    };
+    
+    // print to check
+    printf(YELLOW "Number of bytes sent to client=%d (excluding first byte)\n" RESET, sendBytes);
+}
+
+// - function to send response 10 to client
+// - input: socket descriptor connected to client, data string to send, and total of bytes in that data string
+// - output: none
+// - dependencies: none
+void sendResponse10(int connectfd, char data[BUFF_SIZE + 1], int total_length){
+    char packet[BUFF_SIZE + 1];
+    int sendBytes;
+
+    // init packet
+    packet[0] = '0' + 10; // this the ASCII value (one unit behind 9 in ascii table)
+
+    // copy data into packet 
+    memcpy(packet + 1, data, total_length);
+
+    int number_of_bytes_to_send = 1 + total_length;
+
+    // send to client
+    if( (sendBytes = send(connectfd, packet, number_of_bytes_to_send, 0)) < 0){
+        perror("Error");
+    };
+    
+    // print to check
+    printf(YELLOW "Number of bytes sent to client=%d (excluding first byte)\n" RESET, sendBytes);
 }
 
 // Thread function to handle ipc messages
@@ -230,7 +289,7 @@ void *message_handler(void *arg) {
         //--------------------IPC-------------------
         // Get the status of the message queue and store into buf
         if (msgctl(msgid, IPC_STAT, &buf) == -1) {
-            perror(RED "msgctl" RESET);
+            // perror(RED "msgctl" RESET);
             continue;
         }
 
@@ -241,7 +300,7 @@ void *message_handler(void *arg) {
 
             // Receive the message
             if (msgrcv(msgid, &message, sizeof(message.text), 1, 0) == -1) {
-                perror(RED "msgrcv failed" RESET);
+                // perror(RED "msgrcv failed" RESET);
                 continue;
             }
 
@@ -330,7 +389,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
 
         int status;
 
-        if (add_user(username, password, conn)) { //register succesfully
+        if (add_user(username, password, conn)) { // register succesfully
             status = 1;
         }
         else status = 0; //register fail
@@ -502,6 +561,37 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
             // send response back to client
             sendResponse5(connectfd, status, room_id, room->tcp_port);
         }
+    } else if(message_type == '9'){ // ascii value of '9' is 57 in ASCII table
+        // get top 5 players 
+        char data[256];
+        int total_length = 0;
+
+        if( (total_length = get_top_players(conn, data) ) == 0){
+            perror(RED "failed querying for top 5 players" RESET);
+        }
+        
+        // send response to client
+        sendResponse9(connectfd, data, total_length);
+    } else if(message_type == 58) { // '10' is basically one ascii value behind '9' in ASCII table =))
+        // get data for this player
+        char data[256];
+        int total_length = 0;
+
+        // get player_id 
+        if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+            perror("Error");
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int player_id = buff[0];
+
+        if( (total_length = get_personal_statistics(conn, player_id, data) ) == 0){
+            perror(RED "failed querying for statistics of player" RESET);
+        }
+        
+        // send response to client
+        sendResponse10(connectfd, data, total_length);
     }
 
     return;
@@ -576,8 +666,6 @@ int main (int argc, char *argv[]) {
     printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP)\n" RESET, SERV_PORT);
 
     //-----------handle ipc-------------------------
-    
-    pthread_t thread_id;
 
     // Generate a unique key
     int key = ftok("progfile", 65);

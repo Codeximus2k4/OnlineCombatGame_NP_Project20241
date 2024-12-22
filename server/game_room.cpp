@@ -13,6 +13,9 @@
 #include <signal.h>
 #include <errno.h> // use of errno variable
 
+#include "db_connection.cpp"
+#include <libpq-fe.h> //library to connect to postgresql
+
 //ipc libraries
 #include <sys/ipc.h>
 #include <sys/msg.h>
@@ -94,6 +97,24 @@ int get_listener_socket(char SERV_PORT[BUFF_SIZE + 1]){
     }
 
     return listener;
+}
+
+// - function to update score of a specific player to database
+// - input: player_id, score of the previous match (this will be augmented to `score` column in database)
+// - output: 1 on successful, 0 on failure
+// - dependencies
+// - note that both score and unmber of games_played column in database of this player will get updated
+int updateScore(int player_id, int score){
+    // connect to users db
+    PGconn *conn = connect_db();
+
+    // update player's statistics (games played, score) to database
+    int status = update_player_score(conn, player_id, score);
+
+    // close database connection
+    close_db(conn);
+
+    return status;
 }
 
 // get sockaddr, IPv4 or IPv6
