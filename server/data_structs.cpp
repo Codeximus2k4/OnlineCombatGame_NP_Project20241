@@ -516,7 +516,8 @@ void serializeRoomInformation(char result[], Room *head){
 
     Room *p = head;
     while(p != NULL){
-        if(p->started = 1) {
+        if(p->started == 1) {
+            p = p->next;
             continue;
         }
 
@@ -553,15 +554,10 @@ void serializeRoomInformation(char result[], Room *head){
 // message format: [room_id][num_players_in_room][started]
 // input: the message, the room_id, the head of the player list
 void serializeIpcMsg(ipc_msg *message, int room_id, Player *head) {
-    int ready = 0; //the ready state of the room
     message->type = 1;
     message->text[0] = room_id + '0';
     message->text[1] = countPlayerInRoom(head) + '0';
-    int num_players_ready = countPlayerReadyInRoom(head);
-    if (num_players_ready == 4) ready = 1; //full 4 players are ready
-    else ready = 0;
-    message->text[2] = ready + '0';
-    message->text[3] = '\0';
+    message->text[2] = '\0';
 }
 
 // - function to find room by id
