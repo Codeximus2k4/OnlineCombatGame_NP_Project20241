@@ -564,6 +564,8 @@ Room *findRoomById(Room *head, int room_id){
         if(p->id == room_id) {
             break;
         }
+
+        p = p->next;
     }
 
     return p;
@@ -580,7 +582,8 @@ Player *findPlayerInRoomById(Player *head, int player_id){
         if(p->id == player_id){
             break;
         }
-        p= p->next;
+
+        p = p->next;
     }
 
     return p;
@@ -597,6 +600,8 @@ Player *findPlayerInRoomBySocketDescriptor(Player *head, int socket_descriptor){
         if(p->socket_descriptor == socket_descriptor){
             break;
         }
+
+        p = p->next;
     }
 
     return p;

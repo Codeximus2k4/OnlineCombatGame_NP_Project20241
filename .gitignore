@@ -33,3 +33,7 @@ jmeter.log
 Makefile
 
 server/server
+
+scripts/__pycache__
+
+client/__pycache__
