@@ -184,7 +184,7 @@ int findPlayerIdByAddress(sockaddr_in cliaddr){
     return -1;
 }
 
-int sent_UDP_port(Player *head, int udp_port)
+int sendResponse7(Player *head, int udp_port)
 {
     // implementing non-blocking send using select
     fd_set writefds;
@@ -192,9 +192,16 @@ int sent_UDP_port(Player *head, int udp_port)
     timeout.tv_sec = 1;
     timeout.tv_usec= 0;
     char message[3];
-    message[0]=7;
-    message[1]= udp_port/256;
-    message[2]= udp_port%256; 
+
+    // set first byte of message to '7'
+    message[0]= '7';
+
+    // convert TCP port of room network byte (2 bytes) because there are 65536 ports
+    uint16_t byte_room_udp_port = htons(udp_port);
+    // append these 2 bytes to response packet
+    memcpy(message + 1, &byte_room_udp_port, 2);
+
+
     int finished_sending = 1;
     //printf("%d",countPlayerInRoom(head));
     // first we check the writability of each socket first
@@ -206,7 +213,7 @@ int sent_UDP_port(Player *head, int udp_port)
         else
         {
             finished_sending = 0;
-            int bytes_sent = send(tcp_client_sockfd, message+port_bytes_sent,3 - port_bytes_sent, 0);
+            int bytes_sent = send(tcp_client_sockfd, message+port_bytes_sent, 3 - port_bytes_sent, 0);
             if (bytes_sent<0)
             {
                 char err_message[80];
