@@ -756,6 +756,58 @@ class GameManager:
 
             pygame.display.update()
 
+    def pick_hero_screen(self):
+        while True:
+            self.screen.blit(self.menu_background, (0, 0))
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Title
+            title_text = self.title_font.render("PICK A HERO", True, config.COLORS['MENU_TEXT'])
+            title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
+            self.screen.blit(title_text, title_rect)
+            
+            #Button
+            lock_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH-config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+                text_input="Lock",
+                font=get_font(20),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+
+            back_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            )
+            
+            hero1_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            )
+            
+            hero2_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            )
+            
+            hero3_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            )
+            
+            hero4_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            )
+            
+            hero5_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            )
+            
+            pygame.display.update()
+            
                     
     def de_serialize_entities(self, data, entities):
         index = 0
