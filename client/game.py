@@ -630,8 +630,8 @@ class GameManager:
             room_tcp_socket.close()
             stop_thread.set() # Ensure the thread stops when leaving the function
             update_thread.join() # Wait for the thread to finish
-            #self.run(room_udp_port=udp_room_port)
-            self.pick_hero_screen(room_tcp_port=room_tcp_port)
+            self.pick_hero_screen()
+            self.run(room_udp_port=udp_room_port)
 
 
     def list_of_room_screen(self):
@@ -757,13 +757,8 @@ class GameManager:
 
             pygame.display.update()
 
-    def pick_hero_screen(self, room_tcp_port):
-        # Connect to the room TCP network
-        room_tcp_socket = NetworkManager(
-            server_addr=config.SERVER_ADDR,
-            server_port=room_tcp_port
-        )
-        
+    def pick_hero_screen(self):
+        hero_picked = " " 
         while True:
             self.screen.blit(self.menu_background, (0, 0))
             mouse_pos = pygame.mouse.get_pos()
@@ -785,17 +780,17 @@ class GameManager:
             
             samurai_button = Button(
                 image=pygame.image.load("data/images/pickHero/Samurai.png"),
-                pos=(180, 110),
+                pos=(390, 270),
                 text_input="Samurai",
                 font=get_font(16),
                 base_color=config.COLORS['BUTTON_BASE'],
                 hovering_color="White"
             )
             
-            evil_wizard_button = Button(
-                image=pygame.image.load("data/images/pickHero/EvilWizard.png"),
-                pos=(480, 110),
-                text_input="Evil Eizard",
+            wizard_button = Button(
+                image=pygame.image.load("data/images/pickHero/Wizard.png"),
+                pos=(390, 450),
+                text_input="Wizard",
                 font=get_font(16),
                 base_color=config.COLORS['BUTTON_BASE'],
                 hovering_color="White"
@@ -803,7 +798,7 @@ class GameManager:
             
             king_button = Button(
                 image=pygame.image.load("data/images/pickHero/King.png"),
-                pos=(180, 360),
+                pos=(570, 270),
                 text_input="King",
                 font=get_font(16),
                 base_color=config.COLORS['BUTTON_BASE'],
@@ -812,7 +807,7 @@ class GameManager:
             
             witch_button = Button(
                 image=pygame.image.load("data/images/pickHero/Witch.png"),
-                pos=(480, 360),
+                pos=(570, 450),
                 text_input="Witch",
                 font=get_font(16),
                 base_color=config.COLORS['BUTTON_BASE'],
@@ -820,12 +815,10 @@ class GameManager:
             )
             
             # Draw all buttons
-            buttons = [lock_button, samurai_button, evil_wizard_button, king_button, witch_button]
+            buttons = [lock_button, samurai_button, wizard_button, king_button, witch_button]
             for button in buttons:
                 button.changeColor(mouse_pos)
                 button.update(self.screen)
-                
-            hero_picked = 1 
                 
             # Event handling
             for event in pygame.event.get():
@@ -834,18 +827,21 @@ class GameManager:
                     sys.exit()
                     
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    # if lock_button.checkForInput(mouse_pos):
-                    #     pick_hero_request(hero_id=hero_picked,
-                    #                      pick_hero_socket=room_tcp_socket)
-                    #     self.run(room_udp_port=udp_room_port)
+                    if lock_button.checkForInput(mouse_pos):
+                        break
                     if samurai_button.checkForInput(mouse_pos):
-                        hero_picked = 1
-                    if evil_wizard_button.checkForInput(mouse_pos):
-                        hero_picked = 2
+                        hero_picked = "Samurai"
+                    if wizard_button.checkForInput(mouse_pos):
+                        hero_picked = "Wizard"
                     if king_button.checkForInput(mouse_pos):
-                        hero_picked = 3
+                        hero_picked = "King"
                     if witch_button.checkForInput(mouse_pos):
-                        hero_picked = 4
+                        hero_picked = "Witch"
+                        
+            pick_text = f"You pick: {hero_picked}"
+            pick_text_rendered = get_font(22).render(pick_text, True, config.COLORS['MENU_TEXT'])
+            player_rect = pick_text_rendered.get_rect(center=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100))
+            self.screen.blit(pick_text_rendered, player_rect)
             
             pygame.display.update()
             
