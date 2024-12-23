@@ -630,7 +630,8 @@ class GameManager:
             room_tcp_socket.close()
             stop_thread.set() # Ensure the thread stops when leaving the function
             update_thread.join() # Wait for the thread to finish
-            self.run(room_udp_port=udp_room_port)
+            #self.run(room_udp_port=udp_room_port)
+            self.pick_hero_screen(room_tcp_port=room_tcp_port)
 
 
     def list_of_room_screen(self):
@@ -785,21 +786,37 @@ class GameManager:
             samurai_button = Button(
                 image=pygame.image.load("data/images/pickHero/Samurai.png"),
                 pos=(180, 110),
+                text_input="Samurai",
+                font=get_font(16),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
             )
             
             evil_wizard_button = Button(
                 image=pygame.image.load("data/images/pickHero/EvilWizard.png"),
                 pos=(480, 110),
+                text_input="Evil Eizard",
+                font=get_font(16),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
             )
             
             king_button = Button(
                 image=pygame.image.load("data/images/pickHero/King.png"),
                 pos=(180, 360),
+                text_input="King",
+                font=get_font(16),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
             )
             
             witch_button = Button(
                 image=pygame.image.load("data/images/pickHero/Witch.png"),
                 pos=(480, 360),
+                text_input="Witch",
+                font=get_font(16),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
             )
             
             # Draw all buttons
@@ -808,7 +825,7 @@ class GameManager:
                 button.changeColor(mouse_pos)
                 button.update(self.screen)
                 
-            hero_picked = 0 
+            hero_picked = 1 
                 
             # Event handling
             for event in pygame.event.get():
@@ -817,9 +834,10 @@ class GameManager:
                     sys.exit()
                     
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    if lock_button.checkForInput(mouse_pos):
-                        pick_hero_request(hero_id=hero_picked,
-                                          pick_hero_socket=room_tcp_socket)
+                    # if lock_button.checkForInput(mouse_pos):
+                    #     pick_hero_request(hero_id=hero_picked,
+                    #                      pick_hero_socket=room_tcp_socket)
+                    #     self.run(room_udp_port=udp_room_port)
                     if samurai_button.checkForInput(mouse_pos):
                         hero_picked = 1
                     if evil_wizard_button.checkForInput(mouse_pos):
