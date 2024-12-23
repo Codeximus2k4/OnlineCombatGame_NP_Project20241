@@ -12,68 +12,67 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-/*---------------------------------------------
-Defining Player structs
------------------------------------------------
-*/
-
-
 
 
 // the game room (sub process) manages the list of player in the room
 // int id; // id of player
 // sockaddr_in cliaddr; // IPv4 address corresponding to each player
 // Player *next; // next player in the list
-int min(int a , int b)
-{
-    if (a<b) return a;
+int min(int a , int b) {
+    if (a < b) return a;
     else return b;
 }
-int max(int a, int b)
-{
-    if (a>b) return a;
+
+int max(int a, int b) {
+    if (a > b) return a;
     else return b;
 }
-struct Hitbox
-{
+
+struct Hitbox {
     int offset_x;
     int offset_y;
     int width;
     int height;
 };
-struct Items {
-    int x, y; //position
+
+struct Item {
     int type;
     int respawn_time;
     int timeSinceConsumption;
-    Items *next;
+    Item *next;
     Hitbox *hitbox;
 };
 
-struct Traps
-{
-    int x,y; //position
+struct Trap {
     int cooldown_time;
     int timeSinceActivated;
     int type;
-    Hitbox* hitbox;
-    Traps * next;
+    int timeInEffect; // time since trap has been activated
+    int effectTime; // duration of the trap's effect
+    Hitbox *effectHitbox;
+    Hitbox *activateHitbox;
+    Trap * next;
 };
 
 
+Hitbox *makeHitbox(int offset_x, int offset_y, int width, int height) {
+    Hitbox *newHitBox = (Hitbox*) malloc(sizeof(Hitbox));
 
-Hitbox *makeHitbox()
-{
-    Hitbox *newHitBox =  (Hitbox*) malloc(sizeof(Hitbox));
-    newHitBox->offset_x = 0;
-    newHitBox->offset_y = 0;
-    newHitBox->width = 0;
-    newHitBox->height=0;
+    newHitBox->offset_x = offset_x;
+    newHitBox->offset_y = offset_y;
+    newHitBox->width = width;
+    newHitBox->height = height;
+
     return newHitBox;  
 }
-int check_collision(Hitbox *a, Hitbox *b)
-{
-    return 0 ;
+
+// - function to check if the the hitboxes of 2 entities collapse
+// - input: pointer to hitbox 1, pointer to hitbox 2
+// - output: 1 if 2 entities collapse, 0 otherwise
+// - dependencies:
+int check_collision(Hitbox *a, Hitbox *b) {
+
+    return 0;
 }
 
 //there are trap doors on the map. when player hits it, a projectile is fired
@@ -298,8 +297,8 @@ void handleStateChange(Player *player, int input_action,int collisionx, int coll
 struct Game{
     Player* players;
     int game_mode;
-    Items* items;
-    Traps* traps;
+    Item* items;
+    Trap* traps;
     int game_loop;
     int Score_team1;
     int Score_team2;
@@ -368,6 +367,7 @@ int serializePlayersInRoomInformation(char result[], Player *head) {
     }
     return 10;
 }
+
 // - add a player to list of players in the room
 // - input: head pointer to list of players in the room, pointer to a Player
 // - output: head of list of players
@@ -677,4 +677,156 @@ Room *removeRoomFromListRooms(Room *head, Room *removeRoom){
     free(removeRoom);
     printf("List of rooms updated (room to remove was not at head of the list)\n");
     return head;
+}
+
+// - make a new Trap based on the information provided
+// - input: type of trap, effect hitbox, activation hitbox, all other values will be set to 0 or NULL
+// - output: pointer to a new Player
+// - dependencies: none
+// - NOTE: type = 1 is fire trap, type = 2 is slow trap
+Trap *makeTrap(int cooldown_time, int type, int effectTime, Hitbox *effectHitbox, Hitbox *activateHitbox){
+    Trap *p = (Trap *) malloc(sizeof(Trap));
+    p->cooldown_time = cooldown_time;
+    p->effectTime = effectTime;
+    p->timeSinceActivated = 0; // first init will be 0
+    p->timeInEffect = 0;
+    p->type = type;
+    p->effectHitbox = effectHitbox;
+    p->activateHitbox = activateHitbox;
+    
+
+    p->next = NULL;
+
+    return p;
+}
+
+// - add a trap to list of traps in the game
+// - input: head pointer to list of traps in the game, pointer to a Trap
+// - output: head of list of traps
+// - dependencies: none
+Trap *addTrapToListOfTraps(Trap *head, Trap *trap){
+    // if there are no traps yet
+    if(head == NULL){
+        head = trap;
+        return head;
+    }
+
+    // else add to the end of the linked list
+    Trap *p = head;
+    while(p->next != NULL){
+        p = p->next;
+    }
+
+    p->next = trap;
+
+    return head;
+}
+
+// - function to remove a trap from the list of traps 
+// - input: head pointer to the list of traps, pointer to the trap to remove
+// - output: updated head pointer of the list of traps
+Trap *removeTrapFromListOfTraps(Trap *head, Trap *removeTrap){
+    // if list of traps empty
+    if(head == NULL){
+        return NULL;
+    }
+
+    // if we need to remove head
+    if(head == removeTrap){
+        head = head->next;
+        free(removeTrap);
+
+        // printf("List of traps updated (trap to remove was at the head of list)\n");
+        return head;
+    }
+
+    // traverse to find previous node 
+    Trap *temp = head;
+    while(temp != NULL && temp->next != removeTrap){
+        temp = temp->next;
+    }
+
+    // if the player to remove is not found
+    if(temp == NULL){
+        // printf("Trap not found in the list, list unchanged\n");
+        return head;
+    }
+
+    // remove the node
+    temp->next = removeTrap->next;
+    free(removeTrap);
+    // printf("List of traps updated (trap to remove was not at head of the list)\n");
+    return head;
+}
+
+// - function to update information of a trap
+// - input: pointer to a trap to update
+// - output: none
+// - dependencies: none
+void updateTrapInformation(Trap *trap) {
+    // update time sice last activated
+    trap->timeSinceActivated++; // simply increment time since last activated
+
+    // update time in effect
+    trap->timeInEffect = min(trap->timeInEffect + 1, trap->effectTime);
+}
+
+// - function to check if a player has stepped on an activated trap
+// - input: pointer to player, pointer to trap
+// - output: 0 if the trap is not activated by the player, type of trap if trap is activated
+// - dependencies: check_collision
+int trapActivated(Player *player, Trap *trap){
+    // check if trap is still on cool down
+    if(trap->timeSinceActivated < trap->cooldown_time) return 0;
+
+    // if player doesn't step on the trap
+    if(!check_collision(player->selfHitBox, trap->activateHitbox)) return 0;
+
+    // else update trap information and return trap's type
+    trap->timeSinceActivated = 0;
+    trap->timeInEffect = 0; // this means trap is now in effect
+
+    return trap->type;
+}
+
+// - function to check if a player affected when a trap is activated
+// - input: pointer to a player, pointer to the trap
+// - output: 0 if player is not affected by a trap, type of trap if player is affected by the trap
+int takeEffectFromTrap(Player *player, Trap *trap) {
+    // check if player is not in the trap effect's area
+    if(!check_collision(player->selfHitBox, trap->effectHitbox)) return;
+
+    // check if trap is not in effect anymore
+    if(trap->timeInEffect >= trap->effectTime) return 0;
+    
+    return trap->type;
+}
+
+// - function to generate all traps of a map
+// - input: none
+// - output: pointer to the head of linked list of traps
+// - dependencies: makeTrap(), makeHitbox(), addTrapToListOfTraps()
+Trap *spawnAllTraps(){
+    // init head pointer of list of traps
+    Trap *traps = NULL;
+
+    // create all traps in this map
+
+    // create first trap
+    Hitbox *firstTrapEffectHitbox = makeHitbox(800, 336, 16, 16);
+    Hitbox *firstTrapActivateHitbox = makeHitbox(200, 336, 16, 16);
+    Trap *firstTrap = makeTrap(50, 1, 20, firstTrapEffectHitbox, firstTrapActivateHitbox);
+
+    // add first trap to list of traps
+    traps = addTrapToListOfTraps(traps, firstTrap);
+
+    // create second trap
+    Hitbox *secondTrapEffectHitbox = makeHitbox(1300, 150, 16, 16);
+    Hitbox *secondTrapActivateHitbox = makeHitbox(1500, 336, 16, 16);
+    Trap *secondTrap = makeTrap(50, 2, 20, secondTrapEffectHitbox, secondTrapActivateHitbox);
+
+    // add second trap to list of traps
+    traps = addTrapToListOfTraps(traps, secondTrap);
+
+    return traps;
 }
