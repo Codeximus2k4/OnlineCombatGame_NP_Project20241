@@ -317,7 +317,7 @@ def update_ready_request(user_id: int, is_ready:int, update_ready_socket: Networ
     # Convert to bytes and combine into message
     request_type_byte = request_type.encode("ascii")
     user_id_byte = bytes([user_id])
-    is_ready_byte = bytes([is_ready_byte])
+    is_ready_byte = bytes([is_ready])
     message = request_type_byte + user_id_byte + is_ready_byte
 
     # Send the message
@@ -340,7 +340,8 @@ class Animation:
             self.frame = min(self.frame+1 , self.img_duration* len(self.images) )
             if self.frame >= self.img_duration* len(self.images) -1:
                 self.done = True
-        
+    def get_size(self):
+        return self.images[int(self.frame/self.img_duration)].get_size()
     def get_img(self):
         return self.images[int(self.frame/self.img_duration)]
 

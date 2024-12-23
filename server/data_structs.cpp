@@ -137,10 +137,8 @@ struct Player {
     int posx,posy;
     int timeSinceDeath;
 };
-void update_player(Player* player, int collisionx, int collisiony)
+void update_player(Player* player)
 {
-    player->collisionx = collisionx;
-    player->collisiony =  collisiony;
     if (player->Hit) player->action = 10;
     player->timeSinceAttack= min(player->timeSinceAttack+1, player->attack_cooldown+1);
     player->timeSinceDash =  min(player->timeSinceDash+1, player->dash_cooldown+1);
@@ -152,15 +150,15 @@ void update_player(Player* player, int collisionx, int collisiony)
             player->action=0;
             return;
         }
-        else if (player->movement_x==2 && (player->collisionx!=2 || player->collisionx!=3)) 
+        else if (player->movement_x==2 && (player->collisionx!=2 && player->collisionx!=3)) 
         {
             player->posx -= player->speed;
             player->posx = max(player->posx, 0);
             player->isFacingLeft = true;
         }
-        else if (player->movement_x==1 && (player->collisionx!=1 || player->collisionx!=3) )
+        else if (player->movement_x==1 && (player->collisionx!=1 && player->collisionx!=3) )
         {
-            player->posx+=player->speed;
+            player->posx +=player->speed;
             player->posx = min(player->posx, 65000); 
             player->isFacingLeft= false;
         }
@@ -178,8 +176,8 @@ void update_player(Player* player, int collisionx, int collisiony)
             return;
         }
     }
-    
-
+    printf("%d - %d\n",player->collisionx,player->collisiony);
+    printf("%d - %d\n",player->posx, player->posy);
     // finished updating the action now, let's update the position
 }
 int serialize_player_info(char *send_buffer, int byteSerialized, Player *player)
@@ -234,8 +232,8 @@ void characterSpawner(Player* players)
         {
             if (temp->posx==-1 && temp->posy==-1)
             {
-                temp->posx = 0;
-                temp->posy = 200;
+                temp->posx = 300;
+                temp->posy = 252;
                 temp->health=100;
                 temp->stamina = 100;
                 temp->isFacingLeft=true;

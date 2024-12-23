@@ -38,7 +38,7 @@ class GameManager:
 
         self.user_id = None
         self.udp_room_socket =None
-        self.udp_room_port =-1
+        self.udp_room_port =None
 
     def load_assets(self):
         """Load game assets"""
@@ -47,7 +47,7 @@ class GameManager:
                 'grass': load_images('tiles/grass'),
                 'large_decor': load_images('tiles/large_decor'),
                 'stone':  load_images('tiles/stone'),
-                'Samurai': load_image('entities/Samurai/Idle/Idle_1.png'),
+                'Samurai': load_image('entities/Samurai/Idle/idle1.png'),
                 'background': load_images('background'),
                 'Samurai/idle': Animation(load_images('entities/Samurai/Idle'), img_dur=5, loop = True),
                 'Samurai/attack1': Animation(load_images('entities/Samurai/Attack1'), img_dur = 5, loop =False),
@@ -521,10 +521,13 @@ class GameManager:
             try:
                 room_tcp_socket.tcp_socket.setblocking(False) # set non blocking for room socket
                 message_type = room_tcp_socket.receive_tcp_message(buff_size=1).decode() # Receive the message type
-                
+                print(f"Message type: {message_type}")
                 if message_type == "7":
+                    nonlocal udp_room_port
                     udp_room_port = room_tcp_socket.receive_tcp_message(buff_size=2).decode()
-                    udp_room_port = struct("!H", udp_room_port.encode("utf-8"))[0]
+                    print(udp_room_port)
+                    udp_room_port = struct.unpack("!H", udp_room_port.encode("utf-8"))[0]
+                    print(f"Room UDP port: {udp_room_port}")
                 elif message_type == "8":
                     num_players = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
                     num_players = ord(num_players)
@@ -549,7 +552,7 @@ class GameManager:
                 if new_players:
                     nonlocal players
                     players = new_players
-                time.sleep(1) # Update every 1 second
+                time.sleep(0.2) # Update every 1 second
 
         # Start the update thread
         update_thread = threading.Thread(target=update_players,
@@ -601,11 +604,6 @@ class GameManager:
                     button.changeColor(mouse_pos)
                     button.update(self.screen)
 
-                # Set up ready message format
-                message_type =  "7"
-                message_type_byte =  message_type.encode("ascii")
-                user_id_byte =  self.user_id.to_bytes(1,"big")
-
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         stop_thread.set()  # Signal the update thread to stop
@@ -643,6 +641,7 @@ class GameManager:
             room_tcp_socket.close()
             stop_thread.set() # Ensure the thread stops when leaving the function
             update_thread.join() # Wait for the thread to finish
+            self.run(room_udp_port=udp_room_port)
 
 
     def list_of_room_screen(self):
@@ -767,8 +766,7 @@ class GameManager:
                             
 
             pygame.display.update()
-
-                    
+           
     def de_serialize_entities(self, data):
         index = 0
         length =  len(data)
@@ -843,7 +841,24 @@ class GameManager:
             for each in self.entities:
                 if each.id == id and each.entity_type==entity_type:
                     found_entity=True
-                    each.pos = [posx,posy]
+                    # update the position
+                    if each.collisions['left'] and each.pos[0]>posx:
+                        pass
+                    elif each.collisions['right'] and each.pos[0]<posx:
+                        pass
+                    else:
+                        each.pos[0]=posx
+                    
+                    if each.collisions['up'] and each.pos[1]>posy:
+                        pass
+                    elif each.collisions['down'] and each.pos[1]<posy:
+                        pass
+                    else:
+                        each.pos[1]=posy
+                    
+                    
+
+                    
                     if entity_type==0:
                         each.flip = flip
                         each.set_action(action_type,False)
@@ -879,21 +894,34 @@ class GameManager:
             if (player.collisions['up'] and player.collisions['down']):
                 collisionx = 3
         return [collisionx, collisiony]
-    def run(self, room_udp_port):
+    def run(self,room_udp_port):
+        """Main game loop"""
+        self.display =  pygame.Surface((640,480), pygame.SRCALPHA)
+        self.display_2 =  pygame.Surface((640,480))
+
+        # Set up the NetworkManager for UDP communication
+        print(f"Room UDP port: {room_udp_port}")
+        room_udp_socket = NetworkManager(
+            server_addr=config.SERVER_ADDR,
+            server_port=room_udp_port
+        )
+        self.udp_room_socket =  room_udp_socket.udp_socket
         print("Game is starting...")
+
+        # Load the level and initialize entities
         self.tilemap = Tilemap(self, tile_size=16)
         self.map = 2
         self.load_level(self.map)
-        SERVER_ADDR = "127.0.0.1"
-        
         self.setup_background()
         self.entities = []
-        self.scroll = [0,0]
-        # set up queue for sharing data between threads
-        q = queue.Queue(maxsize= 1)
+        self.scroll = [0, 0]
 
-        # ---------- MULTI-THREAD HANDLING---------
-        # target function for multi-thread handling
+        # Set up the player
+        self.player = None
+        self.horizontal_movement = [0, 0]
+
+        # Set up queue for shared data
+        q = queue.Queue(maxsize=1)
         def receive_messages(sock, q):
             while True:
                 try:
@@ -909,8 +937,6 @@ class GameManager:
         thread = threading.Thread(target=receive_messages, args = (self.udp_room_socket, q),daemon=True)
         thread.start()
 
-        self.player = None 
-        self.horizontal_movement = [0,0]
         while True:
             self.display.fill(color = (0,0,0,0))
             self.display_2.blit(pygame.transform.scale(self.game_background, self.display.get_size()), (0,0))
@@ -923,7 +949,7 @@ class GameManager:
                         print("found player")
                         break
             if self.player is not None:
-                    self.scroll[0] +=  (self.player.rect(size = (200,200),topleft =  self.player.pos).centerx -  self.display.get_width()/2 - self.scroll[0])/30
+                    self.scroll[0] +=  (self.player.rect(topleft =  self.player.pos).centerx -  self.display.get_width()/2 - self.scroll[0])/30
             render_scroll =  (int(self.scroll[0]),int (self.scroll[1]))
                 
             self.tilemap.render(self.display, offset =  render_scroll)
@@ -982,15 +1008,17 @@ class GameManager:
             
         # Check collision
             collisions =  self.check_collision(self.player)
+            print(collisions)
             msg += collisions[0].to_bytes(1,"big") + collisions[1].to_bytes(1,"big")
         
         # Send message to server
-            byteSent = self.udp_room_socket.sendto(msg, (SERVER_ADDR, self.udp_room_port))
+            byteSent = self.udp_room_socket.sendto(msg, (config.SERVER_ADDR, room_udp_port))
             if (byteSent<=0):
                 pass
                 print("Send payload: failed")
             else:
                 pass
+                #print(f"Sent {byteSent} to server")
         #Parse data
             data = ""
             try:
@@ -998,14 +1026,16 @@ class GameManager:
             except Exception as e:
                 pass
             if len(data)!=0:
-                print(data)
                 self.de_serialize_entities(data)
-           
-            
+
         # Camera offset to get player to the center of the screen
             #update and render each entity
             if self.player is not None:
+                print(self.player.pos)
                 self.player.update(self.tilemap, [self.horizontal_movement[0]-self.horizontal_movement[1],0])
+                pygame.draw.rect(self.display, (255,0,0),
+                                 pygame.Rect(self.player.pos[0]-render_scroll[0], self.player.pos[1]-render_scroll[1],self.player.size[0],self.player.size[1]),
+                                 1)
                 self.player.render(self.display,offset = render_scroll)
             
             for each in self.entities:
@@ -1016,7 +1046,7 @@ class GameManager:
             self.display_2.blit(self.display, (0,0))
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
             pygame.display.update()
-            self.clock.tick(60)
+            self.clock.tick(40)
 
 if __name__ == "__main__":
     GameManager().menu()

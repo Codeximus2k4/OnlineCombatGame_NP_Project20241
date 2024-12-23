@@ -36,10 +36,13 @@ class NetworkManager:
     
     def send_udp_input(self, message, addr):
         """Send input via UDP"""
+        byteSent = -1
         try:
-            self.udp_socket.sendto(message, addr)
+            byteSent = self.udp_socket.sendto(message, addr)
         except Exception as e:
             print(f"UDP send error: {e}")
+        finally:
+            return byteSent
 
     def receive_tcp_message(self, buff_size=1024):
         """Receive message via TCP"""
@@ -47,23 +50,25 @@ class NetworkManager:
         return message
         
     
-    def start_input_listener(self, callback):
+    def start_input_listener(self,queue):
         """Start listening for UDP inputs"""
-        self.input_callback = callback
         
-        def receive_messages():
+        def receive_messages(queue):
             while True:
                 try:
                     data, _ = self.udp_socket.recvfrom(self.buffer_size)
-                    decoded_data = data.decode()
-                    if self.input_callback:
-                        self.input_callback(decoded_data)
+                    if (len(data)!=0):
+                        try :
+                            queue.get(block=False)
+                        except Exception as e:
+                            pass
+                        queue.put(data)
                 except Exception as e:
                     print(f"Receive error: {e}")
-                    break
+                    continue
         
         # Start a daemon thread for receiving messages
-        thread = threading.Thread(target=receive_messages)
+        thread = threading.Thread(target=receive_messages, args = (queue,))
         thread.daemon = True
         thread.start()
     

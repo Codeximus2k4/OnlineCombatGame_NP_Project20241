@@ -25,7 +25,7 @@
 #include "data_structs.cpp"
 
 
-#define TICK_RATE 60 
+#define TICK_RATE 25 
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 
 // Define color escape codes for colorful text
@@ -192,7 +192,7 @@ int sent_UDP_port(Player *head, int udp_port)
     timeout.tv_sec = 1;
     timeout.tv_usec= 0;
     char message[3];
-    message[0]=7;
+    message[0]='7';
     message[1]= udp_port/256;
     message[2]= udp_port%256; 
     int finished_sending = 1;
@@ -332,7 +332,9 @@ void *listenFromClients(void *arg){
         }
         //else printf("Received something\n");
         buff[rcvBytes] = '\0';
-        printf("Receive %d bytes from clients\n",rcvBytes);
+        for (int i = 0;i<rcvBytes;i++) printf("%d",buff[i]);
+        printf("\n");
+        printf("received: %d\n",rcvBytes);
         // get player_id of this data
         int player_id = buff[0];
         
@@ -343,7 +345,7 @@ void *listenFromClients(void *arg){
         player->cliaddr = clientAddr;
 
         // copy the data received corresponds to this player
-        strcpy(player->input_buffer, buff);
+        memcpy(player->input_buffer, buff,7);
         player->bytes_received = rcvBytes;
     }
 
@@ -687,7 +689,10 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     interaction =  each->input_buffer[4];
                     collisionx =  each->input_buffer[5];
                     collisiony =  each->input_buffer[6];
-
+                    printf("input:");
+                    for (int i = 0;i<7;i++) printf("%d",each->input_buffer[i]);
+                    printf("\n");
+                    printf("id : %d collision: %d - %d\n",id,collisionx,collisiony);
                     Player* player =  findPlayerInRoomById(game->players, id);
                     if (player ==NULL) 
                     {
@@ -697,6 +702,8 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     else
                     {
                         player->movement_x=movementx;
+                        player->collisionx = collisionx;
+                        player->collisiony = collisiony;
                         handleStateChange(player, action,collisionx, collisiony); // handle change in animation first
                         //handleInteraction(player, interaction);
                     }
@@ -712,7 +719,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
             Player *temp;
             for (temp=game->players;temp!=NULL;temp= temp->next)
             {
-                update_player(temp, collisionx, collisiony);
+                update_player(temp);
                 byteSerialized = serialize_player_info(send_buffer, byteSerialized, temp);
             }
             int byteSent = 0;
@@ -728,7 +735,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     }  
                 else
                 {
-                    printf("Sent %d bytes to client id %d]\n", byteSent, temp->id);
+                    //rintf("Sent %d bytes to client id %d]\n", byteSent, temp->id);
                 }
                     
             }
