@@ -19,16 +19,18 @@ class PhysicsEntity:
         self.collision_mesh =  {'left':[], 'right': [],'up':[],'down':[]}
         coord_x = [i for i in range(self.pos[0],self.pos[0]+self.size[0],self.game.tilemap.tile_size)]
         coord_x.append(self.size[0]+self.pos[0])
+        coord_x.append(self.pos[0])
         coord_y = [i for i in range(self.pos[1],self.pos[1]+self.size[1],self.game.tilemap.tile_size)]
         coord_y.append(self.size[1]+self.pos[1])
+        coord_y.append(self.pos[1])
         for each in coord_y:
-            self.collision_mesh['left'].append([self.pos[0],each])
+            self.collision_mesh['left'].append([self.pos[0]-2,each])
         for each in coord_y:
-            self.collision_mesh['right'].append([self.pos[0]+ self.size[0],each])
+            self.collision_mesh['right'].append([self.pos[0]+ self.size[0]+2,each])
         for each in coord_x:
-            self.collision_mesh['up'].append([each,self.pos[1]])
+            self.collision_mesh['up'].append([each,self.pos[1]-2])
         for each in coord_x:
-            self.collision_mesh['down'].append([each,self.pos[1]+self.size[1]])
+            self.collision_mesh['down'].append([each,self.pos[1]+self.size[1] + 2])
     def convert_entity_class(self):
         raise NotImplementedError("Have not implemented this method")
     def convert_action_type(self):
@@ -47,29 +49,35 @@ class PhysicsEntity:
         else:
             self.generate_collision_mesh()
             self.collisions = {'up':False, 'down':False,'right' : False, 'left':False}
-            predicted_pos =  [self.pos[0]+movement[0], self.pos[1]+self.velocity_y]
-            entity_rect =  self.rect(topleft=predicted_pos)
+            # predicted_pos =  [self.pos[0]+movement[0], self.pos[1]+self.velocity_y]
+            # entity_rect =  self.rect(topleft=predicted_pos)
             #check collision from the all side
             for side in ['left','right','up','down']:
                 for point in self.collision_mesh[side]:
                     if self.collisions[side]:
                         break
-                    collision_point_prediction =  [point[0]+movement[0], point[1]+self.velocity_y]
-                    for rect in tilemap.physics_rects_around(collision_point_prediction):
-                        if entity_rect.colliderect(rect):
-                            if side =='left':
-                                if (movement[0]>0 or self.flip):
-                                    self.collisions['left'] = True
-                            elif side == 'right':
-                                if (movement[0]<0 or not self.flip):
-                                    self.collisions['right'] = True
-                            elif side == 'up':
-                                if (movement[1]<=0):
-                                    self.collisions['up'] =  True
-                            elif side == 'down':
-                                if (movement[1]>=0):
-                                    self.collisions['down'] =  True
-                            
+
+                    if side =='left' or side =='right':
+                        collision_point_prediction =  [point[0]+movement[0], point[1]]
+                        for rect in tilemap.physics_rects_around(collision_point_prediction):
+                            if rect.collidepoint(collision_point_prediction):
+                                if side =='left':
+                                    if (movement[0]>0 or self.flip):
+                                        self.collisions['left'] = True
+                                elif side == 'right':
+                                    if (movement[0]<0 or not self.flip):
+                                        self.collisions['right'] = True
+                    else: 
+                        collision_point_prediction =  [point[0], point[1]+self.velocity_y]
+                        for rect in tilemap.physics_rects_around(collision_point_prediction):
+                            if rect.collidepoint(collision_point_prediction):
+                                if side == 'up':
+                                    if (movement[1]<=0):
+                                        self.collisions['up'] =  True
+                                elif side == 'down':
+                                    if (movement[1]>=0):
+                                        self.collisions['down'] =  True
+                                
     def update(self, tilemap, movement = (0,0)):
         self.check_collision(tilemap, movement)
         self.velocity_y =  min(3, self.velocity_y+0.1)

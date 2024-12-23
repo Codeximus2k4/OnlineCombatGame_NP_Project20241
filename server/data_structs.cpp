@@ -137,7 +137,18 @@ struct Player {
     int posx,posy;
     int timeSinceDeath;
 };
-void update_player(Player* player)
+struct Game{
+    Player* players;
+    int game_mode;
+    Item* items;
+    Trap* traps;
+    int game_loop;
+    int Score_team1;
+    int Score_team2;
+    int gravity;
+};
+
+void update_player(Player* player, Game *game)
 {
     if (player->Hit) player->action = 10;
     player->timeSinceAttack= min(player->timeSinceAttack+1, player->attack_cooldown+1);
@@ -176,6 +187,9 @@ void update_player(Player* player)
             return;
         }
     }
+
+    // update posy
+    if (player->collisiony!=2 && player->collisiony !=3) player->posy +=game->gravity;
     printf("%d - %d\n",player->collisionx,player->collisiony);
     printf("%d - %d\n",player->posx, player->posy);
     // finished updating the action now, let's update the position
@@ -295,16 +309,6 @@ void handleStateChange(Player *player, int input_action,int collisionx, int coll
 //linked list of items
 //each item is at different pos on the screen
 
-struct Game{
-    Player* players;
-    int game_mode;
-    Item* items;
-    Trap* traps;
-    int game_loop;
-    int Score_team1;
-    int Score_team2;
-    int gravity;
-};
 // - function to count total number of players in a room
 // - input: the head of the player list in the room
 // - output: number of players in the room

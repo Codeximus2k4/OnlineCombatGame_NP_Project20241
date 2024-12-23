@@ -630,10 +630,11 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         else continue;
     }
     //------------------ Initialize the game first ------------------
+    int MAX_GRAVITY = 5;
     Game *game =  (Game*) malloc(sizeof(Game));
     game->game_loop=0;
     game->game_mode=0; //game mode 0  for deathmatch, game mode 1 for capture the flag
-    game->gravity=-1;
+    game->gravity=1;
     game->items = NULL;
     game->players =  players;
     if (game->game_mode==1){
@@ -713,13 +714,15 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                 }            
             }
             if (!client_responded) continue;
+            // check gravity
+            game->gravity =  min(game->gravity+1, MAX_GRAVITY);
             // update and serialize players' info
             memset(send_buffer, 0, BUFF_SIZE);
             byteSerialized=0;
             Player *temp;
             for (temp=game->players;temp!=NULL;temp= temp->next)
             {
-                update_player(temp);
+                update_player(temp,game);
                 byteSerialized = serialize_player_info(send_buffer, byteSerialized, temp);
             }
             int byteSent = 0;
