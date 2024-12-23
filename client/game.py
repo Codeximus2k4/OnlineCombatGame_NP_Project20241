@@ -756,7 +756,13 @@ class GameManager:
 
             pygame.display.update()
 
-    def pick_hero_screen(self):
+    def pick_hero_screen(self, room_tcp_port):
+        # Connect to the room TCP network
+        room_tcp_socket = NetworkManager(
+            server_addr=config.SERVER_ADDR,
+            server_port=room_tcp_port
+        )
+        
         while True:
             self.screen.blit(self.menu_background, (0, 0))
             mouse_pos = pygame.mouse.get_pos()
@@ -775,36 +781,53 @@ class GameManager:
                 base_color=config.COLORS['BUTTON_BASE'],
                 hovering_color="White"
             )
-
-            back_button = Button(
-                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
-                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            
+            samurai_button = Button(
+                image=pygame.image.load("data/images/pickHero/Samurai.png"),
+                pos=(180, 110),
             )
             
-            hero1_button = Button(
-                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
-                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            evil_wizard_button = Button(
+                image=pygame.image.load("data/images/pickHero/EvilWizard.png"),
+                pos=(480, 110),
             )
             
-            hero2_button = Button(
-                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
-                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            king_button = Button(
+                image=pygame.image.load("data/images/pickHero/King.png"),
+                pos=(180, 360),
             )
             
-            hero3_button = Button(
-                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
-                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+            witch_button = Button(
+                image=pygame.image.load("data/images/pickHero/Witch.png"),
+                pos=(480, 360),
             )
             
-            hero4_button = Button(
-                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
-                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
-            )
-            
-            hero5_button = Button(
-                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
-                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
-            )
+            # Draw all buttons
+            buttons = [lock_button, samurai_button, evil_wizard_button, king_button, witch_button]
+            for button in buttons:
+                button.changeColor(mouse_pos)
+                button.update(self.screen)
+                
+            hero_picked = 0 
+                
+            # Event handling
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                    
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if lock_button.checkForInput(mouse_pos):
+                        pick_hero_request(hero_id=hero_picked,
+                                          pick_hero_socket=room_tcp_socket)
+                    if samurai_button.checkForInput(mouse_pos):
+                        hero_picked = 1
+                    if evil_wizard_button.checkForInput(mouse_pos):
+                        hero_picked = 2
+                    if king_button.checkForInput(mouse_pos):
+                        hero_picked = 3
+                    if witch_button.checkForInput(mouse_pos):
+                        hero_picked = 4
             
             pygame.display.update()
             

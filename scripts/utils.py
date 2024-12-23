@@ -322,6 +322,28 @@ def update_ready_request(user_id: int, is_ready:int, update_ready_socket: Networ
 
     # Send the message
     update_ready_socket.send_tcp_message(message)
+    
+def pick_hero_request(hero_id: int): 
+    """Message type 11: Pick a hero"""
+    # Connect the socket to the server
+    pick_hero_socket = NetworkManager(
+        server_addr=config.SERVER_ADDR,
+        server_port=config.SERVER_PORT
+    )
+    pick_hero_socket.connect()
+
+    # Send the request type 10 to the server
+    request_type = "11"
+    hero_id = hero_id
+
+    # Convert to bytes
+    request_type_byte = bytes([request_type])
+    hero_id = bytes([hero_id])
+    message = request_type_byte + hero_id
+    print(f"Message: {message}")
+    # Send the message request to the server
+    pick_hero_socket.send_tcp_message(message=message)
+    print("Successfully sent the message")
 
 class Animation:
     def __init__(self, images ,img_dur = 5, loop =True):
