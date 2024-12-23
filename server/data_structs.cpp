@@ -794,7 +794,7 @@ int trapActivated(Player *player, Trap *trap){
 // - output: 0 if player is not affected by a trap, type of trap if player is affected by the trap
 int takeEffectFromTrap(Player *player, Trap *trap) {
     // check if player is not in the trap effect's area
-    if(!check_collision(player->selfHitBox, trap->effectHitbox)) return;
+    if(!check_collision(player->selfHitBox, trap->effectHitbox)) return 0;
 
     // check if trap is not in effect anymore
     if(trap->timeInEffect >= trap->effectTime) return 0;
