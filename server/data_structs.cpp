@@ -43,6 +43,7 @@ struct Item {
     Hitbox *hitbox;
 };
 
+
 struct Trap {
     int cooldown_time;
     int timeSinceActivated;
@@ -829,4 +830,143 @@ Trap *spawnAllTraps(){
     traps = addTrapToListOfTraps(traps, secondTrap);
 
     return traps;
+}
+
+
+// - make a new item based on the information provided
+// - input: type of item, hitbox, all other values will be set to 0 or NULL
+// - output: pointer to a new item
+// - dependencies: none
+Item *makeItem(int type, int respawn_time, int timeSinceConsumption, Hitbox *hitbox){
+    Item *p = (Item *) malloc(sizeof(Item));
+    p->type = type;
+    p->respawn_time = respawn_time;
+    p->timeSinceConsumption = timeSinceConsumption;
+    p->hitbox = hitbox;
+    return p;
+}
+
+// - add a trap to list of items in the game
+// - input: head pointer to list of items in the game, pointer to a Items
+// - output: head of list of items
+// - dependencies: none
+Item *addItemToListOfItems(Item *head, Item *trap){
+    // if there are no items yet
+    if(head == NULL){
+        head = trap;
+        return head;
+    }
+
+    // else add to the end of the linked list
+    Item *p = head;
+    while(p->next != NULL){
+        p = p->next;
+    }
+
+    p->next = trap;
+
+    return head;
+}
+
+// - function to remove a item from the list of items 
+// - input: head pointer to the list of items, pointer to the item to remove
+// - output: updated head pointer of the list of items
+Item *removeItemFromListOfItems(Item *head, Item *removeItem){
+    // if list of items empty
+    if(head == NULL){
+        return NULL;
+    }
+
+    // if we need to remove head
+    if(head == removeItem){
+        head = head->next;
+        free(removeItem);
+
+        // printf("List of items updated (item to remove was at the head of list)\n");
+        return head;
+    }
+
+    // traverse to find previous node 
+    Item *temp = head;
+    while(temp != NULL && temp->next != removeItem){
+        temp = temp->next;
+    }
+
+    // if the item to remove is not found
+    if(temp == NULL){
+        // printf("Item not found in the list, list unchanged\n");
+        return head;
+    }
+
+    // remove the node
+    temp->next = removeItem->next;
+    free(removeItem);
+    // printf("List of items updated (item to remove was not at head of the list)\n");
+    return head;
+}
+
+// - function to update information of a trap
+// - input: pointer to a trap to update
+// - output: none
+// - dependencies: none
+void updateItemInformation(Item *item) {
+    // update time sice last activated
+    item->timeSinceConsumption++; // simply increment time since last activated
+}
+
+
+
+
+// - Verify player eligibility for item consumption
+// - input: player
+// - output: type of item (0 if the player does not has ability to consume any items)
+int consumedItem(Player *player, Item *head){
+    Item *p = head;
+
+    // if list of item is empty
+    if(p==NULL) return 0;
+
+    // Traverse to find satisfy item
+    while(p!=NULL){
+        if(p->timeSinceConsumption > p->respawn_time && check_collision(player->selfHitBox, p->hitbox)){
+            p->timeSinceConsumption = 0;
+            return p->type;
+        }
+        p=p->next;
+    }
+
+    // Return 0 if the player does not has ability to consume any items
+    return 0;
+}
+
+// - function to generate all items of a map
+// - input: none
+// - output: pointer to the head of linked list of items
+// - dependencies: makeItems(), makeHitbox(), addItemToListOfItems()
+Item* spawnAllItems() {
+    // init head pointer of list of items
+    Item* items = NULL;
+
+    // create all items in this map
+    Hitbox* item1EffectHitbox = makeHitbox(800, 200, 16, 16);
+    Item* item1 = makeItem(1, 50, 51, item1EffectHitbox);
+    items = addItemToListOfItems(items, item1);
+
+    Hitbox* item2EffectHitbox = makeHitbox(800, 220, 16, 16);
+    Item* item2 = makeItem(2, 50, 51, item2EffectHitbox);
+    items = addItemToListOfItems(items, item2);
+
+    Hitbox* item3EffectHitbox = makeHitbox(800, 240, 16, 16);
+    Item* item3 = makeItem(3, 50, 51, item3EffectHitbox);
+    items = addItemToListOfItems(items, item3);
+
+    Hitbox* item4EffectHitbox = makeHitbox(800, 260, 16, 16);
+    Item* item4 = makeItem(4, 50, 51, item4EffectHitbox);
+    items = addItemToListOfItems(items, item4);
+
+    Hitbox* item5EffectHitbox = makeHitbox(800, 280, 16, 16);
+    Item* item5 = makeItem(5, 50, 51, item5EffectHitbox);
+    items = addItemToListOfItems(items, item5);
+
+    return items;
 }
