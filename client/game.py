@@ -552,7 +552,6 @@ class GameManager:
                 if new_players:
                     nonlocal players
                     players = new_players
-                time.sleep(0.2) # Update every 1 second
 
         # Start the update thread
         update_thread = threading.Thread(target=update_players,
