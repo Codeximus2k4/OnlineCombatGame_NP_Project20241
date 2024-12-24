@@ -1,0 +1,19 @@
+{
+    "files.associations": {
+        "fcntl.h": "c",
+        "_endian.h": "c",
+        "istream": "cpp",
+        "*.tcc": "cpp",
+        "typeinfo": "cpp",
+        "chrono": "cpp",
+        "text_encoding": "cpp",
+        "array": "cpp",
+        "span": "cpp",
+        "string": "cpp",
+        "string_view": "cpp",
+        "vector": "cpp",
+        "cstdlib": "cpp"
+    },
+    "python.defaultInterpreterPath": "/usr/local/bin/python3.10",
+    "C_Cpp.errorSquiggles": "enabled"
+}

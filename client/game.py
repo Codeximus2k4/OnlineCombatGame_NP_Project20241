@@ -500,7 +500,7 @@ class GameManager:
             server_addr=config.SERVER_ADDR,
             server_port=room_tcp_port
         )
-        time.sleep(1)
+        time.sleep(2)
         room_tcp_socket.connect()
 
         # Join the room (send message type 6)

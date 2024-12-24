@@ -1,0 +1,27 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/local/Cellar/gcc/14.2.0/bin/../lib/gcc/current/gcc/x86_64-apple-darwin23/14/../../../../../../include/c++/14",
+                "/usr/local/Cellar/gcc/14.2.0/bin/../lib/gcc/current/gcc/x86_64-apple-darwin23/14/../../../../../../include/c++/14/x86_64-apple-darwin23",
+                "/usr/local/Cellar/gcc/14.2.0/bin/../lib/gcc/current/gcc/x86_64-apple-darwin23/14/../../../../../../include/c++/14/backward",
+                "/usr/local/Cellar/gcc/14.2.0/bin/../lib/gcc/current/gcc/x86_64-apple-darwin23/14/include",
+                "/usr/local/Cellar/gcc/14.2.0/bin/../lib/gcc/current/gcc/x86_64-apple-darwin23/14/include-fixed",
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX14.sdk/usr/include",
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX14.sdk/System/Library/Frameworks",
+                "/usr/local/include",
+                "/usr/local/Cellar/postgresql@14/14.13_2/include/postgresql@14/"
+            ],
+            "defines": [],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "macos-clang-arm64"
+        }
+    ],
+    "version": 4
+}
