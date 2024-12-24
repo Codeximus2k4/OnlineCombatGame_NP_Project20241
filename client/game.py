@@ -842,23 +842,8 @@ class GameManager:
                 if each.id == id and each.entity_type==entity_type:
                     found_entity=True
                     # update the position
-                    if each.collisions['left'] and each.pos[0]>posx:
-                        pass
-                    elif each.collisions['right'] and each.pos[0]<posx:
-                        pass
-                    else:
-                        each.pos[0]=posx
-                    
-                    if each.collisions['up'] and each.pos[1]>posy:
-                        pass
-                    elif each.collisions['down'] and each.pos[1]<posy:
-                        pass
-                    else:
-                        each.pos[1]=posy
-                    
-                    
-
-                    
+                    each.pos[0] = posx
+                    each.pos[1] = posy
                     if entity_type==0:
                         each.flip = flip
                         each.set_action(action_type,False)
@@ -876,24 +861,6 @@ class GameManager:
         self.tilemap.load('data/maps/' +str(map_id)+'.json')
         self.scroll= [0,0]
     
-    def check_collision(self,player: Player) -> list[int]:
-        collisionx = 0
-        collisiony = 0
-        if (player is not None):
-            if (player.collisions['right']):
-                collisionx=1
-            if (player.collisions['left']):
-                collisionx= 2
-            if (player.collisions['left'] and player.collisions['right']):
-                collisionx = 3
-            
-            if (player.collisions['up']):
-                collisiony =1
-            if (player.collisions['down']):
-                collisiony = 2
-            if (player.collisions['up'] and player.collisions['down']):
-                collisionx = 3
-        return [collisionx, collisiony]
     def run(self,room_udp_port):
         """Main game loop"""
         self.display =  pygame.Surface((640,480), pygame.SRCALPHA)
@@ -910,7 +877,7 @@ class GameManager:
 
         # Load the level and initialize entities
         self.tilemap = Tilemap(self, tile_size=16)
-        self.map = 2
+        self.map = 4
         self.load_level(self.map)
         self.setup_background()
         self.entities = []
@@ -919,7 +886,7 @@ class GameManager:
         # Set up the player
         self.player = None
         self.horizontal_movement = [0, 0]
-
+        self.player_default_size = [50,60]
         # Set up queue for shared data
         q = queue.Queue(maxsize=1)
         def receive_messages(sock, q):
@@ -950,6 +917,7 @@ class GameManager:
                         break
             if self.player is not None:
                     self.scroll[0] +=  (self.player.rect(topleft =  self.player.pos).centerx -  self.display.get_width()/2 - self.scroll[0])/30
+                    self.scroll[1] +=  (self.player.rect(topleft =  self.player.pos).centery -  self.display.get_height()/2 - self.scroll[1])/30
             render_scroll =  (int(self.scroll[0]),int (self.scroll[1]))
                 
             self.tilemap.render(self.display, offset =  render_scroll)
@@ -1003,14 +971,16 @@ class GameManager:
             if action ==-1:
                     action=2
 
-                
+            if self.player is None:
+                movement_y = 0
+
             msg += movement_x.to_bytes(1,"big") + movement_y.to_bytes(1,"big")+action.to_bytes(1,"big")+ interaction.to_bytes(1,"big")
             
-        # Check collision
-            collisions =  self.check_collision(self.player)
-            print(collisions)
-            msg += collisions[0].to_bytes(1,"big") + collisions[1].to_bytes(1,"big")
-        
+        # get player size
+            if self.player is not None:
+                msg += self.player.size[0].to_bytes(1,"big") + self.player.size[1].to_bytes(1,"big")
+            else :
+                msg += self.player_default_size[0].to_bytes(1,"big")+self.player_default_size[1].to_bytes(1,"big")
         # Send message to server
             byteSent = self.udp_room_socket.sendto(msg, (config.SERVER_ADDR, room_udp_port))
             if (byteSent<=0):
@@ -1036,12 +1006,15 @@ class GameManager:
                 pygame.draw.rect(self.display, (255,0,0),
                                  pygame.Rect(self.player.pos[0]-render_scroll[0], self.player.pos[1]-render_scroll[1],self.player.size[0],self.player.size[1]),
                                  1)
+                self.display_healthbar_staminabar(self.player, render_scroll)
                 self.player.render(self.display,offset = render_scroll)
             
             for each in self.entities:
                 if each is not self.player:
                     each.update(self.tilemap, [0,0])
                     each.render(self.display,offset = render_scroll)
+                    if isinstance(each, Player):
+                        self.display_healthbar_staminabar(each, render_scroll)
 
             self.display_2.blit(self.display, (0,0))
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))

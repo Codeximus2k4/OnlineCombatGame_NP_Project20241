@@ -9,9 +9,9 @@ class PhysicsEntity:
         self.id =  id
         self.entity_type= entity_type
         self.entity_class = entity_class
+        self.velocity_y=3
         self.pos = list(pos) 
         self.flip=flip
-        self.velocity_y = 3
         self.collisions = {'up':False, 'down':False,'right' : False, 'left':False}
         self.size = (0,0)
         self.collision_mesh =  None
@@ -41,46 +41,11 @@ class PhysicsEntity:
             fresh_start=False
             self.action_type= action
             self.animation =  self.game.assets[self.convert_entity_class()+'/'+self.convert_action_type()].copy()
-            self.size = self.animation.get_size()
-    def check_collision(self,tilemap,movement = [0,0]):
-        # collision check, does not apply for attack state
-        if self.action_type==1 or self.action_type ==2:
-            return 
-        else:
-            self.generate_collision_mesh()
-            self.collisions = {'up':False, 'down':False,'right' : False, 'left':False}
-            # predicted_pos =  [self.pos[0]+movement[0], self.pos[1]+self.velocity_y]
-            # entity_rect =  self.rect(topleft=predicted_pos)
-            #check collision from the all side
-            for side in ['left','right','up','down']:
-                for point in self.collision_mesh[side]:
-                    if self.collisions[side]:
-                        break
-
-                    if side =='left' or side =='right':
-                        collision_point_prediction =  [point[0]+movement[0], point[1]]
-                        for rect in tilemap.physics_rects_around(collision_point_prediction):
-                            if rect.collidepoint(collision_point_prediction):
-                                if side =='left':
-                                    if (movement[0]>0 or self.flip):
-                                        self.collisions['left'] = True
-                                elif side == 'right':
-                                    if (movement[0]<0 or not self.flip):
-                                        self.collisions['right'] = True
-                    else: 
-                        collision_point_prediction =  [point[0], point[1]+self.velocity_y]
-                        for rect in tilemap.physics_rects_around(collision_point_prediction):
-                            if rect.collidepoint(collision_point_prediction):
-                                if side == 'up':
-                                    if (movement[1]<=0):
-                                        self.collisions['up'] =  True
-                                elif side == 'down':
-                                    if (movement[1]>=0):
-                                        self.collisions['down'] =  True
+            self.size = self.animation.get_size()       
                                 
     def update(self, tilemap, movement = (0,0)):
-        self.check_collision(tilemap, movement)
-        self.velocity_y =  min(3, self.velocity_y+0.1)
+        self.velocity_y =min(self.velocity_y+1, 3)
+    #self.collisions = self.check_collision(tilemap, movement)
     def rect(self,topleft = [0,0]):
         return pygame.Rect(topleft[0],topleft[1], self.size[0],self.size[1])
     
@@ -91,7 +56,7 @@ class Player(PhysicsEntity):
         super().__init__(game, id, 0, entity_class, (posx, posy),flip=False)
         self.health =  health
         self.stamina = stamina
-        self.action_type  = 0
+        self.action_type=0
     
     def update(self,tilemap, movement= (0,0)):
         #self.set_action(self.action_type)
@@ -114,9 +79,14 @@ class Player(PhysicsEntity):
         #     self.timeSinceAttack = min (self.timeSinceAttack+1, self.attack_cooldown+1)
         # else:
         super().update(tilemap=tilemap,movement=movement)
+
         if (self.action_type ==1 or self.action_type ==2) and self.animation.done:
             self.set_action(0,False)
+
+        #handle jump end:
+        
         self.animation.update()
+        # get size according to sprite
         self.size =  self.animation.get_size()
     def convert_entity_class(self):
         ent_class = {0:"Samurai",1:"Evil Mage"}

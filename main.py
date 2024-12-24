@@ -1,4 +1,5 @@
 import pygame
+import traceback
 import sys
 import config
 from client.network import NetworkManager
@@ -24,6 +25,7 @@ def main():
 
     except Exception as e:
         print(f"An error occurred: {e}")
+        traceback.print_exc() # better for debugging
     finally:
         # Ensure clean shutdown
         network_manager.close()

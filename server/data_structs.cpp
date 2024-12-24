@@ -13,7 +13,6 @@
 #include <signal.h>
 
 
-
 // the game room (sub process) manages the list of player in the room
 // int id; // id of player
 // sockaddr_in cliaddr; // IPv4 address corresponding to each player
@@ -133,30 +132,215 @@ struct Player {
     int timeSinceDash;
     int speed;
     int movement_x;
+    int movement_y;
     int isFacingLeft;
     int posx,posy;
     int timeSinceDeath;
+    int sizex;
+    int sizey;
 };
+struct Tilemap
+{
+    int tile_size;
+    int tile_num;
+    int x[5000];
+    int y[5000];
+};
+
+Tilemap* loadTilemap(int tile_size, int map)
+{
+    
+    Tilemap* tilemap =  (Tilemap*) malloc(sizeof(Tilemap));
+    tilemap->tile_num = 0;
+    tilemap->tile_size = tile_size;
+    char map_name[] = "0.txt";
+    map_name[0] =  map + '0';
+    FILE *file =  fopen(map_name, "r");
+    char line[256];
+    if (file ==NULL) return NULL;
+    
+    while(fgets(line,sizeof(line),file))
+    {
+        int temp =  strlen(line);
+        temp--;
+        int delimiter;
+        for (int i =0;i<temp;i++) if (line[i]==';') delimiter = i;
+        int x_coord=0;
+        int y_coord=0;
+        int neg = 1;
+        for (int i =0;i<delimiter;i++)
+        {
+            if (line[i]<48 ||line[i]>57) break;
+            if (line[i]=='-') neg =-1;
+            else
+            {
+            int mul = 1;
+            for (int j=1;j<delimiter-i;j++) mul=mul*10;
+            x_coord += mul* (line[i]-'0');
+            }
+
+        }
+        x_coord = x_coord*neg;
+        neg= 1;
+        for (int i =delimiter+1;i<temp;i++)
+        {
+            if (line[i]<48 ||line[i]>57) break;
+            if (line[i]=='-') neg =-1;
+            else
+            {
+            int mul = 1;
+            for (int j=1;j<temp-i;j++) mul=mul*10;
+            y_coord += mul* (line[i]-'0');
+            }
+        }
+        y_coord  = y_coord* neg;
+        tilemap->x[tilemap->tile_num] = x_coord;
+        tilemap->y[tilemap->tile_num] = y_coord;
+        tilemap->tile_num++;
+    }
+    fclose(file);
+    return tilemap;
+}
 struct Game{
     Player* players;
     int game_mode;
     Item* items;
     Trap* traps;
+    Tilemap* tilemap;
     int game_loop;
     int Score_team1;
     int Score_team2;
     int gravity;
+    int map;
 };
 
+int check_player_contact(Player* player, Tilemap* tilemap)
+{
+    player->collisionx = 0;
+    player->collisiony = 0;
+    int tile_size= tilemap->tile_size;
+
+    // check right collision
+    int should_exit=0;
+    if (player->movement_x==1)
+    {
+        int y =  player->posy/tile_size;
+        int x =  (player->posx+player->sizex+1)/tile_size;
+        for (int i=y; i<= (player->posy+player->sizey)/tile_size;i++)
+            {
+                for (int each=0;each<tilemap->tile_num;each++)
+                {
+                    //printf("%d - %d\n",x,i);
+                    if (tilemap->x[each]==x && tilemap->y[each]==i)
+                    {
+                        player->posx = x*tile_size - player->sizex;
+                        player->collisionx= 1;
+                        should_exit=1;
+                        break;
+                    }   
+                }
+                if (should_exit)  break;
+            }
+    }
+    else if (player->movement_x==2)
+    {
+        int y =  player->posy/tile_size;
+        int x =  (player->posx-1)/tile_size;
+        for (int i=y; i<= (player->posy+player->sizey)/tile_size;i++)
+            {
+                for (int each=0;each<tilemap->tile_num;each++)
+                {
+                    if (tilemap->x[each]==x && tilemap->y[each]==i)
+                    {
+                        player->posx = x*tile_size+tile_size;
+                        player->collisionx= 2;
+                        should_exit=1;
+                        break;
+                    }   
+                }
+                if (should_exit)  break;
+            }
+    }
+
+
+        //check for bottom collision
+    int y =  (player->posy+player->sizey+1)/tile_size;
+    int x = (player->posx)/tile_size;
+    if (player->isFacingLeft ==1)
+    { 
+        for (int i=x ; i<=(player->posx + player->sizex)/tile_size;i++)
+        {
+            for (int each=0;each < tilemap->tile_num;each++)
+            {
+                if (tilemap->x[each]==i && tilemap->y[each]==y)
+                {
+                    player->posy =  y*tile_size- player->sizey-1;
+                    player->collisiony= 2;
+                    player->is_jumping  =0;
+                    player->action=0;
+                    return 0 ;
+                }   
+            }
+        }
+    }
+    else
+    {
+        for (int i=(player->posx+player->sizex)/tile_size;i>= x ;i--)
+        {
+            for (int each=0;each < tilemap->tile_num;each++)
+            {
+                if (tilemap->x[each]==i && tilemap->y[each]==y)
+                {
+                    player->posy = y * tile_size-player->sizey-1;
+                    player->collisiony =2;
+                    player->is_jumping=0;
+                    player->action = 0;
+                    return 0 ;
+                }   
+            }
+        }
+    }
+    //check for top collision
+    if (player->vertical_velocity<0)
+    {
+        int y =  (player->posy-1)/tile_size;
+        int x = (player->posx)/tile_size;
+    
+        for (int i=x ; i<=(player->posx + player->sizex)/tile_size;i++)
+        {
+            for (int each=0;each < tilemap->tile_num;each++)
+            {
+                if (tilemap->x[each]==i && tilemap->y[each]==y)
+                {
+                    player->posy =  y*tile_size+tile_size+1;
+                    player->collisiony= 1;
+                    player->is_jumping =0;
+                    player->action=0;
+                    return 0 ;
+                }   
+            }
+        }
+    
+    }
+    return 0;
+}
 void update_player(Player* player, Game *game)
 {
+    if (player->collisiony!=2) player->speed = 7;
+    else player->speed =5;
+    if (player->movement_x!=0) player->action=3;
+    if (player->movement_y==1 && !player->is_jumping) 
+                        {
+                            player->is_jumping=1;
+                            player->vertical_velocity =-15;
+                        }
     if (player->Hit) player->action = 10;
     player->timeSinceAttack= min(player->timeSinceAttack+1, player->attack_cooldown+1);
     player->timeSinceDash =  min(player->timeSinceDash+1, player->dash_cooldown+1);
 
-    if (player->action==3)
+    if (player->action==3 || player->action==4)
     {
-        if (player->movement_x==0)
+        if (player->movement_x==0 && player->action==3)
         {
             player->action=0;
             return;
@@ -165,13 +349,11 @@ void update_player(Player* player, Game *game)
         {
             player->posx -= player->speed;
             player->posx = max(player->posx, 0);
-            player->isFacingLeft = true;
         }
         else if (player->movement_x==1 && (player->collisionx!=1 && player->collisionx!=3) )
         {
             player->posx +=player->speed;
             player->posx = min(player->posx, 65000); 
-            player->isFacingLeft= false;
         }
     }
     else if (player->action==0)
@@ -189,7 +371,10 @@ void update_player(Player* player, Game *game)
     }
 
     // update posy
-    if (player->collisiony!=2 && player->collisiony !=3) player->posy +=game->gravity;
+    player->vertical_velocity = min(player->vertical_velocity+2, game->gravity);
+    if (player->is_jumping && (player->collisiony!=1 && player->vertical_velocity<0)) player->posy +=player->vertical_velocity;
+    else if (player->collisiony!= 2 && player->collisiony!=3) player->posy +=player->vertical_velocity;
+    printf("action: %d\n",player->action);
     printf("%d - %d\n",player->collisionx,player->collisiony);
     printf("%d - %d\n",player->posx, player->posy);
     // finished updating the action now, let's update the position
@@ -246,12 +431,12 @@ void characterSpawner(Player* players)
         {
             if (temp->posx==-1 && temp->posy==-1)
             {
-                temp->posx = 300;
-                temp->posy = 252;
+                temp->posx = 500;
+                temp->posy = 420;
                 temp->health=100;
                 temp->stamina = 100;
-                temp->isFacingLeft=true;
-                temp->speed = 3;
+                temp->isFacingLeft=1;
+                temp->speed = 5;
                 temp->action =  0;
                 temp->attack_cooldown = 5;
                 temp->dash_cooldown = 5;
@@ -259,16 +444,20 @@ void characterSpawner(Player* players)
                 temp->is_jumping=false;
                 temp->timeSinceAttack=0;
                 temp->timeSinceDash=0;
-                temp->movement_x=0;  
+                temp->movement_x=0;
+                temp->movement_y=0; 
                 temp->char_type=0;        
                 temp->is_falling = 0; 
                 temp->Hit = 0;
                 temp->timeSinceDeath=0;
+                temp->vertical_velocity = 0;
+                temp->sizex = 50;
+                temp->sizey = 60;
             }
         }        
     }    
 }
-void handleStateChange(Player *player, int input_action,int collisionx, int collisiony)
+void handleStateChange(Player *player, int input_action)
 {
     if (player->char_type==0) //class samurai
     {
@@ -277,7 +466,7 @@ void handleStateChange(Player *player, int input_action,int collisionx, int coll
         {
             if (player->action ==0 || player->action==3 || player->action==8) // characters is in idle state , for now we are considering only class samurai
             {
-                if (player->is_jumping+ player->is_falling + player->Hit==0)
+                if (player->is_jumping +player->is_falling + player->Hit==0)
                 {
                     if (input_action==1 && player->timeSinceAttack>player->attack_cooldown)
                     {

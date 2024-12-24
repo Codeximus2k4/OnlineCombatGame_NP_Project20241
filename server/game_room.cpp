@@ -25,7 +25,7 @@
 #include "data_structs.cpp"
 
 
-#define TICK_RATE 25 
+#define TICK_RATE 25
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 
 // Define color escape codes for colorful text
@@ -384,7 +384,6 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     int nbytes;
     int total_players = 0;
     pthread_t tid;
-
     // convert port to string
     char CHAR_TCP_PORT[BUFF_SIZE + 1];
     sprintf(CHAR_TCP_PORT, "%d", TCP_SERV_PORT);
@@ -630,11 +629,17 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         else continue;
     }
     //------------------ Initialize the game first ------------------
-    int MAX_GRAVITY = 5;
     Game *game =  (Game*) malloc(sizeof(Game));
+    game->map = 4;
+    game->tilemap =  loadTilemap(16, game->map);
+    if (game->tilemap==NULL) 
+    {
+        printf("Error: map is not properly loaded\n");
+        return 1;
+    }
     game->game_loop=0;
     game->game_mode=0; //game mode 0  for deathmatch, game mode 1 for capture the flag
-    game->gravity=1;
+    game->gravity=3;
     game->items = NULL;
     game->players =  players;
     if (game->game_mode==1){
@@ -676,8 +681,8 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
             int movementy ;
             int action ;
             int interaction ;
-            int collisionx ;
-            int collisiony ;
+            int sizex ;
+            int sizey ;
             for (each =game->players;each!=NULL;each=each->next)
             {
                 if (each->bytes_received!=7)  continue; //payload is always 5 bytes for each player
@@ -688,12 +693,11 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     movementy =  each->input_buffer[2];
                     action =  each->input_buffer[3];
                     interaction =  each->input_buffer[4];
-                    collisionx =  each->input_buffer[5];
-                    collisiony =  each->input_buffer[6];
+                    sizex =  each->input_buffer[5];
+                    sizey =  each->input_buffer[6];
                     printf("input:");
                     for (int i = 0;i<7;i++) printf("%d",each->input_buffer[i]);
                     printf("\n");
-                    printf("id : %d collision: %d - %d\n",id,collisionx,collisiony);
                     Player* player =  findPlayerInRoomById(game->players, id);
                     if (player ==NULL) 
                     {
@@ -702,10 +706,13 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     }
                     else
                     {
+                        player->sizex=sizex;
+                        player->sizey=sizey;
                         player->movement_x=movementx;
-                        player->collisionx = collisionx;
-                        player->collisiony = collisiony;
-                        handleStateChange(player, action,collisionx, collisiony); // handle change in animation first
+                        if (movementx==1) player->isFacingLeft = false;
+                        if (movementx==2) player->isFacingLeft= true;
+                        player->movement_y=movementy;
+                        handleStateChange(player, action); // handle change in animation first
                         //handleInteraction(player, interaction);
                     }
                     each->bytes_received=0;
@@ -714,12 +721,16 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                 }            
             }
             if (!client_responded) continue;
-            // check gravity
-            game->gravity =  min(game->gravity+1, MAX_GRAVITY);
             // update and serialize players' info
             memset(send_buffer, 0, BUFF_SIZE);
-            byteSerialized=0;
+            // check contact of walls and grounds
             Player *temp;
+            for (temp=game->players;temp!=NULL;temp= temp->next)
+            {
+               check_player_contact(temp,game->tilemap);
+            }
+            // update player
+            byteSerialized=0;
             for (temp=game->players;temp!=NULL;temp= temp->next)
             {
                 update_player(temp,game);
@@ -738,7 +749,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     }  
                 else
                 {
-                    //rintf("Sent %d bytes to client id %d]\n", byteSent, temp->id);
+                    //
                 }
                     
             }
