@@ -638,7 +638,6 @@ Room *addRoom(Room *head, Room *room) {
 // - input: room's id, game room process's PID, tcp_port, udp_port, players pointer of Room will be initilized as NULL, call addPlayer() to add player to a room
 // - output: pointer to a new Room
 // - dependencies: none
-Room *makeRoom(int id, int tcp_port, int udp_port){
 
 Room *makeRoom(int id, int pid, int tcp_port, int udp_port){
     Room *p = (Room *) malloc(sizeof(Room));
