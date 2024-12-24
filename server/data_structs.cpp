@@ -524,6 +524,8 @@ int countPlayerInRoom(Player *head){
 // Room *next;
 struct Room {
     int id;
+    int id; 
+    int pid; // this is the process id of the Room (each room has unique process id) (used for managing list of rooms in main server)
     int tcp_port; // TCP port assign for each game room to handle client connection
     int udp_port; // UDP port assign for each game room to transfer data
     int started; 
@@ -636,8 +638,10 @@ Room *addRoom(Room *head, Room *room) {
 // - output: pointer to a new Room
 // - dependencies: none
 Room *makeRoom(int id, int tcp_port, int udp_port){
+Room *makeRoom(int id, int pid, int tcp_port, int udp_port){
     Room *p = (Room *) malloc(sizeof(Room));
     p->id = id;
+    p->pid = pid;
     p->tcp_port = tcp_port;
     p->udp_port = udp_port;
     p->started = 0; // when we create a room then this room must not be started yet

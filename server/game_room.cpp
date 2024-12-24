@@ -254,12 +254,16 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
     int sendBytes;
     int recvBytes;
 
+    // print log
+    printf("connected client with socket %d sendt request type 7\n", clientfd);
+
     // get opcode 
     int opcode = buff[0];
 
     // get user_id
     if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
         perror(RED "Error inside handleConnectedClients() getting `user_id`" RESET);
+        return;
     } else if(recvBytes == 0){
         fprintf(stdout, "Client closes connection\n");
         return;
@@ -269,6 +273,7 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
     // get ready
     if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
         perror(RED "Error inside handleConnectedClients() getting `ready`" RESET);
+        return;
     } else if(recvBytes == 0){
         fprintf(stdout, "Client closes connection\n");
         return;
@@ -403,6 +408,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
 
     // notify 
     printf(YELLOW "Gameroom Server [%d] listening on %s\n" RESET, room_id, CHAR_TCP_PORT);
+    printf(YELLOW "Gameroom Server [%d] listening on %s with socket descriptor = %d\n" RESET, room_id, CHAR_TCP_PORT, listener);
 
     // main loop
     for(;;){
@@ -541,6 +547,8 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                             printf(GREEN "gameroom server [%d]: socket %d hung up\n" RESET, room_id, i);
                         } else {
                             perror(RED "Error in waiting room, receive data from connected clients" RESET);
+                            // perror(RED "Error in waiting room, receive data from connected clients" RESET);
+                            continue;
                         }
 
                         close(i); // close this socket
@@ -591,6 +599,26 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                 printf("Game is starting...\n");
                 break;
             }
+
+        // print currently active clients in game room
+        printf(CYAN "\t(In waiting room %d) Currently active clients information:\n" RESET, room_id);
+        Player *p = players;
+
+        // printf("1\n");
+
+        // if(p == NULL) printf("p is null\n");
+        while(p != NULL){
+            // printf("2\n");
+
+            char ip[INET_ADDRSTRLEN];  // Buffer to store the IP address as a string
+            inet_ntop(AF_INET, &(p->cliaddr.sin_addr), ip, INET_ADDRSTRLEN);  // Convert to string
+            
+            printf("\t\tClient with id = %d, socket = %d, address = [%s:%d], ready = %d\n", p->id, p->socket_descriptor, ip, ntohs(p->cliaddr.sin_port), p->ready);
+
+            // printf("3\n");
+            p = p->next;
+        }
+        
     } // END for(;;)
 
     
