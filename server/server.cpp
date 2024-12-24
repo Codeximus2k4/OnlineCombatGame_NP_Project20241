@@ -61,7 +61,6 @@ void handle_sigint(int sig) {
     if (msgctl(msgid, IPC_RMID, NULL) == -1) {
         perror("msgctl (remove)");
     } else {
-        printf("Message queue removed successfully.\n");
         printf(GREEN "[+] Message queue removed successfully.\n" RESET);
     }
 
@@ -330,8 +329,6 @@ void *message_handler(void *arg) {
             room_updated->total_players = message.text[1] - '0'; //update num of players in room
             room_updated->ready = message.text[2] - '0'; //update ready status
             printf("Total number of player in room %d is %d\n", room_id_updated, room_updated->total_players);
-            if (room_updated->total_players == 0) rooms = removeRoomFromListRooms(rooms, room_updated);
-
             // if the room does not have any player left
             if (room_updated->total_players == 0) {
                 // remove room from list of rooms
@@ -378,7 +375,6 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
     message_type = buff[0];
 
     // print request type
-    printf(BLUE "[+] Request type %c from [%s:%d]\n" RESET, message_type, cli_addr, ntohs(cliaddr.sin_port));
     printf(BLUE "[+] Request type %c from [%s:%d] with socket descriptor = %d\n" RESET, message_type, cli_addr, ntohs(cliaddr.sin_port), connectfd);
 
     if(message_type == '1'){
@@ -521,10 +517,8 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
         }
         int player_id = buff[0];
 
-        // create room and add room to list of rooms
-        // note that first tcp_udp_room will be 10000 udp_room_port will be 20000
-        Room *room = makeRoom(room_id, tcp_room_port, udp_room_port);
-        rooms = addRoom(rooms, room);
+       
+        
         // // create room and add room to list of rooms
         // // note that first tcp_udp_room will be 10000 udp_room_port will be 20000
         // Room *room = makeRoom(room_id, tcp_room_port, udp_room_port);
@@ -558,6 +552,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
             // create room and add room to list of rooms
             // note that first tcp_udp_room will be 10000 udp_room_port will be 20000
             Room *room = makeRoom(room_id, pid, tcp_room_port, udp_room_port);
+
             rooms = addRoom(rooms, room);
 
             // notify back to client
@@ -713,7 +708,6 @@ int main (int argc, char *argv[]) {
         return 1;
     }
 
-    printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP)\n" RESET, SERV_PORT);
     printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP) with socket descriptor = %d\n" RESET, SERV_PORT, sockfd);
 
     //-----------handle ipc-------------------------

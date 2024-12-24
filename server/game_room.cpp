@@ -407,7 +407,6 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     fdmax = listener; // so far it's this one
 
     // notify 
-    printf(YELLOW "Gameroom Server [%d] listening on %s\n" RESET, room_id, CHAR_TCP_PORT);
     printf(YELLOW "Gameroom Server [%d] listening on %s with socket descriptor = %d\n" RESET, room_id, CHAR_TCP_PORT, listener);
 
     // main loop
@@ -546,7 +545,6 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                             // connection closed
                             printf(GREEN "gameroom server [%d]: socket %d hung up\n" RESET, room_id, i);
                         } else {
-                            perror(RED "Error in waiting room, receive data from connected clients" RESET);
                             printf(RED "(In waiting room %d), Client with socket descriptor %d got some error\n", room_id, i);
                             // perror(RED "Error in waiting room, receive data from connected clients" RESET);
                             continue;
@@ -579,7 +577,6 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         if (!gameStart) 
                         {
                             handleConnectedClients(i, buff);
-                            gameStart =  check_gameStart_condition(players, countPlayerInRoom(players));
                             gameStart = check_gameStart_condition(players, countPlayerInRoom(players));
                         }
                     }
