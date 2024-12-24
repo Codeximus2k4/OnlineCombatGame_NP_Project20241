@@ -408,7 +408,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     fdmax = listener; // so far it's this one
 
     // notify 
-    printf(YELLOW "Gameroom Server [%d] listening on %s\n" RESET, room_id, CHAR_TCP_PORT);
+    printf(YELLOW "Gameroom Server [%d] listening on %s with socket descriptor = %d\n" RESET, room_id, CHAR_TCP_PORT, listener);
 
     // main loop
     for(;;){
@@ -546,7 +546,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                             // connection closed
                             printf(GREEN "gameroom server [%d]: socket %d hung up\n" RESET, room_id, i);
                         } else {
-                            printf(RED "(In waiting room), Client with socket descriptor %d got some error\n", i);
+                            printf(RED "(In waiting room %d), Client with socket descriptor %d got some error\n", room_id, i);
                             // perror(RED "Error in waiting room, receive data from connected clients" RESET);
                             continue;
                         }
@@ -613,7 +613,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
             char ip[INET_ADDRSTRLEN];  // Buffer to store the IP address as a string
             inet_ntop(AF_INET, &(p->cliaddr.sin_addr), ip, INET_ADDRSTRLEN);  // Convert to string
             
-            printf("\t\tClient with id = %d, socket = %d, address = [%s:%d]\n", p->id, p->socket_descriptor, ip, ntohs(p->cliaddr.sin_port));
+            printf("\t\tClient with id = %d, socket = %d, address = [%s:%d], ready = %d\n", p->id, p->socket_descriptor, ip, ntohs(p->cliaddr.sin_port), p->ready);
 
             // printf("3\n");
             p = p->next;

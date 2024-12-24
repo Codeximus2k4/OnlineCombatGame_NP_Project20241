@@ -340,6 +340,15 @@ void *message_handler(void *arg) {
                 } else {
                     perror(RED "Failed to kill child process" );
                 }
+
+                // log out all rooms' information
+                printf(CYAN "\t(In main server) All rooms information currently:\n");
+                Room *p = rooms;
+                while(p != NULL){
+                    printf("\t\tRoom id = %d, room process id = %d\n", p->id, p->pid);
+
+                    p = p->next;
+                }
             }
         }
     }
@@ -366,7 +375,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
     message_type = buff[0];
 
     // print request type
-    printf(BLUE "[+] Request type %c from [%s:%d]\n" RESET, message_type, cli_addr, ntohs(cliaddr.sin_port));
+    printf(BLUE "[+] Request type %c from [%s:%d] with socket descriptor = %d\n" RESET, message_type, cli_addr, ntohs(cliaddr.sin_port), connectfd);
 
     if(message_type == '1'){
         // register request from client
@@ -696,7 +705,7 @@ int main (int argc, char *argv[]) {
         return 1;
     }
 
-    printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP)\n" RESET, SERV_PORT);
+    printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP) with socket descriptor = %d\n" RESET, SERV_PORT, sockfd);
 
     //-----------handle ipc-------------------------
 
