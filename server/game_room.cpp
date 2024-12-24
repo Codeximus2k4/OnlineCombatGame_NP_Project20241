@@ -547,6 +547,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                             printf(GREEN "gameroom server [%d]: socket %d hung up\n" RESET, room_id, i);
                         } else {
                             perror(RED "Error in waiting room, receive data from connected clients" RESET);
+                            printf(RED "(In waiting room %d), Client with socket descriptor %d got some error\n", room_id, i);
                             // perror(RED "Error in waiting room, receive data from connected clients" RESET);
                             continue;
                         }
@@ -579,6 +580,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         {
                             handleConnectedClients(i, buff);
                             gameStart =  check_gameStart_condition(players, countPlayerInRoom(players));
+                            gameStart = check_gameStart_condition(players, countPlayerInRoom(players));
                         }
                     }
                 } // END handle data from client
