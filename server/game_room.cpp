@@ -666,7 +666,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     }
     game->game_loop=0;
     game->game_mode=0; //game mode 0  for deathmatch, game mode 1 for capture the flag
-    game->gravity=3;
+    game->gravity=5;
     game->items = NULL;
     game->players =  players;
     if (game->game_mode==1){

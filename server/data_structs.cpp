@@ -326,8 +326,7 @@ int check_player_contact(Player* player, Tilemap* tilemap)
 }
 void update_player(Player* player, Game *game)
 {
-    if (player->collisiony!=2) player->speed = 7;
-    else player->speed =5;
+    
     if (player->movement_x!=0) player->action=3;
     if (player->movement_y==1 && !player->is_jumping) 
                         {
