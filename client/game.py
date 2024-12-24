@@ -637,10 +637,11 @@ class GameManager:
                 if udp_room_port:
                     break
         finally:
-            room_tcp_socket.close()
             stop_thread.set() # Ensure the thread stops when leaving the function
             update_thread.join() # Wait for the thread to finish
-            self.run(room_udp_port=udp_room_port)
+            room_tcp_socket.close()
+            if udp_room_port:
+                self.run(room_udp_port=udp_room_port)
 
 
     def list_of_room_screen(self):
@@ -1046,6 +1047,15 @@ class GameManager:
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
             pygame.display.update()
             self.clock.tick(40)
+
+    def display_healthbar_staminabar(self, player: Player):
+        """
+        Display healthbar and stamina bar of players\n
+        Args:
+        - player: the player who need to display his/her health and stamina status
+        """
+        pygame.draw.rect(self.display, (255, 0, 0), (player.pos[0], player.pos[1]-20, 50, 10))
+        pygame.draw.rect(self.display, (0, 128, 0), (player.pos[1], player.pos[1]-20, 50, 10))
 
 if __name__ == "__main__":
     GameManager().menu()
