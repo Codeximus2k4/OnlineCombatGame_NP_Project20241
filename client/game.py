@@ -1048,14 +1048,15 @@ class GameManager:
             pygame.display.update()
             self.clock.tick(40)
 
-    def display_healthbar_staminabar(self, player: Player):
+    def display_healthbar_staminabar(self, player: Player, render_scroll):
         """
         Display healthbar and stamina bar of players\n
         Args:
         - player: the player who need to display his/her health and stamina status
         """
-        pygame.draw.rect(self.display, (255, 0, 0), (player.pos[0], player.pos[1]-20, 50, 10))
-        pygame.draw.rect(self.display, (0, 128, 0), (player.pos[1], player.pos[1]-20, 50, 10))
+        pygame.draw.rect(self.display, (255, 0, 0), (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-17, 50, 7))
+        pygame.draw.rect(self.display, (0, 255, 0), (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-17, (50/100) * (player.health), 7))
+        pygame.draw.rect(self.display, (255, 255, 0), (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-7, (50/100) * (player.stamina), 3))
 
 if __name__ == "__main__":
     GameManager().menu()
