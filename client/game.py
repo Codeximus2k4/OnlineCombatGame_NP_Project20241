@@ -793,7 +793,14 @@ class GameManager:
 
             pygame.display.update()
 
-
+    def choose_characters(self):
+        while True:
+            self.screen.blit(self.background, (0, 0))
+            mouse_pos = pygame.mouse.get_pos()
+            
+            # Title
+            title_text = self.title_font.render("GAME MODE", True, config.COLORS['MENU_TEXT'])
+            title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH//2, 100))
 
 
     def run(self):
