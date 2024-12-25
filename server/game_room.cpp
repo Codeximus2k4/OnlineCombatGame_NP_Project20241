@@ -759,7 +759,6 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         return 1;
     }
     game->game_loop=0;
-    game->game_mode=0; //game mode 0  for deathmatch, game mode 1 for capture the flag
     game->gravity=5;
     game->items = NULL;
     game->respawn_time=3;
