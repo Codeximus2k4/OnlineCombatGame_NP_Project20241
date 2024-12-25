@@ -1170,8 +1170,8 @@ class GameManager:
                         self.scroll[1] +=  (self.player.rect(topleft =  self.player.pos).centery -  self.display.get_height()/2 - self.scroll[1])/30
             render_scroll =  (int(self.scroll[0]),int (self.scroll[1]))
 
-            # if (self.game_mode ==2):
-            #     self.display_base_sign(render_scroll)        
+            if (self.game_mode ==1):
+                self.display_base_sign(render_scroll)        
             self.tilemap.render(self.display, offset =  render_scroll)
             
             #update and render each entity
