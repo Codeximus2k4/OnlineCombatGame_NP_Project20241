@@ -352,7 +352,7 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
         correspondingPlayer->ready = ready;
         printf("Player with id %d has ready status %d\n",correspondingPlayer->id, correspondingPlayer->ready);
 
-    } else if(opcode == '11'){
+    } else if(opcode == 59){ // '0' + 11 = 59 in ASCII VALUE
         // get user_id 
         if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
             perror(RED "Error inside handleConnectedClients() getting `user_id`" RESET);
@@ -375,7 +375,7 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
 
         // send response back to all players about this change of game mode
         sendResponse11(game->game_mode);
-    } else if(opcode == '12'){
+    } else if(opcode == 60){ // '0' + 12 = 60 in ASCII VALUE
         // get user_id 
         if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
             perror(RED "Error inside handleConnectedClients() getting `user_id`" RESET);
