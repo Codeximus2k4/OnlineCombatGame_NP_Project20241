@@ -739,7 +739,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         if (movementx==1) player->isFacingLeft = false;
                         if (movementx==2) player->isFacingLeft= true;
                         player->movement_y=movementy;
-                        handleStateChange(player, action); // handle change in animation first
+                        player->proposed_action=action; // handle change in animation first
                         //handleInteraction(player, interaction);
                     }
                     each->bytes_received=0;

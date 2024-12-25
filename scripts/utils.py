@@ -340,6 +340,8 @@ class Animation:
             self.frame = min(self.frame+1 , self.img_duration* len(self.images)-1)
             if self.frame >= self.img_duration* len(self.images) -1:
                 self.done = True
+    def revert_frame(self):
+        self.frame -=1
     def get_size(self):
         return self.images[int(self.frame/self.img_duration)].get_size()
     def get_img(self):

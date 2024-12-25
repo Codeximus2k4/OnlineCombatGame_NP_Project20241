@@ -138,6 +138,10 @@ struct Player {
     int timeSinceDeath;
     int sizex;
     int sizey;
+    int previous_sizex;
+    int previous_sizey;
+    int proposed_action;
+    int HitFrame;
 };
 struct Tilemap
 {
@@ -218,6 +222,7 @@ int check_player_contact(Player* player, Tilemap* tilemap)
 {
     player->collisionx = 0;
     player->collisiony = 0;
+    if (player->action==1 || player->action==2) return 0 ;
     int tile_size= tilemap->tile_size;
 
     // check right collision
@@ -292,8 +297,9 @@ int check_player_contact(Player* player, Tilemap* tilemap)
                 if (tilemap->x[each]==i && tilemap->y[each]==y)
                 {
                     player->posy = y * tile_size-player->sizey-1;
-                    player->collisiony =2;
+                    player->collisiony= 2;
                     player->is_jumping=0;
+                    player->is_falling =0;
                     player->action = 0;
                     return 0 ;
                 }   
@@ -314,7 +320,6 @@ int check_player_contact(Player* player, Tilemap* tilemap)
                 {
                     player->posy =  y*tile_size+tile_size+1;
                     player->collisiony= 1;
-                    player->is_jumping =0;
                     player->action=0;
                     return 0 ;
                 }   
@@ -326,25 +331,65 @@ int check_player_contact(Player* player, Tilemap* tilemap)
 }
 void update_player(Player* player, Game *game)
 {
+    //handle state change
+    if (player->timeSinceAttack>player->HitFrame && (player->action==1 ||player->action==2)) player->action =0; //end attack
+
+    if (player->collisiony !=2 && player->vertical_velocity>0 
+    && player->action==4) player->action = 6;
+
+    if (player->action == 4 || player->action==6) player->speed = 4;
+    else if (player->action==1 || player->action==2) 
+    {
+        player->speed=0; // does not move while attacking
+    }
+    else
+    {
+        player->speed=5;
+    }
     
-    if (player->movement_x!=0) player->action=3;
+    if (player->movement_x!=0 && player->collisiony==2 && player->action==0) 
+    {
+        player->action =3;
+    }
+
     if (player->movement_y==1 && !player->is_jumping) 
                         {
                             player->is_jumping=1;
                             player->vertical_velocity =-15;
+                            player->action = 4;
                         }
-    if (player->Hit) player->action = 10;
-    player->timeSinceAttack= min(player->timeSinceAttack+1, player->attack_cooldown+1);
-    player->timeSinceDash =  min(player->timeSinceDash+1, player->dash_cooldown+1);
 
-    if (player->action==3 || player->action==4)
+    player->timeSinceAttack = min(player->timeSinceAttack+1, player->attack_cooldown+1);
+
+    if (player->proposed_action==1 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown) 
     {
-        if (player->movement_x==0 && player->action==3)
-        {
-            player->action=0;
-            return;
-        }
-        else if (player->movement_x==2 && (player->collisionx!=2 && player->collisionx!=3)) 
+        player->action=1;
+        player->timeSinceAttack=0;
+    } 
+
+    if (player->proposed_action==2 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown) 
+    {
+        player->action=2;
+        player->timeSinceAttack = 0;
+    } 
+
+    if (player->Hit) player->action = 10;
+
+    // align the position according to the previous frame first
+    if (!player->isFacingLeft)
+    {
+        player->posy-= player->sizey-player->previous_sizey;
+    }
+    else 
+    {
+        player->posy-= player->sizey-player->previous_sizey;
+        player->posx-= player->sizex-player->previous_sizex;
+    }
+    //position update
+    //posx
+    if (player->action==3 || player->action==4 || player->action ==6)
+    {
+        if (player->movement_x==2 && (player->collisionx!=2 && player->collisionx!=3)) 
         {
             player->posx -= player->speed;
             player->posx = max(player->posx, 0);
@@ -355,24 +400,26 @@ void update_player(Player* player, Game *game)
             player->posx = min(player->posx, 65000); 
         }
     }
-    else if (player->action==0)
-    {
-        if (player->movement_x==1)
-        {
-        player->action = 3;
-        return;
-        }
-        else if (player->movement_x==2)
-        {
-            player->action =3;
-            return;
-        }
-    }
 
     // update posy
     player->vertical_velocity = min(player->vertical_velocity+2, game->gravity);
-    if (player->is_jumping && (player->collisiony!=1 && player->vertical_velocity<0)) player->posy +=player->vertical_velocity;
-    else if (player->collisiony!= 2 && player->collisiony!=3) player->posy +=player->vertical_velocity;
+
+    if (player->timeSinceAttack >player->HitFrame)
+    {
+        if (player->is_jumping && (player->collisiony!=1 && player->vertical_velocity<0)) 
+        {
+            player->posy +=player->vertical_velocity;
+        }
+        else if (player->collisiony!= 2 && player->collisiony!=3 && player->timeSinceAttack>player->HitFrame+1) 
+        {
+            player->posy +=player->vertical_velocity;
+        }
+    }
+
+
+    // reassign previous size
+    player->previous_sizex =  player->sizex;
+    player->previous_sizey =  player->sizey;
     printf("action: %d\n",player->action);
     printf("%d - %d\n",player->collisionx,player->collisiony);
     printf("%d - %d\n",player->posx, player->posy);
@@ -437,11 +484,12 @@ void characterSpawner(Player* players)
                 temp->isFacingLeft=1;
                 temp->speed = 5;
                 temp->action =  0;
-                temp->attack_cooldown = 5;
-                temp->dash_cooldown = 5;
+                temp->attack_cooldown = 50;
+                temp->HitFrame = 30;
+                temp->dash_cooldown = 10;
                 temp->is_blocking=false; 
                 temp->is_jumping=false;
-                temp->timeSinceAttack=0;
+                temp->timeSinceAttack=52;
                 temp->timeSinceDash=0;
                 temp->movement_x=0;
                 temp->movement_y=0; 
@@ -452,19 +500,21 @@ void characterSpawner(Player* players)
                 temp->vertical_velocity = 0;
                 temp->sizex = 50;
                 temp->sizey = 60;
+                temp->previous_sizex=50;
+                temp->previous_sizey=60;
             }
         }        
     }    
 }
 void handleStateChange(Player *player, int input_action)
 {
-    if (player->char_type==0) //class samurai
-    {
+    
         if (player->action==input_action) return; // no change so skip
         else 
         {
             if (player->action ==0 || player->action==3 || player->action==8) // characters is in idle state , for now we are considering only class samurai
             {
+
                 if (player->is_jumping +player->is_falling + player->Hit==0)
                 {
                     if (input_action==1 && player->timeSinceAttack>player->attack_cooldown)
@@ -491,7 +541,7 @@ void handleStateChange(Player *player, int input_action)
             }          
         }
 
-    }
+    
 }
 
 //linked list of items
