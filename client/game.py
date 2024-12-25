@@ -1037,7 +1037,7 @@ class GameManager:
 
         # Load the level and initialize entities
         self.tilemap = Tilemap(self, tile_size=16)
-        self.map = 4
+        self.map = 5
         self.load_level(self.map)
         self.setup_background()
         self.entities = []

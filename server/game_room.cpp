@@ -754,7 +754,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     }
     //------------------ Initialize the game first ------------------
     // Game *game =  (Game*) malloc(sizeof(Game)); // ALREADY DECLARED AS GLOBAL VARIABLE
-    game->map = 4;
+    game->map = 5;
     game->tilemap =  loadTilemap(16, game->map);
     if (game->tilemap==NULL) 
     {
