@@ -287,27 +287,38 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
     printf("Player with id %d has ready status %d\n",correspondingPlayer->id, correspondingPlayer->ready);
 }
 
-// - function to send players in the room in4 to clients
+// - function to send players in the room all information in the waiting room
 // - input: socket descriptor connected to client, the head of the player list
-// - IMPORTANT NOTE: request type is in char, num_player is in char
 void sendResponse8(int connectfd, Player *players){
     char data[500];
     int sendBytes;
+    char packet[256]; // packet string to send to client
 
     memset(data, 0, sizeof(data));
+    memset(packet, 0, sizeof(packet));
 
+    // get the payload of the packet to send to clients
     int data_length = serializePlayersInRoomInformation(data, players);
 
+    // init packet
+    packet[0] = '8';
+
+    // copy payload into packet
+    memcpy(packet + 1, data, data_length);
+
+    // update total of bytes to send to client
+    int number_of_bytes = data_length + 1;
+
     printf("Data length: %d\n", data_length);
-    // send to client (2 bytes)
-    if( (sendBytes = send(connectfd, data, data_length, 0)) < 0){
+
+    // send to client 
+    if( (sendBytes = send(connectfd, packet, number_of_bytes, 0)) < 0){
         perror(RED "Error inside sendResponse8()" RESET);
     };
     
     // print to check
-    printf(YELLOW "Bytes sent to client=%d, type=%c\n" RESET, sendBytes, data[0]);
+    printf(YELLOW "Bytes sent to client=%d, type=%c\n" RESET, sendBytes, packet[0]);
 }
-
 
 // - function to handle listening data from client using thread
 // - input: udp_server_socket that is used for communicating with clients

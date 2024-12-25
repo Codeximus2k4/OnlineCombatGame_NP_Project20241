@@ -145,6 +145,7 @@ struct vfx {
 
 struct Player {
     int id; // id of player
+    char username[50]; // username of the player
     int udp_port_byte_sent = 0; // the amount of bytes that have been sent to the client regarding the UDP port message
     int socket_descriptor; // socket descriptor corresponding for each player (to handle select())
     int ready;
@@ -649,9 +650,6 @@ void handleStateChange(Player *player, int input_action)
     
 }
 
-//linked list of items
-//each item is at different pos on the screen
-
 // - function to count total number of players in a room
 // - input: the head of the player list in the room
 // - output: number of players in the room
@@ -696,25 +694,60 @@ struct ipc_msg {
     long type;
     char text[4];
 };
+
+// - function to serialize information in game room to a string
+// - input: `result` string (data to be populated), head pointer to list of players in the room
+// - output: data length of payload if successful, 0 otherwise
+// - dependencies: countPlayerInRoom()
 int serializePlayersInRoomInformation(char result[], Player *head) {
-    result[0] = '8';
-    result[1] = countPlayerInRoom(head);
-    if (result[1] == 0) {
-        result[2] = '\0';
-        return 3;
+    int totalPlayers = 0;
+    int offset = 0;
+
+    // if list of rooms is empty
+    if(head == NULL){
+        strcpy(result, "0");
+
+        return 1; // since it only contains "0"
     }
+
+    // set first byte to number of players in room
+    totalPlayers = countPlayerInRoom(head);
+    result[0] = (char) totalPlayers;
+
+    // update offset
+    offset++;
+
     Player *p = head;
-    int offset = 2; 
-    while (p != NULL) {
-        result[offset++] = p->id;
-        result[offset++] = p->ready;
+    while(p != NULL){
+        // set next byte to username_len
+        result[offset] = (char) strlen(p->username);
+
+        // update offset
+        offset++;
+
+        // set next bytes to actual uesrname data
+        memcpy(result + offset, p->username, strlen(p->username));
+
+        // update offset
+        offset += strlen(p->username);
+
+        // set next byte to user id
+        result[offset] = (char) p->id;
+
+        // update offset
+        offset++;
+
+        // set next byte to ready state of this user
+        result[offset] = (char) p->ready;
+
+        // update offset
+        offset++;
+
+        // move to next player in the list
         p = p->next;
     }
-    if (offset!=10)
-    {
-        for (int i =offset;i<=10;i++) result[i]= 0;
-    }
-    return 10;
+
+    return offset;
 }
 
 // - add a player to list of players in the room
@@ -746,6 +779,13 @@ Player *addPlayerToPlayersInRoom(Player *head, Player *player){
 Player *makePlayer(int id, int socket_descriptor, sockaddr_in cliaddr){
     Player *p = (Player*) malloc(sizeof(Player));
     p->id = id;
+
+    // query for username of this player_id (in database)
+    char username[256];
+    memset(username, 0, sizeof(username));
+    query_for_username(username, id);
+    strcpy(p->username, username); // store username of this player
+
     p->socket_descriptor = socket_descriptor;
     p->cliaddr = cliaddr;
     p->ready = 0;
@@ -790,7 +830,6 @@ Room *addRoom(Room *head, Room *room) {
 // - input: room's id, game room process's PID, tcp_port, udp_port, players pointer of Room will be initilized as NULL, call addPlayer() to add player to a room
 // - output: pointer to a new Room
 // - dependencies: none
-
 Room *makeRoom(int id, int pid, int tcp_port, int udp_port){
     Room *p = (Room *) malloc(sizeof(Room));
     p->id = id;
