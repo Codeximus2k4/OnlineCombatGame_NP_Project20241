@@ -942,7 +942,50 @@ class GameManager:
                 else:   
                     stamina =  data[index]
                     index+=1
-            
+
+                team=0
+                if self.game_mode==1:
+                    if index>= length-1:
+                        print("Payload is missing score")
+                        break
+                    else:
+                        score = data[index]*256 + data[index+1]
+                        index+=2
+                elif self.game_mode==2:
+                    if index>=length:
+                        print("Payload is missing team")
+                        break
+                    else:   
+                        team =  data[index]
+                        index+=1
+                    
+                    if index>=length:
+                        print("Payload is missing score")
+                        break
+                    else:   
+                        score =  data[index]
+                        index+=1
+            elif entity_type==3:
+                if index >=length:
+                    print("Payload is missing entity_class")
+                    break
+                else:
+                    index+=1
+
+                if index>= length-1:
+                    print("Payload is missing posx flag")
+                    break
+                else:
+                    posx = data[index]*256 + data[index+1]
+                    index+=2
+                
+                if index>= length-1:
+                    print("Payload is missing posy flag")
+                    break
+                else:
+                    posy = data[index]*256 + data[index+1]
+                    index+=2
+
             found_entity = False
             for each in self.entities:
                 if each.id == id and each.entity_type==entity_type:
