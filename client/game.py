@@ -779,6 +779,95 @@ class GameManager:
                             
 
             pygame.display.update()
+    
+    def pick_hero_screen(self):
+        hero_picked = " " 
+        while True:
+            self.screen.blit(self.menu_background, (0, 0))
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Title
+            title_text = self.title_font.render("PICK A HERO", True, config.COLORS['MENU_TEXT'])
+            title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
+            self.screen.blit(title_text, title_rect)
+            
+            #Button
+            lock_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH-config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+                text_input="Lock",
+                font=get_font(20),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            
+            samurai_button = Button(
+                image=pygame.image.load("data/images/pickHero/Samurai.png"),
+                pos=(390, 270),
+                text_input="Samurai",
+                font=get_font(16),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            
+            wizard_button = Button(
+                image=pygame.image.load("data/images/pickHero/Wizard.png"),
+                pos=(390, 450),
+                text_input="Wizard",
+                font=get_font(16),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            
+            king_button = Button(
+                image=pygame.image.load("data/images/pickHero/King.png"),
+                pos=(570, 270),
+                text_input="King",
+                font=get_font(16),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            
+            witch_button = Button(
+                image=pygame.image.load("data/images/pickHero/Witch.png"),
+                pos=(570, 450),
+                text_input="Witch",
+                font=get_font(16),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            
+            # Draw all buttons
+            buttons = [lock_button, samurai_button, wizard_button, king_button, witch_button]
+            for button in buttons:
+                button.changeColor(mouse_pos)
+                button.update(self.screen)
+                
+            # Event handling
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                    
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if lock_button.checkForInput(mouse_pos):
+                        break
+                    if samurai_button.checkForInput(mouse_pos):
+                        hero_picked = "Samurai"
+                    if wizard_button.checkForInput(mouse_pos):
+                        hero_picked = "Wizard"
+                    if king_button.checkForInput(mouse_pos):
+                        hero_picked = "King"
+                    if witch_button.checkForInput(mouse_pos):
+                        hero_picked = "Witch"
+                        
+            pick_text = f"You pick: {hero_picked}"
+            pick_text_rendered = get_font(22).render(pick_text, True, config.COLORS['MENU_TEXT'])
+            player_rect = pick_text_rendered.get_rect(center=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100))
+            self.screen.blit(pick_text_rendered, player_rect)
+            
+            pygame.display.update()
+            
            
     def de_serialize_entities(self, data):
         index = 0
