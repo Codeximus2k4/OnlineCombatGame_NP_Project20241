@@ -91,5 +91,27 @@ class Player(PhysicsEntity):
     def render(self,surf,offset = (0,0)):
         super().render(surf,offset=offset)
 
-   
+class Base:
+    def __init__(self,team_id, pos, game):
+        self.team_id = team_id
+        self.pos = pos
+        self.game =game
+        self.animation = self.game.assets['base/team'+str(self.team_id)].copy() 
+    def update(self):
+        self.animation.update()
+    def render(self, surf,offset = (0,0)):
+        surf.blit(self.animation.get_img(),dest = (self.pos[0]-offset[0],self.pos[1]-offset[1]))   
     
+
+class Flag:
+    def __init__(self, team_id, pos,game):
+        self.id = team_id
+        self.pos=pos
+        self.game=game
+        self.entity_type =  3
+        self.animation =  self.game.assets['flag/flag'+str(team_id)].copy()
+    def update(self):
+        self.animation.update()
+    def render(self, surf , offset= (0,0)):
+        surf.blit(self.animation.get_img(), dest = (self.pos[0]-offset[0],self.pos[1]-offset[1]))  
+

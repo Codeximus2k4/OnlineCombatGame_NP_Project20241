@@ -27,7 +27,10 @@
 
 #define TICK_RATE 25
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
-
+#define GAME_TIME 90 // MAX time for a match
+#define GRAVITY 5
+#define RESPAWN_TIME 120
+#define FLAG_SCORE_LIMIT 2 // max score limit for capture the flag
 
 // Define color escape codes for colorful text
 #define RESET   "\033[0m"
@@ -216,7 +219,7 @@ int sent_UDP_port(Player *head, int udp_port)
                 //perror(err_message);
             }
             else p->udp_port_byte_sent+=bytes_sent;
-            printf("%d\n",bytes_sent);
+            
             if (p->udp_port_byte_sent ==3) finished_sending=1;
         }
     }
@@ -759,16 +762,27 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         return 1;
     }
     game->game_loop=0;
-    game->gravity=5;
+    game->gravity=GRAVITY;
     game->items = NULL;
-    game->respawn_time=3;
+    game->respawn_time=RESPAWN_TIME;
     game->players =  players;
-    if (game->game_mode==1){
+    game->game_mode = 2;
+    if (game->game_mode==2)
+    {
         game->Score_team1 = 0;
         game->Score_team2 = 0;
+        game->flag1 =  makeFlag(1);
+        game->flag2 = makeFlag(2);
         }
+    else 
+    {
+        game->flag1=NULL;
+        game->flag2=NULL;
+    }
+    assign_players_to_team(game);
     game->traps= NULL;
     total_players =  countPlayerInRoom(players);
+
     characterSpawner(game->players, game);
     // set up a number of buffer for each client
     
@@ -781,15 +795,30 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     if(pthread_create(&tid, NULL, listenFromClients, &UDP_server_socket) != 0){
         perror(RED "Error creating thread ");
     }
-    struct timespec last_tick, current_time;
+    struct timespec last_tick, current_time, start_time;
     clock_gettime(CLOCK_MONOTONIC, &last_tick);
-
+    start_time =  last_tick;
     while (true)
         {
-            //printf("inside the loop");
+           // printf("inside the loop");
         clock_gettime(CLOCK_MONOTONIC, &current_time);
         long elapsed_ms  =  (current_time.tv_sec - last_tick.tv_sec)*1000 
                             + (current_time.tv_nsec - last_tick.tv_nsec)/1000000;
+        
+        // if the time surpassed limit , end the match
+        if (game->game_mode ==1 && current_time.tv_sec - start_time.tv_sec >= GAME_TIME) 
+        {
+            printf("Time limit reached, the match is ending ...\n");
+            break; // should implement some catch error on the client side to know when the game ends
+        }
+        else if (game->game_mode==2)
+        {
+            if (game->Score_team1> FLAG_SCORE_LIMIT || game->Score_team2>FLAG_SCORE_LIMIT)
+            {
+                printf("Score limit reached, the match is ending\n");
+                break;
+            } 
+        }
         // Listen from each client
         if (elapsed_ms >TICK_RATE)
         {
@@ -843,8 +872,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                 }            
             }
             if (!client_responded) continue;
-            // update and serialize players' info
-            memset(send_buffer, 0, BUFF_SIZE);
+
             // check contact of walls and grounds
             Player *temp;
             for (temp=game->players;temp!=NULL;temp= temp->next)
@@ -856,6 +884,8 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
             {
                 update_player(temp,game);
             }
+
+            //check attack
             Player *player1, *player2;
             for (player1= game->players;player1!=NULL;player1= player1->next)
             {
@@ -879,13 +909,29 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     }
                 }
             }
-
+    
+            //checking flag interaction
+            for (player1= game->players;player1!=NULL;player1=player1->next)
+            {
+                if (player1->flagTaken ==NULL) 
+                {
+                    int status = captureTheFlag(player1, game->flag1);
+                    status =  captureTheFlag(player1, game->flag2);
+                }
+                else 
+                {
+                    int status = scoreTheFlag(player1, game);
+                }
+            }
             // Packaging payload
+            // update and serialize players' info
+            memset(send_buffer, 0, BUFF_SIZE);
             byteSerialized=0;
             for (temp=game->players;temp!=NULL;temp= temp->next)
             {
-                byteSerialized = serialize_player_info(send_buffer, byteSerialized, temp);
+                byteSerialized = serialize_player_info(send_buffer, byteSerialized, temp, game);
             }
+            if (game->game_mode==2) byteSerialized =  serialize_flag_info(send_buffer,byteSerialized, game );
             int byteSent = 0;
             for (temp=game->players;temp!=NULL;temp= temp->next)
             {
@@ -899,7 +945,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     }  
                 else
                 {
-                    //
+                    //printf("Sent %d bytes to clients\n",byteSent);
                 }
                     
             }
@@ -910,7 +956,13 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         {
             usleep(1000);
         }  
-        }   
-
+        }
+    Player* player;
+    for (player= game->players;player!=NULL;player=player->next)
+    {
+        int status =  updateScore(player->id, player->score);
+        if (status) printf("Successfully updated player id %d to db\n", player->id);
+        else printf("Failed to update player id %d to db\n", player->id);
+    }   
     return 0;
 }

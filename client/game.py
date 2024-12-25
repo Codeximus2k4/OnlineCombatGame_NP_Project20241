@@ -8,7 +8,7 @@ import config
 from client.network import NetworkManager
 from pygame import SCRAP_TEXT
 from scripts.utils import *
-from scripts.entities import PhysicsEntity, Player
+from scripts.entities import PhysicsEntity, Player, Base, Flag
 from scripts.button import Button
 from scripts.tilemap  import Tilemap
 
@@ -58,7 +58,11 @@ class GameManager:
                 'Samurai/run':Animation(load_images('entities/Samurai/Run'),img_dur=5, loop = True),
                 'Samurai/jump':Animation(load_images('entities/Samurai/Jump'),img_dur= 5, loop=False),
                 'Samurai/fall':Animation(load_images('entities/Samurai/Fall'),img_dur= 5, loop=False),
-                'Samurai/take hit':Animation(load_images('entities/Samurai/Take Hit'),img_dur= 5, loop=False)
+                'Samurai/take hit':Animation(load_images('entities/Samurai/Take Hit'),img_dur= 5, loop=False),
+                'base/team1': Animation(load_images('team_home/teama'), img_dur=5,loop= True),
+                'base/team2': Animation(load_images('team_home/teamb'), img_dur=5,loop= True),
+                'flag/flag1': Animation(load_images('flags/flagA'), img_dur=5,loop= True),
+                'flag/flag2': Animation(load_images('flags/flagB'), img_dur=5,loop= True),
         }
     
     def setup_background(self):
@@ -872,7 +876,7 @@ class GameManager:
     def de_serialize_entities(self, data):
         index = 0
         length =  len(data)
-    #print(f"Analyzing payload of length {length}")
+        print(f"Analyzing payload of length {length}")
         while (1):
 
             if index >= length: 
@@ -961,7 +965,27 @@ class GameManager:
                     else:   
                         score =  data[index]
                         index+=1
-            
+            elif entity_type==3:
+                if index >=length:
+                    print("Payload is missing entity_class")
+                    break
+                else:
+                    index+=1
+
+                if index>= length-1:
+                    print("Payload is missing posx flag")
+                    break
+                else:
+                    posx = data[index]*256 + data[index+1]
+                    index+=2
+                
+                if index>= length-1:
+                    print("Payload is missing posy flag")
+                    break
+                else:
+                    posy = data[index]*256 + data[index+1]
+                    index+=2
+
             found_entity = False
             for each in self.entities:
                 if each.id == id and each.entity_type==entity_type:
@@ -972,17 +996,21 @@ class GameManager:
                     if entity_type==0:
                         each.flip = flip
                         each.set_action(action_type,False)
-                        print(action_type)
                         each.health = health
                         each.stamina = stamina  
-                    each.score=score
-                    each.team =team
+                        each.score=score
+                        each.team =team
+                    if entity_type==3:
+                        pass # no implementation yet
             if not found_entity:
                 if entity_type==0:
                     new_player =  Player(game = self, id = id, entity_class=entity_class,posx = posx
                                          , posy=posy, health=health, stamina=stamina, team =team)
                     new_player.set_action(0, True)
                     self.entities.append(new_player)
+                if entity_type == 3:
+                    new_flag =  Flag(team_id =  id, pos =  [posx,posy], game=self)
+                    self.entities.append(new_flag)
             #print(f"There are {len(self.entities)} in game")
          
     def load_level(self, map_id):
@@ -991,6 +1019,10 @@ class GameManager:
     
     def run(self,room_udp_port):
         """Main game loop"""
+        self.game_mode = 1 # the game mode is capture the flag
+        if (self.game_mode ==1):
+            self.base_sign = []
+
         self.display =  pygame.Surface((960,720), pygame.SRCALPHA)
         self.display_2 =  pygame.Surface((960,720))
 
@@ -1128,11 +1160,13 @@ class GameManager:
                         self.scroll[0] +=  (self.player.rect(topleft =  self.player.pos).centerx -  self.display.get_width()/2 - self.scroll[0])/30
                         self.scroll[1] +=  (self.player.rect(topleft =  self.player.pos).centery -  self.display.get_height()/2 - self.scroll[1])/30
             render_scroll =  (int(self.scroll[0]),int (self.scroll[1]))
-                    
+
+            if (self.game_mode ==1):
+                self.display_base_sign(render_scroll)        
             self.tilemap.render(self.display, offset =  render_scroll)
+            
             #update and render each entity
             if self.player is not None:
-                print(self.player.pos)
                 # pygame.draw.rect(self.display, (255,0,0),
                 #                  pygame.Rect(self.player.pos[0]-render_scroll[0], self.player.pos[1]-render_scroll[1],self.player.size[0],self.player.size[1]),
                 #                  1)
@@ -1141,13 +1175,19 @@ class GameManager:
                 self.display_healthbar_staminabar(self.player, render_scroll)
                 self.player.render(self.display,offset = render_scroll)
             
+            # render the flag 
             for each in self.entities:
-                if each is not self.player:
+                if each is not self.player and isinstance(each, Flag):
+                    each.update()
                     each.render(self.display,offset = render_scroll)
-                    if isinstance(each, Player):
-                        self.display_username(each, render_scroll, config.COLORS["BLUE"])
-                        # self.display_score(each, each.score, render_scroll, config.COLORS["WHITE"])
-                        self.display_healthbar_staminabar(each, render_scroll)
+
+            # render the player after the flags,items,traps to make them appear on top 
+            for each in self.entities:
+                if each is not self.player and isinstance(each, Player):
+                    each.render(self.display,offset = render_scroll)
+                    self.display_username(each, render_scroll, config.COLORS["BLUE"])
+                    # self.display_score(each, each.score, render_scroll, config.COLORS["WHITE"])
+                    self.display_healthbar_staminabar(each, render_scroll)
 
             self.display_2.blit(self.display, (0,0))
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
@@ -1216,8 +1256,14 @@ class GameManager:
         
         # Blit the score onto the display
         self.display.blit(score_text, score_rect)
-
-
+    # display the base sign for two teams A and B
+    def display_base_sign(self, offset):
+        if len(self.base_sign)==0:
+            self.base_sign = [Base(1, [224, 384],self), Base(2, [1648, 384],self)]
+        
+        for each in self.base_sign:
+            each.update()
+            each.render(self.display,offset)
 
 if __name__ == "__main__":
     GameManager().menu()

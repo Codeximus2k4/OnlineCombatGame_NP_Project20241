@@ -157,5 +157,5 @@ class Editor:
                 tilemap =  json.load(file)
                 for pos, _ in tilemap['tilemap'].items():
                     txt_file.write(pos + '\n')
-#Editor().run()      
-Editor().convert_json_text('map.json','map.txt')
+Editor().run()      
+#Editor().convert_json_text('map.json','map.txt')

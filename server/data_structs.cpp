@@ -49,6 +49,15 @@ struct Item {
     Hitbox *hitbox;
 };
 
+// Data structure for flags to be used in Capture the flag game mode
+struct Flag
+{
+    int id;
+    int posx,posy;
+    int action;
+    Hitbox *captureHitbox; //Hitbox for capturing this flag
+    Hitbox *scoreHitbox;  //Hitbox for submitting this flag to earn score -> this will be the location of home team
+};
 
 struct Trap {
     int cooldown_time;
@@ -192,7 +201,32 @@ struct Player {
     int HitFrame;
     int score;
     int HitTime;
+    Flag* flagTaken;
 };
+
+// - function : return the flag to the original position after scoring
+// - input : Player *player (pointer to the player holding the flag)
+// - output: none
+// - dependencies: none
+void respawnFlag(Player *player)
+{
+    Flag* flag =  player->flagTaken;
+    player->flagTaken=NULL;
+    if (flag ==NULL) return;
+    if (flag->id==1)
+    {
+        flag->posx = 192;
+        flag->posy = 330;
+        flag->action=0;
+    }
+    else if (flag->id==2)
+    {
+        flag->posx = 1616;
+        flag->posy = 330;
+        flag->action=0;
+    }
+}
+
 struct Tilemap
 {
     int tile_size;
@@ -261,11 +295,13 @@ struct Game{
     Item* items;
     Trap* traps;
     Tilemap* tilemap;
+    Flag* flag1;
+    Flag* flag2;
     int game_loop;
     int Score_team1;
     int Score_team2;
     int gravity;
-    int respawn_time = 120;
+    int respawn_time;
     int map;
 };
 
@@ -494,13 +530,21 @@ void update_player(Player* player, Game *game)
         //update stamina
         player->stamina = min(player->stamina+5, 100);
 
+        //update the flag position if the player is holding the flag
+        if (player->flagTaken!=NULL) 
+        {
+            Flag* flag = player->flagTaken;
+            flag->posx =  player->posx;
+            flag->posy = player->posy;
+        }
+
         // printf("action: %d\n",player->action);
         // printf("%d - %d\n",player->collisionx,player->collisiony);
         // printf("%d - %d\n",player->posx, player->posy);
         // finished updating the action now, let's update the position
     }
 }
-int serialize_player_info(char *send_buffer, int byteSerialized, Player *player)
+int serialize_player_info(char *send_buffer, int byteSerialized, Player *player, Game* game)
 {
     send_buffer[byteSerialized] =  player->id;
     byteSerialized++;
@@ -551,15 +595,50 @@ int serialize_player_info(char *send_buffer, int byteSerialized, Player *player)
     send_buffer[byteSerialized]=  t2;
     byteSerialized++;
     }
-    else 
+    else if (player->team==1)
     {
         send_buffer[byteSerialized]=  player->team;
         byteSerialized++;
 
-        send_buffer[byteSerialized]=  player->score;
+        send_buffer[byteSerialized]=  game->Score_team1;
         byteSerialized++;
     }
+    else if (player->team==2)
+    {
+        send_buffer[byteSerialized]=  player->team;
+        byteSerialized++;
+
+        send_buffer[byteSerialized]=  game->Score_team2;
+        byteSerialized++;
+    }
+
     return byteSerialized;
+}
+// - function: assign players to teams, if the game mode is 1 -> classic then the team is 0 for all players, else assign them accordingly
+// - input : pointer to the game
+// - output: none
+// - dependencies: none
+void assign_players_to_team(Game *game)
+{
+    if (game->game_mode==2)
+    {
+    int index = 1;  
+        for (Player* temp =  game->players;temp!=NULL;temp=temp->next)
+        {
+            if (index%2==1) temp->team = 1;
+            else temp->team=2;
+            index++;
+            temp->timeSinceDeath=game->respawn_time+1;
+        }
+    }
+    else 
+    {
+        for (Player* temp =  game->players;temp!=NULL;temp=temp->next)
+        {
+            temp->team = 0;
+            temp->timeSinceDeath=game->respawn_time+1;
+        }
+    }
 }
 void characterSpawner(Player* players, Game *game)
 {
@@ -568,6 +647,7 @@ void characterSpawner(Player* players, Game *game)
     {
         if (temp->health<=0 && temp->timeSinceDeath>=game->respawn_time) // This character just died or just got into the game, needs to be spawned
         {
+                temp->flagTaken = NULL;
                 temp->score = 0;
                 temp->posx = 500;
                 temp->posy = 420;
@@ -598,7 +678,8 @@ void characterSpawner(Player* players, Game *game)
                 temp->attackHitBox = makeHitbox(temp->posx+DISTANCE_FROM_ATTACK_HITBOX, temp->posy, ATTACK_HITBOX_WIDTH,ATTACK_HITBOX_HEIGHT);
         }        
     }    
-}void check_attack(Player *player1, Player *player2)
+}
+void check_attack(Player *player1, Player *player2)
 {
     int attacked = check_collision(player1->attackHitBox, player2->selfHitBox);
     printf("player id %d is hit? %d\n",player2->id, attacked);
@@ -616,7 +697,12 @@ void characterSpawner(Player* players, Game *game)
         {
             player2->timeSinceDeath=0;
             player2->action=11;
-            player2->score+=100;
+            player1->score+=100;
+            if (player2->flagTaken!=NULL) 
+            {
+                player1->score+=50;
+                respawnFlag(player2);
+            }
         }
     }
     if (attacked==1 && player1->action==2) 
@@ -633,6 +719,11 @@ void characterSpawner(Player* players, Game *game)
             player2->timeSinceDeath=0;
             player2->action=11;
             player1->score+=100;
+            if (player2->flagTaken!=NULL) 
+            {
+                player1->score+=50;
+                respawnFlag(player2);
+            }
         }
     }
 
@@ -673,6 +764,57 @@ void handleStateChange(Player *player, int input_action)
         }
 
     
+}
+
+int serialize_flag_info(char *send_buffer, int byteSerialized, Game *game)
+{
+    // flag 1
+    Flag* flag1 =  game->flag1; 
+    send_buffer[byteSerialized] = game->flag1->id;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = 3;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = 0;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = game->flag1->posx/256;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = game->flag1->posx%256;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = game->flag1->posy/256;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = game->flag1->posy%256;
+    byteSerialized++;
+
+    // flag 2
+    Flag* flag2 =  game->flag2;
+    send_buffer[byteSerialized] = game->flag2->id;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = 3;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = 0;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = game->flag2->posx/256;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = game->flag2->posx%256;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = game->flag2->posy/256;
+    byteSerialized++;
+
+    send_buffer[byteSerialized] = game->flag2->posy%256;
+    byteSerialized++;
+
+    return byteSerialized;
 }
 
 // - function to count total number of players in a room
@@ -1388,6 +1530,74 @@ Item* spawnAllItems() {
 
     return items;
 }
+
+
+// - function : make a flag object
+// - input : id 
+// - output: pointer to the flag
+// - dependencies: none
+Flag *makeFlag(int id)
+{
+    Flag *newflag = (Flag*) malloc(sizeof(Flag));
+    newflag->id = id;
+    if (id==1) // flag of team 1
+    {
+        newflag->posx = 192;
+        newflag->posy = 330; 
+        newflag->action =  0;
+        newflag->captureHitbox =  makeHitbox(192, 330, 64, 64);
+        newflag->scoreHitbox =  makeHitbox(1616,330, 64,64 );
+    }
+    else if (id==2)
+    {
+        newflag->posx = 1616;
+        newflag->posy = 330; 
+        newflag->action =  0;
+        newflag->captureHitbox =  makeHitbox(1616, 330, 64, 64);
+        newflag->scoreHitbox =  makeHitbox(192,330, 64,64 );
+    }
+    return newflag;
+}
+
+
+// - function : check if the player can capture the flag or not
+// - input : Player *player (pointer to player), Flag *flag (pointer to flag)
+// - output: 1 if success, 0 for failed to capture
+// - dependencies: none
+int captureTheFlag(Player *player, Flag* flag)
+{
+    if (player->team == flag->id) return 0;
+    if (check_collision(player->selfHitBox, flag->captureHitbox))
+    {
+        flag->action =1;
+        player->flagTaken = flag;
+        printf("Player id %d \n has captured the flag", player->id);
+        return 1;
+    }
+    else return 0;
+}
+
+// - function : check if the player can capture the flag or not
+// - input : Player *player (pointer to player), Flag *flag (pointer to flag), Game *game (pointer to main game)
+// - output: 1 if success, 0 for failed to score
+// - dependencies: none
+int scoreTheFlag(Player *player, Game *game)
+{
+    Flag *flag =  player->flagTaken;
+    if (flag==NULL) return 0;
+    if (flag->action==0) return 0;
+    if (check_collision(player->selfHitBox, flag->scoreHitbox))
+    {
+        if (flag->id==1) game->Score_team2++;
+        if (flag->id==2) game->Score_team1++;
+        player->score+=50;
+        printf("Player id %d has scored\n", player->id);
+        respawnFlag(player);
+        return 1;
+    }
+    else return 0;
+}
+
 
 // - function to make a new user server-side 
 // - input: id of user (queried from database)
