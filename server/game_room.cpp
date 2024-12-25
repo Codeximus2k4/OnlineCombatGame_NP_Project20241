@@ -259,32 +259,36 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
     printf("connected client with socket %d sendt request type 7\n", clientfd);
 
     // get opcode 
-    int opcode = buff[0];
+    char opcode = buff[0];
 
-    // get user_id
-    if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
-        perror(RED "Error inside handleConnectedClients() getting `user_id`" RESET);
-        return;
-    } else if(recvBytes == 0){
-        fprintf(stdout, "Client closes connection\n");
-        return;
-    }
-    int player_id = buff[0];
+    if(opcode == '7'){
+        // get user_id
+        if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
+            perror(RED "Error inside handleConnectedClients() getting `user_id`" RESET);
+            return;
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int player_id = buff[0];
 
-    // get ready
-    if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
-        perror(RED "Error inside handleConnectedClients() getting `ready`" RESET);
-        return;
-    } else if(recvBytes == 0){
-        fprintf(stdout, "Client closes connection\n");
-        return;
-    }
-    int ready = buff[0];
+        // get ready
+        if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
+            perror(RED "Error inside handleConnectedClients() getting `ready`" RESET);
+            return;
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int ready = buff[0];
 
-    // update internal linked list
-    Player *correspondingPlayer = findPlayerInRoomById(players, player_id);
-    correspondingPlayer->ready = ready;
-    printf("Player with id %d has ready status %d\n",correspondingPlayer->id, correspondingPlayer->ready);
+        // update internal linked list
+        Player *correspondingPlayer = findPlayerInRoomById(players, player_id);
+        correspondingPlayer->ready = ready;
+        printf("Player with id %d has ready status %d\n",correspondingPlayer->id, correspondingPlayer->ready);
+    } else if(opcode == '11'){
+
+    } 
 }
 
 // - function to send players in the room all information in the waiting room
