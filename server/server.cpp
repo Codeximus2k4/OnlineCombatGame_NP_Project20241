@@ -499,11 +499,17 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
                 // update list of logged in users
                 User *p = makeUser(user_id);
                 loggedInUsers = addUserToLoggedInList(loggedInUsers, p);
+
+                // log server-side
+                printf(YELLOW "Client [%s:%d] logged in successfully\n", cli_addr, ntohs(cliaddr.sin_port));
             } else {
                 // user already logged in somewhere else, login unsuccessful
                 status = 0;
 
                 sendResponse2(connectfd, status, user_id);
+
+                // log server-side
+                printf(YELLOW "Client [%s:%d] cannot log in with crendential: %s %s, another user is using this account\n", cli_addr, ntohs(cliaddr.sin_port), username, password);
             }
         }
         else { // login fail due to wrong crendentials
@@ -511,6 +517,9 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
             user_id = -1;
             // send response back to client
             sendResponse2(connectfd, status, user_id);
+
+            // log server-side
+                printf(YELLOW "Client [%s:%d] cannot log in with crendential: %s %s, wrong credential\n", cli_addr, ntohs(cliaddr.sin_port), username, password);
         }
 
     } else if(message_type == '3'){
