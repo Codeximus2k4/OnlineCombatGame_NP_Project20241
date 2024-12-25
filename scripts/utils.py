@@ -323,6 +323,38 @@ def update_ready_request(user_id: int, is_ready:int, update_ready_socket: Networ
     # Send the message
     update_ready_socket.send_tcp_message(message)
 
+def game_mode_request(user_id: int, game_mode: str, game_mode_socket: NetworkManager):
+    """Message type 11: Request the game mode for game play"""
+    # Get the message components
+    request_type = 59 # request type 11
+    user_id = user_id
+    game_mode = game_mode
+
+    # Convert to bytes and combine into 1 message
+    request_type_byte = bytes([request_type])
+    user_id_byte = bytes([user_id])
+    game_mode_byte = game_mode.encode("ascii")
+    message = request_type_byte + user_id_byte + game_mode_byte
+
+    # Send the request to the server
+    game_mode_socket.send_tcp_message(message)
+
+def hero_request(user_id: int, hero_id: str, hero_socket: NetworkManager):
+    """Message type 12: Request the hero type"""
+    request_type = 60 # request type 12
+    user_id = user_id
+    hero_id = hero_id
+
+    # Convert to bytes and combine into 1 message
+    request_type_byte = bytes([request_type])
+    user_id_byte = bytes([user_id])
+    hero_id_byte = hero_id.encode("ascii")
+    message = request_type_byte + user_id_byte + hero_id_byte
+
+
+    # Send the request to the server
+    hero_socket.send_tcp_message(message)
+
 class Animation:
     def __init__(self, images ,img_dur = 5, loop =True):
         self.images=  images

@@ -39,6 +39,7 @@ class GameManager:
         self.user_id = None
         self.udp_room_socket =None
         self.udp_room_port =None
+        self.game_mode: int = None
 
         self.id_to_username = {}
 
@@ -496,9 +497,7 @@ class GameManager:
             pygame.display.update()
 
     def waiting_room_screen(self, user_id, room_id, room_tcp_port):
-        """Waiting room screen for host"""
-
-        # Connect to the room TCP network
+        """Waiting room screen with hero selection"""
         room_tcp_socket = NetworkManager(
             server_addr=config.SERVER_ADDR,
             server_port=room_tcp_port
@@ -506,158 +505,257 @@ class GameManager:
         time.sleep(1)
         room_tcp_socket.connect()
 
-        # Join the room (send message type 6)
-        response = connect_room_request(user_id=user_id, 
-                                        host_room_socket=room_tcp_socket)
+        response = connect_room_request(user_id=user_id, host_room_socket=room_tcp_socket)
         print("Create/Join room response: " + response)
 
-        players = []  # Shared variable to store the current player list
-        stop_thread = threading.Event()  # Event to signal the update thread to stop
-        is_ready = 0 # Store current ready state of the player
-        udp_room_port: int = None # udp room port for game play
-        
+        players = []
+        stop_thread = threading.Event()
+        is_ready = 0
+        udp_room_port = None
+        hero_picked = " "
+        game_mode_picked = "CLASSIC"
+        hero_to_id = {
+            "Samurai": "1",
+            "Wizard": "2",
+            "King": "3",
+            "Witch": "4"
+        }
+
+        game_mode_to_id = {
+            "CLASSIC": "1",
+            "CAPTURE THE FLAG": "2"
+        }
 
         def waiting_room_process():
-            """Fetch the list of players in the room/Receive the tcp port"""
-            
-            new_players = [] # New players list
+            new_players = []
             try:
-                room_tcp_socket.tcp_socket.setblocking(False) # set non blocking for room socket
-                message_type = room_tcp_socket.receive_tcp_message(buff_size=1).decode() # Receive the message type
+                room_tcp_socket.tcp_socket.setblocking(False)
+                message_type = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
                 print(f"Message type: {message_type}")
                 if message_type == "7":
                     nonlocal udp_room_port
                     udp_room_port = room_tcp_socket.receive_tcp_message(buff_size=2).decode()
-                    print(udp_room_port)
                     udp_room_port = struct.unpack("!H", udp_room_port.encode("utf-8"))[0]
                     print(f"Room UDP port: {udp_room_port}")
                 elif message_type == "8":
-                    num_players = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
-                    num_players = ord(num_players)
+                    num_players = ord(room_tcp_socket.receive_tcp_message(buff_size=1).decode())
                     while num_players:
-                        # Get the username length of the player
-                        username_length = room_tcp_socket.receive_tcp_message(buff_size=1).decode() 
-                        username_length = ord(username_length)
-
-                        # Get the username of the player
+                        username_length = ord(room_tcp_socket.receive_tcp_message(buff_size=1).decode())
                         username = room_tcp_socket.receive_tcp_message(buff_size=username_length).decode()
-
-                        # Get the player id of the player
-                        player_id = room_tcp_socket.receive_tcp_message(buff_size=1)
-                        player_id = ord(player_id)
-
-                        # Get the ready status of the player
-                        ready_status = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
-                        ready_status = ord(ready_status)
-
-                        # get the list of players
-                        new_players.append({"player_id": player_id,"username": username, "ready": ready_status})
-                        num_players = num_players - 1
+                        player_id = ord(room_tcp_socket.receive_tcp_message(buff_size=1))
+                        ready_status = ord(room_tcp_socket.receive_tcp_message(buff_size=1).decode())
+                        new_players.append({"player_id": player_id, "username": username, "ready": ready_status})
+                        num_players -= 1
+                else:
+                    message_type = ord(message_type)
+                    print(f"Message type: {message_type}")
+                    game_mode = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
+                    print(f"Game mode: {game_mode}")
+                    if game_mode == "1":
+                        self.game_mode = 1
+                    elif game_mode == "2":
+                        self.game_mode = 2
                 return new_players
             except Exception as e:
                 print(f"Error when receiving message type 7/8: {e}")
             finally:
-                room_tcp_socket.tcp_socket.setblocking(True) # Set blocking for room socket
+                room_tcp_socket.tcp_socket.setblocking(True)
                 return new_players
-            
+
         def update_players():
-            """Background thread to update the player list"""
             while not stop_thread.is_set():
                 new_players = waiting_room_process()
                 if new_players:
                     nonlocal players
                     players = new_players
 
-        # Start the update thread
-        update_thread = threading.Thread(target=update_players,
-                                         daemon=True)
+        update_thread = threading.Thread(target=update_players, daemon=True)
         update_thread.start()
 
         # Buttons
-        ready = False
         ready_button = Button(
-            image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"), 
+            image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
             pos=(config.SCREEN_WIDTH - config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
-            text_input="READY", 
-            font=get_font(20), 
-            base_color=config.COLORS['GREEN'], 
+            text_input="READY",
+            font=get_font(20),
+            base_color=config.COLORS['GREEN'],
             hovering_color="White"
         )
 
         back_button = Button(
-            image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"), 
+            image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
             pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
-            text_input="BACK", 
-            font=get_font(20), 
-            base_color=config.COLORS['BUTTON_BASE'], 
+            text_input="BACK",
+            font=get_font(20),
+            base_color=config.COLORS['BUTTON_BASE'],
             hovering_color="White"
         )
+
+        # Add game mode arrow buttons
+        sc_offset = 250
+        left_arrow = Button(
+            image=pygame.transform.scale(pygame.image.load("data/images/menuAssets/Refresh Rect.png"), (30, 30)),
+            pos=(25, sc_offset+300),
+            text_input="<",
+            font=get_font(20),
+            base_color=config.COLORS['BUTTON_BASE'],
+            hovering_color="White"
+        )
+
+        right_arrow = Button(
+            image=pygame.transform.scale(pygame.image.load("data/images/menuAssets/Refresh Rect.png"), (30, 30)),
+            pos=(325, sc_offset+300),
+            text_input=">",
+            font=get_font(20),
+            base_color=config.COLORS['BUTTON_BASE'],
+            hovering_color="White"
+        )
+                
+
+        # Hero selection buttons (right column, smaller images)
+        hero_buttons = {
+            "Samurai": Button(
+                image=pygame.transform.scale(pygame.image.load("data/images/pickHero/Samurai.png"), (150, 150)),
+                pos=(config.SCREEN_WIDTH - 150, sc_offset),
+                text_input="Samurai",
+                font=get_font(14),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            ),
+            "Wizard": Button(
+                image=pygame.transform.scale(pygame.image.load("data/images/pickHero/Wizard.png"), (150, 150)),
+                pos=(config.SCREEN_WIDTH - 300, sc_offset),
+                text_input="Wizard",
+                font=get_font(14),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            ),
+            "King": Button(
+                image=pygame.transform.scale(pygame.image.load("data/images/pickHero/King.png"), (150, 150)),
+                pos=(config.SCREEN_WIDTH - 150, sc_offset+150),
+                text_input="King",
+                font=get_font(14),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            ),
+            "Witch": Button(
+                image=pygame.transform.scale(pygame.image.load("data/images/pickHero/Witch.png"), (150, 150)),
+                pos=(config.SCREEN_WIDTH - 300, sc_offset+150),
+                text_input="Witch",
+                font=get_font(14),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+        }
 
         try:
             while True:
                 self.screen.blit(self.menu_background, (0, 0))
                 mouse_pos = pygame.mouse.get_pos()
 
-                # Title
-                text = f"ROOM {room_id}"
-                title_text = self.title_font.render(text, True, config.COLORS['MENU_TEXT'])
-                title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
+                # Room Title
+                room_text = f"ROOM {room_id}"
+                title_text = self.title_font.render(room_text, True, config.COLORS['MENU_TEXT'])
+                title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 50))
                 self.screen.blit(title_text, title_rect)
 
-                # Display player list
-                y_offset = 200
+                # Display player list (left side)
+                players_title = get_font(30).render("Players", True, config.COLORS['MENU_TEXT'])
+                self.screen.blit(players_title, (50, 100))
+
+                # Display hero choice (rigth side)
+                heroes_title = get_font(30).render("Heroes", True, config.COLORS['MENU_TEXT'])
+                self.screen.blit(heroes_title, (650, 100))
+                
+                y_offset = 150
                 for player in players:
                     player_text = f"{player['username']} - {'Ready' if player['ready'] else 'Not Ready'}"
-                    player_text_rendered = get_font(25).render(player_text, True, config.COLORS['MENU_TEXT'])
-                    player_rect = player_text_rendered.get_rect(center=(config.SCREEN_WIDTH // 2, y_offset))
-                    self.screen.blit(player_text_rendered, player_rect)
-                    y_offset += 50  # Adjust spacing between players
+                    player_text_rendered = get_font(20).render(player_text, True, config.COLORS['MENU_TEXT'])
+                    self.screen.blit(player_text_rendered, (50, y_offset))
+                    y_offset += 40
 
-                # Buttons
-                for button in [ready_button, back_button]:
+                # Display selected hero
+                hero_text = f"Selected Hero: {hero_picked}"
+                hero_text_rendered = get_font(15).render(hero_text, True, config.COLORS['MENU_TEXT'])
+                self.screen.blit(hero_text_rendered, (config.SCREEN_WIDTH - 380, sc_offset+270))
+
+                # Update game mode text display
+                text = f"Selected Game Mode:"
+                text_rendered = get_font(15).render(text, True, config.COLORS['MENU_TEXT'])
+                self.screen.blit(text_rendered, (50, sc_offset+270))
+
+                game_mode_text = get_font(15).render(game_mode_picked, True, config.COLORS['MENU_TEXT'])
+                text_rect = game_mode_text.get_rect(center=(175, sc_offset+300))
+                self.screen.blit(game_mode_text, text_rect)
+
+                # Add to button updates section
+                for button in [ready_button, back_button, left_arrow, right_arrow, *hero_buttons.values()]:
                     button.changeColor(mouse_pos)
                     button.update(self.screen)
 
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
-                        stop_thread.set()  # Signal the update thread to stop
+                        stop_thread.set()
                         room_tcp_socket.close()
                         pygame.quit()
                         sys.exit()
 
                     if event.type == pygame.MOUSEBUTTONDOWN:
+                        for hero_name, button in hero_buttons.items():
+                            if button.checkForInput(mouse_pos):
+                                hero_picked = hero_name
+
                         if ready_button.checkForInput(mouse_pos):
-                            if is_ready==0:
+                            if hero_picked == " ":
+                                # Display a notification
+                                noti_text = get_font(22).render("You need to choose a hero!", True, config.COLORS['RED'])
+                                noti_rect = noti_text.get_rect(center=(config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT-50))
+                                self.screen.blit(noti_text, noti_rect)
+                                continue        # Player must choose a hero
+                            if is_ready == 0:
                                 is_ready = 1
                                 ready_button.text_input = "CANCEL"
                                 ready_button.base_color = config.COLORS["RED"]
                                 ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
-                                update_ready_request(user_id=self.user_id,
-                                                        is_ready=is_ready,
-                                                        update_ready_socket=room_tcp_socket)
                             else:
+                                is_ready = 0
                                 ready_button.text_input = "READY"
                                 ready_button.base_color = config.COLORS["GREEN"]
                                 ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
-                                is_ready = 0
-                                update_ready_request(user_id=self.user_id,
-                                                        is_ready=is_ready,
-                                                        update_ready_socket=room_tcp_socket)
+                            hero_request(user_id=user_id, hero_id=hero_to_id[hero_picked], hero_socket=room_tcp_socket)
+                            game_mode_request(user_id=user_id, game_mode=game_mode_to_id[game_mode_picked], game_mode_socket=room_tcp_socket)
+                            update_ready_request(user_id=self.user_id, is_ready=is_ready, update_ready_socket=room_tcp_socket)
 
-                        if back_button.checkForInput(mouse_pos):
-                            stop_thread.set()  # Signal the update thread to stop
-                            return
+                        # Add to event handling section
+                        if left_arrow.checkForInput(mouse_pos):
+                            if game_mode_picked == "CLASSIC":
+                                game_mode_picked = "CAPTURE THE FLAG"
+                            else:
+                                game_mode_picked = "CLASSIC"
+
+                        if right_arrow.checkForInput(mouse_pos):
+                            if game_mode_picked == "CLASSIC":
+                                game_mode_picked = "CAPTURE THE FLAG"
+                            else:
+                                game_mode_picked = "CLASSIC"
                         
+                        if back_button.checkForInput(mouse_pos):
+                            stop_thread.set()
+                            update_thread.join()
+                            room_tcp_socket.close()
+                            return
+
                 pygame.display.update()
                 if udp_room_port:
                     break
         finally:
-            stop_thread.set() # Ensure the thread stops when leaving the function
-            update_thread.join() # Wait for the thread to finish
+            stop_thread.set()
+            update_thread.join()
             room_tcp_socket.close()
             if udp_room_port:
                 for player in players:
                     self.id_to_username[player["player_id"]] = player["username"]
+                print(f"Game mode: {self.game_mode}")
                 self.run(room_udp_port=udp_room_port)
 
 
@@ -782,94 +880,6 @@ class GameManager:
                                                          room_tcp_port=room_tcp_port)
                             
 
-            pygame.display.update()
-    
-    def pick_hero_screen(self):
-        hero_picked = " " 
-        while True:
-            self.screen.blit(self.menu_background, (0, 0))
-            mouse_pos = pygame.mouse.get_pos()
-
-            # Title
-            title_text = self.title_font.render("PICK A HERO", True, config.COLORS['MENU_TEXT'])
-            title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
-            self.screen.blit(title_text, title_rect)
-            
-            #Button
-            lock_button = Button(
-                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
-                pos=(config.SCREEN_WIDTH-config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
-                text_input="Lock",
-                font=get_font(20),
-                base_color=config.COLORS['BUTTON_BASE'],
-                hovering_color="White"
-            )
-            
-            samurai_button = Button(
-                image=pygame.image.load("data/images/pickHero/Samurai.png"),
-                pos=(390, 270),
-                text_input="Samurai",
-                font=get_font(16),
-                base_color=config.COLORS['BUTTON_BASE'],
-                hovering_color="White"
-            )
-            
-            wizard_button = Button(
-                image=pygame.image.load("data/images/pickHero/Wizard.png"),
-                pos=(390, 450),
-                text_input="Wizard",
-                font=get_font(16),
-                base_color=config.COLORS['BUTTON_BASE'],
-                hovering_color="White"
-            )
-            
-            king_button = Button(
-                image=pygame.image.load("data/images/pickHero/King.png"),
-                pos=(570, 270),
-                text_input="King",
-                font=get_font(16),
-                base_color=config.COLORS['BUTTON_BASE'],
-                hovering_color="White"
-            )
-            
-            witch_button = Button(
-                image=pygame.image.load("data/images/pickHero/Witch.png"),
-                pos=(570, 450),
-                text_input="Witch",
-                font=get_font(16),
-                base_color=config.COLORS['BUTTON_BASE'],
-                hovering_color="White"
-            )
-            
-            # Draw all buttons
-            buttons = [lock_button, samurai_button, wizard_button, king_button, witch_button]
-            for button in buttons:
-                button.changeColor(mouse_pos)
-                button.update(self.screen)
-                
-            # Event handling
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-                    
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if lock_button.checkForInput(mouse_pos):
-                        break
-                    if samurai_button.checkForInput(mouse_pos):
-                        hero_picked = "Samurai"
-                    if wizard_button.checkForInput(mouse_pos):
-                        hero_picked = "Wizard"
-                    if king_button.checkForInput(mouse_pos):
-                        hero_picked = "King"
-                    if witch_button.checkForInput(mouse_pos):
-                        hero_picked = "Witch"
-                        
-            pick_text = f"You pick: {hero_picked}"
-            pick_text_rendered = get_font(22).render(pick_text, True, config.COLORS['MENU_TEXT'])
-            player_rect = pick_text_rendered.get_rect(center=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100))
-            self.screen.blit(pick_text_rendered, player_rect)
-            
             pygame.display.update()
             
            
@@ -1019,8 +1029,7 @@ class GameManager:
     
     def run(self,room_udp_port):
         """Main game loop"""
-        self.game_mode = 1 # the game mode is capture the flag
-        if (self.game_mode ==1):
+        if self.game_mode == 1:
             self.base_sign = []
 
         self.display =  pygame.Surface((960,720), pygame.SRCALPHA)
@@ -1161,8 +1170,8 @@ class GameManager:
                         self.scroll[1] +=  (self.player.rect(topleft =  self.player.pos).centery -  self.display.get_height()/2 - self.scroll[1])/30
             render_scroll =  (int(self.scroll[0]),int (self.scroll[1]))
 
-            if (self.game_mode ==1):
-                self.display_base_sign(render_scroll)        
+            # if (self.game_mode ==2):
+            #     self.display_base_sign(render_scroll)        
             self.tilemap.render(self.display, offset =  render_scroll)
             
             #update and render each entity
@@ -1171,7 +1180,7 @@ class GameManager:
                 #                  pygame.Rect(self.player.pos[0]-render_scroll[0], self.player.pos[1]-render_scroll[1],self.player.size[0],self.player.size[1]),
                 #                  1)
                 self.display_username(self.player, render_scroll, config.COLORS["LIGHT_GREEN"])
-                # self.display_score(self.player, self.player.score, render_scroll, config.COLORS["WHITE"])
+                self.display_score(self.player, 0, render_scroll, config.COLORS["WHITE"])
                 self.display_healthbar_staminabar(self.player, render_scroll)
                 self.player.render(self.display,offset = render_scroll)
             
