@@ -590,7 +590,7 @@ void characterSpawner(Player* players, Game *game)
         {
             player2->timeSinceDeath=0;
             player2->action=11;
-            player2->score+=10;
+            player2->score+=100;
         }
     }
     if (attacked==1 && player1->action==2) 
@@ -606,7 +606,7 @@ void characterSpawner(Player* players, Game *game)
         {
             player2->timeSinceDeath=0;
             player2->action=11;
-            player1->score+=10;
+            player1->score+=100;
         }
     }
 
