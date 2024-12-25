@@ -1653,3 +1653,55 @@ int userAlreadyLoggedIn(User *head, int user_id){
 
     return 0;
 }
+
+User *findUserInLoggedInListById(User *head, int user_id){
+    if(head == NULL) return NULL;
+
+    User *p = head;
+    while(p != NULL){
+        if(p->id == user_id){
+            break;
+        }
+
+        p = p->next;
+    }
+
+    return p;
+}
+
+// - function to remove a user from the list of logged in users the room
+// - input: head pointer to the list of logged in users, pointer to the user to remove
+// - output: updated head pointer of the list of logged in users
+User *removeUserFromListOfLoggedIn(User *head, User *removeUser){
+    // if list of users empty
+    if(head == NULL){
+        return NULL;
+    }
+
+    // if we need to remove head
+    if(head == removeUser){
+        head = head->next;
+        free(removeUser);
+
+        printf("List of players updated (player to remove was at the head of list)\n");
+        return head;
+    }
+
+    // traverse to find previous node 
+    User *temp = head;
+    while(temp != NULL && temp->next != removeUser){
+        temp = temp->next;
+    }
+
+    // if the player to remove is not found
+    if(temp == NULL){
+        printf("Player not found in the list, list unchanged\n");
+        return head;
+    }
+
+    // remove the node
+    temp->next = removeUser->next;
+    free(removeUser);
+    printf("List of players updated (player to remove was not at head of the list)\n");
+    return head;
+}

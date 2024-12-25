@@ -658,6 +658,20 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
         
         // send response to client
         sendResponse10(connectfd, data, total_length);
+    } else if(message_type == 61) { // '0' + 13 == 61
+        // get user_id 
+        if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+            perror(RED "Error inside handleConnectedClients() getting `user_id`" RESET);
+            return;
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int user_id = buff[0];
+
+        // remove this player from list of logged in users
+        User *p = findUserInLoggedInListById(loggedInUsers, user_id);
+        loggedInUsers = removeUserFromListOfLoggedIn(loggedInUsers, p);
     }
 
     return;
