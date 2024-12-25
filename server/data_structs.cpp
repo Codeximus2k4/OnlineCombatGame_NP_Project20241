@@ -17,6 +17,10 @@
 #define DISTANCE_FROM_ATTACK_HITBOX 30
 #define MAX_HIT_TIME 20
 
+//--------------------------------------------------------------------
+//--------------------- Global variables -----------------------------
+//--------------------------------------------------------------------
+
 
 struct User {
     int id; // user id (queried from database when trying to login)
@@ -1606,6 +1610,7 @@ int scoreTheFlag(Player *player, Game *game)
 User *makeUser(int id){
     User *p = (User *) malloc(sizeof(User));
 
+    p->id = id;
     p->next = NULL;
 
     return p;
