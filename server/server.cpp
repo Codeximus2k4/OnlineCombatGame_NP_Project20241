@@ -35,6 +35,7 @@ int tcp_room_port = 10000; // tcp port for each game room, first used port will 
 int udp_room_port = 20000; // udp port for each game room, first used port will be 20000
 Room *rooms = NULL; // pointer to head of rooms created on server
 int roomCount = 0; // keep track of total rooms created
+User *loggedInUsers = NULL;
 
 /*---------------------------------------------
 Defining functions
@@ -484,21 +485,34 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
         int status;
         int user_id;
 
-        if (check_user(username, password, conn)) { //login succesfully
-            status = 1;
+        if (check_user(username, password, conn)) { // check if this credential exist in database 
+            // get user_id from database
             user_id = get_user_id(username, conn);
 
-            // send response back to client
-            sendResponse2(connectfd, status, user_id);
+            // check if this user is already logged in (somewhere else)
+            if(!userAlreadyLoggedIn(loggedInUsers, user_id)){
+                // logged in successful
+                status = 1;
+
+                // send response back to client
+                sendResponse2(connectfd, status, user_id);
+
+                // update list of logged in users
+                User *p = makeUser(user_id);
+                loggedInUsers = addUserToLoggedInList(loggedInUsers, p);
+            } else {
+                // user already logged in somewhere else, login unsuccessful
+                status = 0;
+
+                sendResponse2(connectfd, status, user_id);
+            }
         }
-        else { //login fail
+        else { // login fail due to wrong crendentials
             status = 0; 
             user_id = -1;
             // send response back to client
             sendResponse2(connectfd, status, user_id);
         }
-
-        // update list of players 
 
     } else if(message_type == '3'){
         // get list room request from client

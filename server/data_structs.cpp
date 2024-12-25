@@ -18,10 +18,12 @@
 #define MAX_HIT_TIME 20
 
 
-// the game room (sub process) manages the list of player in the room
-// int id; // id of player
-// sockaddr_in cliaddr; // IPv4 address corresponding to each player
-// Player *next; // next player in the list
+struct User {
+    int id; // user id (queried from database when trying to login)
+
+    User *next;
+};
+
 int min(int a , int b) {
     if (a < b) return a;
     else return b;
@@ -143,6 +145,10 @@ struct vfx {
 
 // ------------------Class Game and related functions used only by Game defined ------------------
 
+// the game room (sub process) manages the list of player in the room
+// int id; // id of player
+// sockaddr_in cliaddr; // IPv4 address corresponding to each player
+// Player *next; // next player in the list
 struct Player {
     int id; // id of player
     char username[50]; // username of the player
@@ -1232,6 +1238,9 @@ Item *makeItem(int type, int respawn_time, int timeSinceConsumption, Hitbox *hit
     p->respawn_time = respawn_time;
     p->timeSinceConsumption = timeSinceConsumption;
     p->hitbox = hitbox;
+
+    p->next = NULL;
+
     return p;
 }
 
@@ -1358,4 +1367,54 @@ Item* spawnAllItems() {
     items = addItemToListOfItems(items, item5);
 
     return items;
+}
+
+// - function to make a new user server-side 
+// - input: id of user (queried from database)
+// - output: pointer to a new User
+// - dependencies: none
+User *makeUser(int id){
+    User *p = (User *) malloc(sizeof(User));
+
+    p->next = NULL;
+
+    return p;
+}
+
+// - add a user to list of logged in users (server-side) 
+// - input: head pointer to list of logged in users, pointer to a User
+// - output: none
+// - dependencies: none
+User *addUserToLoggedInList(User *head, User *user) {
+    // if there are no users yet
+    if(head == NULL){
+        head = user;
+        return head;
+    }
+
+    // else add to the end of the linked list
+    User *p = head;
+    while(p->next != NULL){
+        p = p->next;
+    }
+
+    p->next = user;
+
+    return head;
+}
+
+// - function to check if a user already logged in to the server
+// - input: pointer to head of User, user id to check
+// - output: 1 if already logged in, 0 otherwise
+int userAlreadyLoggedIn(User *head, int user_id){
+    if(head == NULL) return 0;
+
+    User *p = head;
+    while(p != NULL) {
+        if(p->id == user_id) return 1;
+
+        p = p->next;
+    }
+
+    return 0;
 }
