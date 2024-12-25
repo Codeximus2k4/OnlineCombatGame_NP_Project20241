@@ -54,7 +54,9 @@ class GameManager:
                 'Samurai/attack2': Animation(load_images('entities/Samurai/Attack2'),img_dur = 5, loop = False),
                 'Samurai/death':Animation(load_images('entities/Samurai/Death'),img_dur = 5, loop = False),
                 'Samurai/run':Animation(load_images('entities/Samurai/Run'),img_dur=5, loop = True),
-                'Samurai/jump':Animation(load_images('entities/Samurai/Jump'),img_dur= 5, loop=False)
+                'Samurai/jump':Animation(load_images('entities/Samurai/Jump'),img_dur= 5, loop=False),
+                'Samurai/fall':Animation(load_images('entities/Samurai/Fall'),img_dur= 5, loop=False),
+                'Samurai/take hit':Animation(load_images('entities/Samurai/Take Hit'),img_dur= 5, loop=False)
         }
     
     def setup_background(self):
@@ -847,6 +849,7 @@ class GameManager:
                     if entity_type==0:
                         each.flip = flip
                         each.set_action(action_type,False)
+                        print(action_type)
                         each.health = health
                         each.stamina = stamina  
             if not found_entity:
@@ -863,8 +866,8 @@ class GameManager:
     
     def run(self,room_udp_port):
         """Main game loop"""
-        self.display =  pygame.Surface((640,480), pygame.SRCALPHA)
-        self.display_2 =  pygame.Surface((640,480))
+        self.display =  pygame.Surface((960,720), pygame.SRCALPHA)
+        self.display_2 =  pygame.Surface((960,720))
 
         # Set up the NetworkManager for UDP communication
         print(f"Room UDP port: {room_udp_port}")
@@ -915,12 +918,6 @@ class GameManager:
                         self.player = each
                         print("found player")
                         break
-            if self.player is not None:
-                    self.scroll[0] +=  (self.player.rect(topleft =  self.player.pos).centerx -  self.display.get_width()/2 - self.scroll[0])/30
-                    self.scroll[1] +=  (self.player.rect(topleft =  self.player.pos).centery -  self.display.get_height()/2 - self.scroll[1])/30
-            render_scroll =  (int(self.scroll[0]),int (self.scroll[1]))
-                
-            self.tilemap.render(self.display, offset =  render_scroll)
             
         # ------- Read inputs from player and send client to server --------
             msg= self.user_id.to_bytes(1, "big")
@@ -978,7 +975,11 @@ class GameManager:
             
         # get player size
             if self.player is not None:
-                msg += self.player.size[0].to_bytes(1,"big") + self.player.size[1].to_bytes(1,"big")
+                if (action==1 or action==2):
+                    size = self.player.predict_next_frame_size(action)
+                    msg +=size[0].to_bytes(1,"big") +size[1].to_bytes(1,"big")
+                else:
+                    msg += self.player.size[0].to_bytes(1,"big") + self.player.size[1].to_bytes(1,"big")
             else :
                 msg += self.player_default_size[0].to_bytes(1,"big")+self.player_default_size[1].to_bytes(1,"big")
         # Send message to server
@@ -997,21 +998,24 @@ class GameManager:
                 pass
             if len(data)!=0:
                 self.de_serialize_entities(data)
-
         # Camera offset to get player to the center of the screen
+            if self.player is not None:
+                        self.scroll[0] +=  (self.player.rect(topleft =  self.player.pos).centerx -  self.display.get_width()/2 - self.scroll[0])/30
+                        self.scroll[1] +=  (self.player.rect(topleft =  self.player.pos).centery -  self.display.get_height()/2 - self.scroll[1])/30
+            render_scroll =  (int(self.scroll[0]),int (self.scroll[1]))
+                    
+            self.tilemap.render(self.display, offset =  render_scroll)
             #update and render each entity
             if self.player is not None:
                 print(self.player.pos)
-                self.player.update(self.tilemap, [self.horizontal_movement[0]-self.horizontal_movement[1],0])
-                pygame.draw.rect(self.display, (255,0,0),
-                                 pygame.Rect(self.player.pos[0]-render_scroll[0], self.player.pos[1]-render_scroll[1],self.player.size[0],self.player.size[1]),
-                                 1)
+                # pygame.draw.rect(self.display, (255,0,0),
+                #                  pygame.Rect(self.player.pos[0]-render_scroll[0], self.player.pos[1]-render_scroll[1],self.player.size[0],self.player.size[1]),
+                #                  1)
                 self.display_healthbar_staminabar(self.player, render_scroll)
                 self.player.render(self.display,offset = render_scroll)
             
             for each in self.entities:
                 if each is not self.player:
-                    each.update(self.tilemap, [0,0])
                     each.render(self.display,offset = render_scroll)
                     if isinstance(each, Player):
                         self.display_healthbar_staminabar(each, render_scroll)

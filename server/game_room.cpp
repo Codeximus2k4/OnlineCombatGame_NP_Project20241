@@ -28,6 +28,7 @@
 #define TICK_RATE 25
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
 
+
 // Define color escape codes for colorful text
 #define RESET   "\033[0m"
 #define BOLD    "\033[1m"
@@ -336,10 +337,10 @@ void *listenFromClients(void *arg){
             return 0;
         }
         //else printf("Received something\n");
-        buff[rcvBytes] = '\0';
-        for (int i = 0;i<rcvBytes;i++) printf("%d",buff[i]);
-        printf("\n");
-        printf("received: %d\n",rcvBytes);
+        // buff[rcvBytes] = '\0';
+        // for (int i = 0;i<rcvBytes;i++) printf("%d",buff[i]);
+        // printf("\n");
+        // printf("received: %d\n",rcvBytes);
         // get player_id of this data
         int player_id = buff[0];
         
@@ -668,6 +669,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     game->game_mode=0; //game mode 0  for deathmatch, game mode 1 for capture the flag
     game->gravity=5;
     game->items = NULL;
+    game->respawn_time=3;
     game->players =  players;
     if (game->game_mode==1){
         game->Score_team1 = 0;
@@ -675,7 +677,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         }
     game->traps= NULL;
     total_players =  countPlayerInRoom(players);
-    characterSpawner(game->players);
+    characterSpawner(game->players, game);
     // set up a number of buffer for each client
     
     char send_buffer[1024];
@@ -699,6 +701,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         // Listen from each client
         if (elapsed_ms >TICK_RATE)
         {
+            characterSpawner(game->players, game);
             int client_responded =0;
             // if no client has responded do not move the game state forward
             // Parsing message from player input and update player state
@@ -722,9 +725,9 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     interaction =  each->input_buffer[4];
                     sizex =  each->input_buffer[5];
                     sizey =  each->input_buffer[6];
-                    printf("input:");
-                    for (int i = 0;i<7;i++) printf("%d",each->input_buffer[i]);
-                    printf("\n");
+                    // printf("input:");
+                    // for (int i = 0;i<7;i++) printf("%d",each->input_buffer[i]);
+                    // printf("\n");
                     Player* player =  findPlayerInRoomById(game->players, id);
                     if (player ==NULL) 
                     {
@@ -757,10 +760,38 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                check_player_contact(temp,game->tilemap);
             }
             // update player
-            byteSerialized=0;
             for (temp=game->players;temp!=NULL;temp= temp->next)
             {
                 update_player(temp,game);
+            }
+            Player *player1, *player2;
+            for (player1= game->players;player1!=NULL;player1= player1->next)
+            {
+                if (player1->health <=0) continue;
+                for (player2 = game->players;player2 !=NULL;player2=player2->next)
+                {
+                    if (player2->health<=0) continue;
+                    if (player1==player2) continue;
+                    else if (player1->timeSinceAttack== player1->HitFrame && player2->timeSinceAttack>player2->HitFrame) {
+                        if (player1->isFacingLeft) 
+                        {
+                            player1->attackHitBox->offset_x = player1->posx;
+                            player1->attackHitBox->offset_y = player1->posy;
+                        }
+                        else
+                        {
+                            player1->attackHitBox->offset_x = player1->posx+DISTANCE_FROM_ATTACK_HITBOX;
+                            player1->attackHitBox->offset_y =  player1->posy;
+                        }
+                        check_attack(player1, player2);
+                    }
+                }
+            }
+
+            // Packaging payload
+            byteSerialized=0;
+            for (temp=game->players;temp!=NULL;temp= temp->next)
+            {
                 byteSerialized = serialize_player_info(send_buffer, byteSerialized, temp);
             }
             int byteSent = 0;
