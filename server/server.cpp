@@ -570,7 +570,6 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
 
             // notify back to client
             sendResponse4(connectfd, room_id, tcp_room_port);
-            
 
             // update room count and room ports
             roomCount++;
