@@ -876,7 +876,7 @@ class GameManager:
     def de_serialize_entities(self, data):
         index = 0
         length =  len(data)
-        print(f"Analyzing payload of length {length}")
+        #print(f"Analyzing payload of length {length}")
         while (1):
 
             if index >= length: 
