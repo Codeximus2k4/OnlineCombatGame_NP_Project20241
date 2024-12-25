@@ -439,7 +439,7 @@ void update_player(Player* player, Game *game)
         if (player->timeSinceAttack>player->HitFrame && (player->action==1 ||player->action==2)) player->action =0; //end attack
 
         if (player->collisiony !=2 && player->vertical_velocity>0 
-        && player->action==4) player->action = 6;
+        && player->action!=2 && player->action!=1) player->action = 6;
 
         if (player->action == 4 || player->action==6) player->speed = 4;
         else if (player->action==1 || player->action==2) 
@@ -448,7 +448,7 @@ void update_player(Player* player, Game *game)
         }
         else
         {
-            player->speed=5;
+            player->speed=6;
         }
         
         if (player->movement_x!=0 && player->collisiony==2 && player->action==0) 
@@ -469,14 +469,14 @@ void update_player(Player* player, Game *game)
         {
             player->action=1;
             player->timeSinceAttack=0;
-            player->stamina = max(player->stamina -10,0);
+            player->stamina = max(player->stamina -20,0);
         } 
 
         if (player->proposed_action==2 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=20) 
         {
             player->action=2;
             player->timeSinceAttack = 0;
-            player->stamina = max(player->stamina -20,0);
+            player->stamina = max(player->stamina -40,0);
         } 
 
         // align the position according to the previous frame first
@@ -532,7 +532,7 @@ void update_player(Player* player, Game *game)
         player->selfHitBox->height =  player->sizey;
 
         //update stamina
-        player->stamina = min(player->stamina+5, 100);
+        player->stamina = min(player->stamina+1, 100);
 
         //update the flag position if the player is holding the flag
         if (player->flagTaken!=NULL) 
@@ -633,6 +633,7 @@ void assign_players_to_team(Game *game)
             else temp->team=2;
             index++;
             temp->timeSinceDeath=game->respawn_time+1;
+            temp->health=0;
         }
     }
     else 
@@ -641,6 +642,7 @@ void assign_players_to_team(Game *game)
         {
             temp->team = 0;
             temp->timeSinceDeath=game->respawn_time+1;
+            temp->health=0;
         }
     }
 }
@@ -672,7 +674,7 @@ void characterSpawner(Player* players, Game *game)
                 temp->char_type=0;        
                 temp->is_falling = 0; 
                 temp->Hit = 0;
-                temp->timeSinceDeath=121;
+                temp->timeSinceDeath=game->respawn_time+1;
                 temp->vertical_velocity = 0;
                 temp->sizex = 50;
                 temp->sizey = 60;

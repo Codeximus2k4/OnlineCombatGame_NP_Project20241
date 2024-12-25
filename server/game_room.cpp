@@ -27,9 +27,9 @@
 
 #define TICK_RATE 25
 #define BUFF_SIZE 1024 // MAX UDP packet size is 1500 bytes
-#define GAME_TIME 90 // MAX time for a match
+#define GAME_TIME 90 // MAX time for a match in time
 #define GRAVITY 5
-#define RESPAWN_TIME 120
+#define RESPAWN_TIME 360 // max number of game loops to respawn a player
 #define FLAG_SCORE_LIMIT 2 // max score limit for capture the flag
 
 // Define color escape codes for colorful text
@@ -860,8 +860,11 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         player->sizex=sizex;
                         player->sizey=sizey;
                         player->movement_x=movementx;
-                        if (movementx==1) player->isFacingLeft = false;
-                        if (movementx==2) player->isFacingLeft= true;
+                        if (player->action!=11)
+                        {
+                            if (movementx==1) player->isFacingLeft = false;
+                            if (movementx==2) player->isFacingLeft= true;
+                        }
                         player->movement_y=movementy;
                         player->proposed_action=action; // handle change in animation first
                         //handleInteraction(player, interaction);
