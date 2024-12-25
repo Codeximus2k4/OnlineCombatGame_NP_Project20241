@@ -4,8 +4,10 @@ import pygame
 BASE_IMG_PATH =  'data/images'
 
 class PhysicsEntity:
-    def __init__(self, game, id, entity_type, entity_class,  pos,flip):
+    def __init__(self, game, id, entity_type, entity_class,  pos,flip, team =0 ):
         self.game =  game
+        self.team = 0
+        self.score =0
         self.id =  id
         self.entity_type= entity_type
         self.entity_class = entity_class
@@ -64,8 +66,8 @@ class PhysicsEntity:
     def render(self,surf, offset = (0,0)):
             surf.blit(pygame.transform.flip(self.animation.get_img(),self.flip, False),dest = (self.pos[0]-offset[0],self.pos[1]-offset[1]))
 class Player(PhysicsEntity):
-    def __init__(self, game, id, entity_class, posx, posy,health, stamina ):
-        super().__init__(game, id, 0, entity_class, (posx, posy),flip=False)
+    def __init__(self, game, id, entity_class, posx, posy,health, stamina ,team):
+        super().__init__(game, id, 0, entity_class, (posx, posy),flip=False,team=team)
         self.health =  health
         self.stamina = stamina
         self.action_type=0

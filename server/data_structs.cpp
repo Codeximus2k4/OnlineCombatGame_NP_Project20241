@@ -159,6 +159,7 @@ struct Player {
     Hitbox *selfHitBox, *attackHitBox; //
     char input_buffer[256]; // input buffer of each player
     int bytes_received;
+    int team;
 
     Player *next; // next player in the list
 
@@ -540,6 +541,24 @@ int serialize_player_info(char *send_buffer, int byteSerialized, Player *player)
     send_buffer[byteSerialized]=  player->stamina;
     byteSerialized++;
 
+    if (player->team==0)
+    {
+    int t1 =  player->score/256;
+    send_buffer[byteSerialized]=  t1;
+    byteSerialized++;
+
+    int t2 =  player->score%256;
+    send_buffer[byteSerialized]=  t2;
+    byteSerialized++;
+    }
+    else 
+    {
+        send_buffer[byteSerialized]=  player->team;
+        byteSerialized++;
+
+        send_buffer[byteSerialized]=  player->score;
+        byteSerialized++;
+    }
     return byteSerialized;
 }
 void characterSpawner(Player* players, Game *game)

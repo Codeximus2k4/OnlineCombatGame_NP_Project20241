@@ -938,6 +938,29 @@ class GameManager:
                 else:   
                     stamina =  data[index]
                     index+=1
+
+                team=0
+                if self.game_mode==1:
+                    if index>= length-1:
+                        print("Payload is missing score")
+                        break
+                    else:
+                        score = data[index]*256 + data[index+1]
+                        index+=2
+                elif self.game_mode==2:
+                    if index>=length:
+                        print("Payload is missing team")
+                        break
+                    else:   
+                        team =  data[index]
+                        index+=1
+                    
+                    if index>=length:
+                        print("Payload is missing score")
+                        break
+                    else:   
+                        score =  data[index]
+                        index+=1
             
             found_entity = False
             for each in self.entities:
@@ -952,10 +975,12 @@ class GameManager:
                         print(action_type)
                         each.health = health
                         each.stamina = stamina  
+                    each.score=score
+                    each.team =team
             if not found_entity:
                 if entity_type==0:
-                    new_player =  Player(game= self, id = id, entity_class=entity_class,posx = posx
-                                         , posy=posy, health=health, stamina=stamina)
+                    new_player =  Player(game = self, id = id, entity_class=entity_class,posx = posx
+                                         , posy=posy, health=health, stamina=stamina, team =team)
                     new_player.set_action(0, True)
                     self.entities.append(new_player)
             #print(f"There are {len(self.entities)} in game")
