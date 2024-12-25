@@ -1400,6 +1400,7 @@ Item* spawnAllItems() {
 User *makeUser(int id){
     User *p = (User *) malloc(sizeof(User));
 
+    p->id = id;
     p->next = NULL;
 
     return p;
