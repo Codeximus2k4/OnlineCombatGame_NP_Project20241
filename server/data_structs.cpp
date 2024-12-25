@@ -417,14 +417,14 @@ void update_player(Player* player, Game *game)
 
         player->timeSinceAttack = min(player->timeSinceAttack+1, player->attack_cooldown+1);
 
-        if (player->proposed_action==1 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown) 
+        if (player->proposed_action==1 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=10) 
         {
             player->action=1;
             player->timeSinceAttack=0;
             player->stamina = max(player->stamina -10,0);
         } 
 
-        if (player->proposed_action==2 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown) 
+        if (player->proposed_action==2 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=20) 
         {
             player->action=2;
             player->timeSinceAttack = 0;
@@ -584,11 +584,13 @@ void characterSpawner(Player* players, Game *game)
         {
             player2->action=10;
             player2->HitTime=0;
+            player1->score+=5;
         }
         else 
         {
             player2->timeSinceDeath=0;
             player2->action=11;
+            player2->score+=10;
         }
     }
     if (attacked==1 && player1->action==2) 
@@ -598,11 +600,13 @@ void characterSpawner(Player* players, Game *game)
         {
             player2->action=10;
             player2->HitTime=0;
+            player1->score+=5;
         }
         else 
         {
             player2->timeSinceDeath=0;
             player2->action=11;
+            player1->score+=10;
         }
     }
 
