@@ -40,6 +40,8 @@ class GameManager:
         self.udp_room_socket =None
         self.udp_room_port =None
 
+        self.id_to_username = {}
+
     def load_assets(self):
         """Load game assets"""
         self.assets = {
@@ -72,23 +74,18 @@ class GameManager:
     def login_screen(self):
         """Render login/registration screen"""
         # Constants
-        BG_PATH = "data/images/menuAssets/Background.png"
-        FONT_PATH = "data/images/menuAssets/font.ttf"
         SCREEN_WIDTH, SCREEN_HEIGHT = 400, 300
         COLOR_ACTIVE = pygame.Color('lightskyblue3')
         COLOR_PASSIVE = pygame.Color('white')
         DISPLAY_LIMIT = 10  # Display only the last 10 characters
-        BUFF_SIZE = 1024
-        SERVER_ADDR = "127.0.0.1"
-        SERVER_PORT = 5500
 
         # Initialize Pygame and Font
         pygame.init()
         clock = pygame.time.Clock()
         screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
-        base_font = pygame.font.Font(FONT_PATH, 15)
-        base_bg = pygame.image.load(BG_PATH)
-        response_font = pygame.font.Font(FONT_PATH, 12)
+        base_font = pygame.font.Font(config.FONT_PATH, 15)
+        base_bg = pygame.image.load(config.BACKGROUND_PATH)
+        response_font = pygame.font.Font(config.FONT_PATH, 12)
 
         # Interface Mode (login or register)
         mode = "login"
@@ -534,11 +531,23 @@ class GameManager:
                     num_players = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
                     num_players = ord(num_players)
                     while num_players:
-                        player_id = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
+                        # Get the username length of the player
+                        username_length = room_tcp_socket.receive_tcp_message(buff_size=1).decode() 
+                        username_length = ord(username_length)
+
+                        # Get the username of the player
+                        username = room_tcp_socket.receive_tcp_message(buff_size=username_length).decode()
+
+                        # Get the player id of the player
+                        player_id = room_tcp_socket.receive_tcp_message(buff_size=1)
                         player_id = ord(player_id)
+
+                        # Get the ready status of the player
                         ready_status = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
                         ready_status = ord(ready_status)
-                        new_players.append({"player_id": player_id, "ready": ready_status})
+
+                        # get the list of players
+                        new_players.append({"player_id": player_id,"username": username, "ready": ready_status})
                         num_players = num_players - 1
                 return new_players
             except Exception as e:
@@ -594,7 +603,7 @@ class GameManager:
                 # Display player list
                 y_offset = 200
                 for player in players:
-                    player_text = f"Player {player['player_id']} - {'Ready' if player['ready'] else 'Not Ready'}"
+                    player_text = f"{player['username']} - {'Ready' if player['ready'] else 'Not Ready'}"
                     player_text_rendered = get_font(25).render(player_text, True, config.COLORS['MENU_TEXT'])
                     player_rect = player_text_rendered.get_rect(center=(config.SCREEN_WIDTH // 2, y_offset))
                     self.screen.blit(player_text_rendered, player_rect)
@@ -643,6 +652,8 @@ class GameManager:
             update_thread.join() # Wait for the thread to finish
             room_tcp_socket.close()
             if udp_room_port:
+                for player in players:
+                    self.id_to_username[player["player_id"]] = player["username"]
                 self.run(room_udp_port=udp_room_port)
 
 
@@ -1011,6 +1022,8 @@ class GameManager:
                 # pygame.draw.rect(self.display, (255,0,0),
                 #                  pygame.Rect(self.player.pos[0]-render_scroll[0], self.player.pos[1]-render_scroll[1],self.player.size[0],self.player.size[1]),
                 #                  1)
+                self.display_username(self.player, render_scroll, config.COLORS["LIGHT_GREEN"])
+                # self.display_score(self.player, self.player.score, render_scroll, config.COLORS["WHITE"])
                 self.display_healthbar_staminabar(self.player, render_scroll)
                 self.player.render(self.display,offset = render_scroll)
             
@@ -1018,6 +1031,8 @@ class GameManager:
                 if each is not self.player:
                     each.render(self.display,offset = render_scroll)
                     if isinstance(each, Player):
+                        self.display_username(each, render_scroll, config.COLORS["BLUE"])
+                        # self.display_score(each, each.score, render_scroll, config.COLORS["WHITE"])
                         self.display_healthbar_staminabar(each, render_scroll)
 
             self.display_2.blit(self.display, (0,0))
@@ -1030,10 +1045,65 @@ class GameManager:
         Display healthbar and stamina bar of players\n
         Args:
         - player: the player who need to display his/her health and stamina status
+        - render_scroll: To modify the position of the bars
         """
-        pygame.draw.rect(self.display, (255, 0, 0), (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-17, 50, 7))
-        pygame.draw.rect(self.display, (0, 255, 0), (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-17, (50/100) * (player.health), 7))
-        pygame.draw.rect(self.display, (255, 255, 0), (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-7, (50/100) * (player.stamina), 3))
+        # Display health loss
+        pygame.draw.rect(self.display, config.COLORS['RED'], (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-17, 50, 7))
+        
+        # Display current health
+        pygame.draw.rect(self.display, config.COLORS['LIGHT_GREEN'], (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-17, (50/100) * (player.health), 7))
+        
+        # Display stamina
+        pygame.draw.rect(self.display, config.COLORS['YELLOW'], (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-7, (50/100) * (player.stamina), 3))
+
+    def display_username(self, player: Player, render_scroll, color):
+        """
+        Display the username above the health bar of the player.
+        
+        Args:
+        - player: The player whose username needs to be displayed.
+        - render_scroll: To modify the position of the username.
+        - color: The color of the username text.
+        """
+        username = self.id_to_username.get(player.id, "")
+
+        # Load the font and render the username text
+        username_font = pygame.font.Font(config.FONT_PATH, 10)
+        username_text = username_font.render(username, True, color)
+        
+        # Calculate the position of the username (above the health bar)
+        username_rect = username_text.get_rect(center=(
+            player.pos[0] - render_scroll[0] + 25,  # Center above the health bar
+            player.pos[1] - render_scroll[1] - 25  # Positioned slightly above the health bar
+        ))
+        
+        # Blit the username onto the display
+        self.display.blit(username_text, username_rect)
+
+    def display_score(self, player: Player, score, render_scroll, color):
+        """
+        Display the player's score next to the right of the health bar.
+        
+        Args:
+        - score: The score to display.
+        - player: The player whose score needs to be displayed.
+        - render_scroll: To modify the position of the score.
+        - color: The color of the score text.
+        """
+        # Load the font and render the score text
+        score_font = pygame.font.Font(config.FONT_PATH, 10)
+        score_text = score_font.render(f"Score: {score}", True, color)
+        
+        # Calculate the position of the score (next to the right of the health bar)
+        score_rect = score_text.get_rect(topleft=(
+            player.pos[0] - render_scroll[0] + 55,  # Positioned to the right of the health bar
+            player.pos[1] - render_scroll[1] - 17  # Align vertically with the health bar
+        ))
+        
+        # Blit the score onto the display
+        self.display.blit(score_text, score_rect)
+
+
 
 if __name__ == "__main__":
     GameManager().menu()
