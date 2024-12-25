@@ -45,6 +45,7 @@ Defining global variables
 -----------------------------------------------
 */
 Player *players = NULL; // list of players in this room
+Game *game = (Game*) malloc(sizeof(Game));
 
 /*---------------------------------------------
 Defining functions
@@ -246,51 +247,6 @@ void sendResponse6(int connectfd, int status){
     printf(YELLOW "Bytes sent to client=%d, type=%c, status=%c\n" RESET, sendBytes, data[0], data[1]);
 }
 
-// function to handle data when connected clients want to send something to server (for e.g: player ready state)
-// - handle request type 7 from clients
-void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
-    char key;
-    char payload[BUFF_SIZE + 1];
-    char packet[BUFF_SIZE + 1];
-    int sendBytes;
-    int recvBytes;
-
-    // print log
-    printf("connected client with socket %d sendt request type 7\n", clientfd);
-
-    // get opcode 
-    char opcode = buff[0];
-
-    if(opcode == '7'){
-        // get user_id
-        if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
-            perror(RED "Error inside handleConnectedClients() getting `user_id`" RESET);
-            return;
-        } else if(recvBytes == 0){
-            fprintf(stdout, "Client closes connection\n");
-            return;
-        }
-        int player_id = buff[0];
-
-        // get ready
-        if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
-            perror(RED "Error inside handleConnectedClients() getting `ready`" RESET);
-            return;
-        } else if(recvBytes == 0){
-            fprintf(stdout, "Client closes connection\n");
-            return;
-        }
-        int ready = buff[0];
-
-        // update internal linked list
-        Player *correspondingPlayer = findPlayerInRoomById(players, player_id);
-        correspondingPlayer->ready = ready;
-        printf("Player with id %d has ready status %d\n",correspondingPlayer->id, correspondingPlayer->ready);
-    } else if(opcode == '11'){
-
-    } 
-}
-
 // - function to send players in the room all information in the waiting room
 // - input: socket descriptor connected to client, the head of the player list
 void sendResponse8(int connectfd, Player *players){
@@ -322,6 +278,128 @@ void sendResponse8(int connectfd, Player *players){
     
     // print to check
     printf(YELLOW "Bytes sent to client=%d, type=%c\n" RESET, sendBytes, packet[0]);
+}
+
+// - function to send response 11 from server to all players in the game room
+// - input: game mode of the game 
+// - output: none
+// - dependencies: 
+void sendResponse11(int game_mode){
+    char packet[5];
+    int sendBytes;
+
+    memset(packet, 0, sizeof(packet));
+
+    // init data
+    packet[0] = '0' + 11; // first byte is request type
+    packet[1] = (char) game_mode; // second byte is game_mode
+
+    // send data to all clients in the waiting room
+    Player *p = players;
+    while(p != NULL){
+        if( (sendBytes = send(p->socket_descriptor, packet, 2, 0)) < 0){
+            perror(RED "(Response 11) Error sending data" RESET);
+        };
+        
+        // move to next player
+        p = p->next;
+    }
+    
+    // print to check
+    printf(YELLOW "Bytes sent to each client=%d, type=%c, game_mode=%c\n" RESET, sendBytes, packet[0], packet[1]);
+}
+
+// - function to handle data when connected clients want to send something to server (for e.g: player ready state)
+// - input: socket descriptor connected to the client, buffer (contains request type from client)
+// - output: none
+// - dependencies: 
+void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
+    char key;
+    char payload[BUFF_SIZE + 1];
+    char packet[BUFF_SIZE + 1];
+    int sendBytes;
+    int recvBytes;
+
+    // get opcode 
+    char opcode = buff[0];
+
+    // print log
+    printf("(In game room) Connected client with socket %d sent request type %c\n", clientfd, opcode);
+
+    if(opcode == '7'){
+        // get user_id
+        if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
+            perror(RED "Error inside handleConnectedClients() getting `user_id`" RESET);
+            return;
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int player_id = buff[0];
+
+        // get ready
+        if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
+            perror(RED "Error inside handleConnectedClients() getting `ready`" RESET);
+            return;
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int ready = buff[0];
+
+        // update internal linked list
+        Player *correspondingPlayer = findPlayerInRoomById(players, player_id);
+        correspondingPlayer->ready = ready;
+        printf("Player with id %d has ready status %d\n",correspondingPlayer->id, correspondingPlayer->ready);
+
+    } else if(opcode == '11'){
+        // get user_id 
+        if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
+            perror(RED "Error inside handleConnectedClients() getting `user_id`" RESET);
+            return;
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int player_id = buff[0];
+
+        // get game_mode choice from user and update in Game struct
+        if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
+            perror(RED "Error inside handleConnectedClients() getting `game_mode`" RESET);
+            return;
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        game->game_mode = buff[0];
+
+        // send response back to all players about this change of game mode
+        sendResponse11(game->game_mode);
+    } else if(opcode == '12'){
+        // get user_id 
+        if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
+            perror(RED "Error inside handleConnectedClients() getting `user_id`" RESET);
+            return;
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int player_id = buff[0];
+
+        // get hero id choice from user and update in Game struct
+        if( (recvBytes = recv(clientfd, buff, 1, 0)) < 0){
+            perror(RED "Error inside handleConnectedClients() getting `game_mode`" RESET);
+            return;
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int hero_id = buff[0];
+
+        // store choice of hero_id for the corresponding player
+        Player *p = findPlayerInRoomBySocketDescriptor(players, clientfd);
+        p->char_type = hero_id;
+    }
 }
 
 // - function to handle listening data from client using thread
@@ -672,7 +750,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         else continue;
     }
     //------------------ Initialize the game first ------------------
-    Game *game =  (Game*) malloc(sizeof(Game));
+    // Game *game =  (Game*) malloc(sizeof(Game)); // ALREADY DECLARED AS GLOBAL VARIABLE
     game->map = 4;
     game->tilemap =  loadTilemap(16, game->map);
     if (game->tilemap==NULL) 
