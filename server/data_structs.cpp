@@ -634,6 +634,7 @@ void assign_players_to_team(Game *game)
             index++;
             temp->timeSinceDeath=game->respawn_time+1;
             temp->health=0;
+            temp->score= 0;
         }
     }
     else 
@@ -654,7 +655,6 @@ void characterSpawner(Player* players, Game *game)
         if (temp->health<=0 && temp->timeSinceDeath>=game->respawn_time) // This character just died or just got into the game, needs to be spawned
         {
                 temp->flagTaken = NULL;
-                temp->score = 0;
                 temp->posx = 500;
                 temp->posy = 420;
                 temp->health=100;
