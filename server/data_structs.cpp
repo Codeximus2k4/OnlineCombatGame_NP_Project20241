@@ -686,7 +686,6 @@ struct Room {
     int tcp_port; // TCP port assign for each game room to handle client connection
     int udp_port; // UDP port assign for each game room to transfer data
     int started; 
-    int ready;
     int total_players;
     Room *next;
 };
@@ -910,6 +909,13 @@ void serializeRoomInformation(char result[], Room *head){
 
     Room *p = head;
     while(p != NULL){
+
+        //check if the room is started or not?
+        if (p->started == 1) {
+            p = p->next;
+            continue;
+        }
+        
         // set first byte to room_id
         snprintf(strnum, sizeof(strnum), "%d", p->id);
         strcat(result, strnum);
@@ -932,18 +938,13 @@ void serializeRoomInformation(char result[], Room *head){
     // printf("result=%s\n", result);
 }
 
-// message format: [room_id][num_players_in_room][started]
+// message format: [room_id][num_players_in_room]
 // input: the message, the room_id, the head of the player list
 void serializeIpcMsg(ipc_msg *message, int room_id, Player *head) {
-    int ready = 0; //the ready state of the room
     message->type = 1;
     message->text[0] = room_id + '0';
     message->text[1] = countPlayerInRoom(head) + '0';
-    int num_players_ready = countPlayerReadyInRoom(head);
-    if (num_players_ready == 4) ready = 1; //full 4 players are ready
-    else ready = 0;
-    message->text[2] = ready + '0';
-    message->text[3] = '\0';
+    message->text[2] = '\0';
 }
 
 // - function to find room by id
