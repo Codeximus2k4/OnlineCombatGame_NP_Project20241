@@ -465,18 +465,18 @@ void update_player(Player* player, Game *game)
 
         player->timeSinceAttack = min(player->timeSinceAttack+1, player->attack_cooldown+1);
 
-        if (player->proposed_action==1 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=10) 
+        if (player->proposed_action==1 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>30) 
         {
             player->action=1;
             player->timeSinceAttack=0;
-            player->stamina = max(player->stamina -20,0);
+            player->stamina = max(player->stamina -30,0);
         } 
 
-        if (player->proposed_action==2 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=20) 
+        if (player->proposed_action==2 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=50) 
         {
             player->action=2;
             player->timeSinceAttack = 0;
-            player->stamina = max(player->stamina -40,0);
+            player->stamina = max(player->stamina -50,0);
         } 
 
         // align the position according to the previous frame first
@@ -709,7 +709,7 @@ void check_attack(Player *player1, Player *player2)
     printf("player id %d is hit? %d\n",player2->id, attacked);
     if (attacked==1 && player1->action==1) 
     {
-        player2->health = max(player2->health-10, 0);
+        player2->health = max(player2->health-30, 0);
         player2->action=10;
         if (player2->health>0) 
         {
@@ -731,7 +731,7 @@ void check_attack(Player *player1, Player *player2)
     }
     if (attacked==1 && player1->action==2) 
     {
-        player2->health = max(player2->health-20, 0);
+        player2->health = max(player2->health-50, 0);
         if (player2->health>0)
         {
             player2->action=10;
