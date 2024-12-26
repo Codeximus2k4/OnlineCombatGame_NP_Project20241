@@ -825,7 +825,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                             + (current_time.tv_nsec - last_tick.tv_nsec)/1000000;
         
         // if the time surpassed limit , end the match
-        if (game->game_mode ==1 && current_time.tv_sec - start_time.tv_sec >= GAME_TIME) 
+        if (current_time.tv_sec - start_time.tv_sec >= GAME_TIME) 
         {
             printf("Time limit reached, the match is ending ...\n");
             break; // should implement some catch error on the client side to know when the game ends
