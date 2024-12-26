@@ -327,7 +327,7 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
     char opcode = buff[0];
 
     // print log
-    printf("(In game room) Connected client with socket %d sent request type %c\n", clientfd, opcode);
+    printf(BLUE "[+] (In game room) Connected client with socket %d sent request type %c\n" RESET, clientfd, opcode);
 
     if(opcode == '7'){
         // get user_id
@@ -375,7 +375,6 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
             return;
         }
         game->game_mode = buff[0];
-        game->game_mode -= '0'; // convert back to int
 
         // send response back to all players about this change of game mode
         sendResponse11(game->game_mode);
@@ -402,7 +401,7 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
 
         // store choice of hero_id for the corresponding player
         Player *p = findPlayerInRoomBySocketDescriptor(players, clientfd);
-        p->char_type = hero_id - '1'; // convert back to int
+        p->char_type = hero_id;
         printf("hero id : %d\n",p->char_type);
     }
 }
