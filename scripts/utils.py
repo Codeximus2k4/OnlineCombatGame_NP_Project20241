@@ -355,6 +355,29 @@ def hero_request(user_id: int, hero_id: str, hero_socket: NetworkManager):
     # Send the request to the server
     hero_socket.send_tcp_message(message)
 
+def logout_request(user_id: int):
+    """Message type 13: Requst log out"""
+    # Message components
+    request_type = 61 # Request type 13
+    user_id = user_id
+
+    # Convert to bytes and combine into 1 message
+    request_type_byte = bytes([request_type])
+    user_id_byte = bytes([user_id])
+    message = request_type_byte + user_id_byte
+
+    # Connect to the server
+    logout_socket = NetworkManager(
+        server_addr=config.SERVER_ADDR,
+        server_port=config.SERVER_PORT
+    )
+    logout_socket.connect()
+
+    # Send the message to the server
+    logout_socket.send_tcp_message(message)
+    logout_socket.close()
+
+
 class Animation:
     def __init__(self, images ,img_dur = 5, loop =True):
         self.images=  images

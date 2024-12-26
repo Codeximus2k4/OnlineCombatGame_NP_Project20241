@@ -13,8 +13,7 @@ from scripts.button import Button
 from scripts.tilemap  import Tilemap
 
 class GameManager:
-    def __init__(self,network_manager: NetworkManager):
-        self.network = network_manager
+    def __init__(self):
         self.screen = pygame.display.set_mode((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
         pygame.display.set_caption('combat game')
         
@@ -312,6 +311,7 @@ class GameManager:
             
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    logout_request(self.user_id)
                     pygame.quit()
                     sys.exit()
                 
@@ -320,6 +320,7 @@ class GameManager:
                         self.game_mode_screen()
                     
                     if quit_button.checkForInput(mouse_pos):
+                        logout_request(self.user_id)
                         pygame.quit()
                         sys.exit()
 
@@ -374,6 +375,7 @@ class GameManager:
             
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    logout_request(self.user_id)
                     pygame.quit()
                     sys.exit()
                 
@@ -503,6 +505,7 @@ class GameManager:
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    logout_request(self.user_id)
                     pygame.quit()
                     sys.exit()
 
@@ -574,7 +577,7 @@ class GameManager:
                     message_type = ord(message_type)
                     print(f"Message type: {message_type}")
                     game_mode = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
-                    print(f"Game mode: {game_mode}")
+                    print(f"Listened game mode: {game_mode}")
                     if game_mode == "1":
                         self.game_mode = 1
                     elif game_mode == "2":
@@ -721,6 +724,7 @@ class GameManager:
                     if event.type == pygame.QUIT:
                         stop_thread.set()
                         room_tcp_socket.close()
+                        logout_request(self.user_id)
                         pygame.quit()
                         sys.exit()
 
@@ -873,6 +877,7 @@ class GameManager:
             # Event handling
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    logout_request(self.user_id)
                     pygame.quit()
                     sys.exit()
 
@@ -1121,6 +1126,7 @@ class GameManager:
             interaction= 0 
             for event in pygame.event.get():
                 if event.type ==pygame.QUIT:
+                    logout_request(self.user_id)
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.KEYDOWN:
@@ -1208,7 +1214,7 @@ class GameManager:
                 #                  pygame.Rect(self.player.pos[0]-render_scroll[0], self.player.pos[1]-render_scroll[1],self.player.size[0],self.player.size[1]),
                 #                  1)
                 self.display_username(self.player, render_scroll, config.COLORS["LIGHT_GREEN"])
-                self.display_score(self.player, 0, render_scroll, config.COLORS["WHITE"])
+                self.display_score(self.player, 0, 5, 5, config.COLORS["LIGHT_GREEN"])
                 self.display_healthbar_staminabar(self.player, render_scroll)
                 self.player.render(self.display,offset = render_scroll)
             
@@ -1226,6 +1232,7 @@ class GameManager:
                     # self.display_score(each, each.score, render_scroll, config.COLORS["WHITE"])
                     self.display_healthbar_staminabar(each, render_scroll)
 
+            self.display_remaining_time(0, config.COLORS["YELLOW"])
             self.display_2.blit(self.display, (0,0))
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
             pygame.display.update()
@@ -1271,7 +1278,7 @@ class GameManager:
         # Blit the username onto the display
         self.display.blit(username_text, username_rect)
 
-    def display_score(self, player: Player, score, render_scroll, color):
+    def display_score(self, player: Player, score, posx, posy, color):
         """
         Display the player's score next to the right of the health bar.
         
@@ -1283,12 +1290,11 @@ class GameManager:
         """
         # Load the font and render the score text
         score_font = pygame.font.Font(config.FONT_PATH, 10)
-        score_text = score_font.render(f"Score: {score}", True, color)
+        score_text = score_font.render(f"{self.id_to_username[player.id]}: {score}", True, color)
         
         # Calculate the position of the score (next to the right of the health bar)
         score_rect = score_text.get_rect(topleft=(
-            player.pos[0] - render_scroll[0] + 55,  # Positioned to the right of the health bar
-            player.pos[1] - render_scroll[1] - 17  # Align vertically with the health bar
+            posx, posy
         ))
         
         # Blit the score onto the display
@@ -1301,6 +1307,25 @@ class GameManager:
         for each in self.base_sign:
             each.update()
             each.render(self.display,offset)
+    def display_remaining_time(self, remaining_time, color):
+        """
+        Display the remaining time at the top center of the screen.
+        
+        Args:
+        - remaining_time: The remaining time in seconds to display.
+        - color: The color of the text displaying the time.
+        """
+        # Load the font and render the remaining time text
+        time_font = pygame.font.Font(config.FONT_PATH, 20)
+        time_text = time_font.render(f"Time Left: {remaining_time}s", True, color)
+        
+        # Calculate the position of the text (top center of the screen)
+        time_rect = time_text.get_rect(center=(config.SCREEN_WIDTH // 2, 20))
+        
+        # Blit the text onto the display
+        self.display.blit(time_text, time_rect)
+
+
 
 if __name__ == "__main__":
     GameManager().menu()
