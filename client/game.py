@@ -1111,7 +1111,7 @@ class GameManager:
 
         while True:
             current_time = time.time()
-            if current_time - start_time >= 5:
+            if current_time - start_time >= 90:
                 break
             self.display.fill(color = (0,0,0,0))
             self.display_2.blit(pygame.transform.scale(self.game_background, self.display.get_size()), (0,0))
@@ -1219,8 +1219,14 @@ class GameManager:
                 # pygame.draw.rect(self.display, (255,0,0),
                 #                  pygame.Rect(self.player.pos[0]-render_scroll[0], self.player.pos[1]-render_scroll[1],self.player.size[0],self.player.size[1]),
                 #                  1)
-                self.display_username(self.player, render_scroll, config.COLORS["LIGHT_GREEN"])
-                self.display_score(self.player, 0, 5, 5, config.COLORS["LIGHT_GREEN"])
+                if self.game_mode == 1:
+                    self.display_username(self.player, render_scroll, config.COLORS["LIGHT_GREEN"])
+                else:
+                    if self.player.team == 1:
+                        self.display_username(self.player, render_scroll, config.COLORS["LIGHT_GREEN"])
+                    else:
+                        self.display_username(self.player, render_scroll, config.COLORS["RED"])
+                self.display_score(self.player, self.player.score, 5, 5, config.COLORS["LIGHT_GREEN"])
                 self.display_healthbar_staminabar(self.player, render_scroll)
                 self.player.render(self.display,offset = render_scroll)
             
@@ -1231,14 +1237,26 @@ class GameManager:
                     each.render(self.display,offset = render_scroll)
 
             # render the player after the flags,items,traps to make them appear on top 
+            y_offset = 5
             for each in self.entities:
                 if each is not self.player and isinstance(each, Player):
                     each.render(self.display,offset = render_scroll)
-                    self.display_username(each, render_scroll, config.COLORS["BLUE"])
-                    # self.display_score(each, each.score, render_scroll, config.COLORS["WHITE"])
-                    self.display_healthbar_staminabar(each, render_scroll)
+                    if self.game_mode == 1:
+                        self.display_username(each, render_scroll, config.COLORS["RED"])
+                        self.display_score(each, each.score, 5, y_offset + 15, config.COLORS["RED"])
+                    else:
+                        if each.team == 1:
+                            self.display_username(each, render_scroll, config.COLORS["LIGHT_GREEN"])
+                            self.display_score(each, each.score, 5, y_offset + 15, config.COLORS["LIGHT_GREEN"])
+                        else:
+                            self.display_username(each, render_scroll, config.COLORS["RED"])
+                            self.display_score(each, each.score, 5, y_offset + 15, config.COLORS["RED"])
 
-            self.display_remaining_time(0, config.COLORS["YELLOW"])
+                    
+                    self.display_healthbar_staminabar(each, render_scroll)
+                    y_offset = y_offset + 15
+
+            self.display_remaining_time(90-int(current_time-start_time), config.COLORS["YELLOW"])
             self.display_2.blit(self.display, (0,0))
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
             pygame.display.update()
