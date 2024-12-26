@@ -1640,7 +1640,7 @@ int scoreTheFlag(Player *player, Game *game)
         if (flag->id==1) game->Score_team2++;
         if (flag->id==2) game->Score_team1++;
         player->score+=50;
-        printf("Player id %d has scored\n", player->id);
+        printf("Player id %d has scored: %d\n", player->id, player->score);
         respawnFlag(player);
         return 1;
     }

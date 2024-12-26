@@ -1221,12 +1221,14 @@ class GameManager:
                 #                  1)
                 if self.game_mode == 1:
                     self.display_username(self.player, render_scroll, config.COLORS["LIGHT_GREEN"])
+                    self.display_score(self.player, self.player.score, 5, 5, config.COLORS["LIGHT_GREEN"])
                 else:
                     if self.player.team == 1:
                         self.display_username(self.player, render_scroll, config.COLORS["LIGHT_GREEN"])
+                        self.display_score(self.player, self.player.score, 5, 5, config.COLORS["LIGHT_GREEN"])
                     else:
                         self.display_username(self.player, render_scroll, config.COLORS["RED"])
-                self.display_score(self.player, self.player.score, 5, 5, config.COLORS["LIGHT_GREEN"])
+                        self.display_score(self.player, self.player.score, 5, 5, config.COLORS["RED"])
                 self.display_healthbar_staminabar(self.player, render_scroll)
                 self.player.render(self.display,offset = render_scroll)
             
