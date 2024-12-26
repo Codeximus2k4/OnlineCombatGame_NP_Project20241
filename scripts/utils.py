@@ -323,7 +323,7 @@ def update_ready_request(user_id: int, is_ready:int, update_ready_socket: Networ
     # Send the message
     update_ready_socket.send_tcp_message(message)
 
-def game_mode_request(user_id: int, game_mode: str, game_mode_socket: NetworkManager):
+def game_mode_request(user_id: int, game_mode: int, game_mode_socket: NetworkManager):
     """Message type 11: Request the game mode for game play"""
     # Get the message components
     request_type = 59 # request type 11
@@ -333,13 +333,13 @@ def game_mode_request(user_id: int, game_mode: str, game_mode_socket: NetworkMan
     # Convert to bytes and combine into 1 message
     request_type_byte = bytes([request_type])
     user_id_byte = bytes([user_id])
-    game_mode_byte = game_mode.encode("ascii")
+    game_mode_byte = bytes([game_mode])
     message = request_type_byte + user_id_byte + game_mode_byte
 
     # Send the request to the server
     game_mode_socket.send_tcp_message(message)
 
-def hero_request(user_id: int, hero_id: str, hero_socket: NetworkManager):
+def hero_request(user_id: int, hero_id: int, hero_socket: NetworkManager):
     """Message type 12: Request the hero type"""
     request_type = 60 # request type 12
     user_id = user_id
@@ -348,7 +348,7 @@ def hero_request(user_id: int, hero_id: str, hero_socket: NetworkManager):
     # Convert to bytes and combine into 1 message
     request_type_byte = bytes([request_type])
     user_id_byte = bytes([user_id])
-    hero_id_byte = hero_id.encode("ascii")
+    hero_id_byte = bytes([hero_id])
     message = request_type_byte + user_id_byte + hero_id_byte
 
 
