@@ -864,9 +864,9 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     interaction =  each->input_buffer[4];
                     sizex =  each->input_buffer[5];
                     sizey =  each->input_buffer[6];
-                    printf("input:");
-                    for (int i = 0;i<7;i++) printf("%d",each->input_buffer[i]);
-                    printf("\n");
+                    // printf("input:");
+                    // for (int i = 0;i<7;i++) printf("%d",each->input_buffer[i]);
+                    // printf("\n");
                     Player* player =  findPlayerInRoomById(game->players, id);
                     if (player ==NULL) 
                     {
@@ -935,7 +935,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                 }
             }
 
-            printf("Done checking attack\n");
+            //printf("Done checking attack\n");
             //checking flag interaction
             if (game->game_mode==2)
             {
@@ -975,8 +975,8 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     }  
                 else
                 {
-                   for (int i =0;i<byteSerialized;i++ ) printf("%d ",send_buffer[i]);
-                   printf("\n");
+                //    for (int i =0;i<byteSerialized;i++ ) printf("%d ",send_buffer[i]);
+                //    printf("\n");
                 }
                     
             }

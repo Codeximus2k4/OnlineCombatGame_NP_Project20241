@@ -14,7 +14,7 @@
 
 #define ATTACK_HITBOX_WIDTH 50
 #define ATTACK_HITBOX_HEIGHT 60
-#define DISTANCE_FROM_ATTACK_HITBOX 30
+#define DISTANCE_FROM_ATTACK_HITBOX 20
 #define MAX_HIT_TIME 20
 
 //--------------------------------------------------------------------
@@ -560,10 +560,10 @@ void update_player(Player* player, Game *game)
             flag->posy = player->selfHitBox->offset_y;
         }
 
-        printf("action: %d\n",player->action);
-        printf("%d - %d\n",player->collisionx,player->collisiony);
-        printf("%d - %d\n",player->selfHitBox->offset_x, player->selfHitBox->offset_y);
-        // finished updating the action now, let's update the position
+//         printf("action: %d\n",player->action);
+//         printf("%d - %d\n",player->collisionx,player->collisiony);
+//         printf("%d - %d\n",player->selfHitBox->offset_x, player->selfHitBox->offset_y);
+//         // finished updating the action now, let's update the position
     }
 }
 int serialize_player_info(unsigned char *send_buffer, int byteSerialized, Player *player, Game* game)
@@ -800,8 +800,9 @@ void characterSpawner(Player* players, Game *game)
 }
 void check_attack(Player *player1, Player *player2, Game *game)
 {
-    int attacked ;
+    int attacked =0;
     if (player1->action==1) attacked = check_collision(player1->attackHitBox1, player2->selfHitBox);
+    else if (player1->action==2) attacked = check_collision(player1->attackHitBox2, player2->selfHitBox);
     printf("player id %d is hit? %d\n",player2->id, attacked);
     if (attacked==1 && player1->action==1) 
     {
@@ -853,7 +854,7 @@ void check_attack(Player *player1, Player *player2, Game *game)
         }
 
         //effect handling according to the attacking player
-        if (player1->char_type==1 && player2->health>0) player2->slowed_effect=1; 
+        if (player1->char_type==2 && player2->health>0) player2->slowed_effect=1; 
         if (player1->char_type==4 && player2->health>0) player2->stamina =  max(player2->stamina-50,0);
     }
 
