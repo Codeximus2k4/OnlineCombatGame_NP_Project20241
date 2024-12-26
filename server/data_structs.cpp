@@ -170,7 +170,7 @@ struct Player {
     int ready;
     sockaddr_in cliaddr; // IPv4 address corresponding to each player
     Hitbox *selfHitBox, *attackHitBox; //
-    char input_buffer[256]; // input buffer of each player
+    unsigned char input_buffer[256]; // input buffer of each player
     int bytes_received;
     int team;
 
