@@ -1034,7 +1034,7 @@ class GameManager:
                     # update the position
                     each.pos[0] = posx
                     each.pos[1] = posy
-                    each.entity_class = entity_class
+                    each.entity_class = entity_class-1
                     if entity_type==0:
                         each.flip = flip
                         each.set_action(action_type,False)
@@ -1105,16 +1105,6 @@ class GameManager:
                     continue
         thread = threading.Thread(target=receive_messages, args = (self.udp_room_socket, q),daemon=True)
         thread.start()
-
-        # team1 = []
-        # team2 = []
-        # self.team = [team1, team2]
-        # for entity in self.entities:
-        #     if isinstance(entity, Player):
-        #         if entity.team == 1:
-        #             team1.append(entity)
-        #         else:
-        #             team2.append(entity)
 
         # start time
         start_time = time.time()
@@ -1273,6 +1263,7 @@ class GameManager:
         self.screen.blit(winner_background, winner_rect.topleft)
 
         # Determine winner(s)
+        print(f"Display game mode: {self.game_mode}")
         if self.game_mode == 1:
             # Find the player with the highest score
             winner = max(self.entities, key=lambda e: e.score if isinstance(e, Player) else float('-inf'))
