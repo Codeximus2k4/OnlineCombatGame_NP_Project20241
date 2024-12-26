@@ -155,6 +155,15 @@ void sendResponse3(int connectfd){
 
     memset(roomInformation, 0, sizeof(roomInformation));
 
+    // print log of current rooms in the server
+    printf(CYAN "\t(In main server) Current active rooms information:\n" RESET);
+    Room *p = rooms;
+    while(p != NULL){
+        printf("\t\tRoom id %d: number of players: %d, started: %d\n", p->id, p->total_players, p->started);
+
+        p = p->next;
+    }
+
     // init data to send
     serializeRoomInformation(roomInformation, rooms);
     strcpy(data, "3");

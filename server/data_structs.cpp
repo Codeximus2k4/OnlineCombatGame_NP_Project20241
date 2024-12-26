@@ -1069,6 +1069,28 @@ int countRooms(Room *head) {
     return totalRoomCount;
 }
 
+// - function to count total number of AVAILABLE rooms in server
+// - input: pointer to head of list of rooms
+// - output: number of rooms in the list
+// - dependencies: none
+int countAvailableRooms(Room *head){
+    Room *p = head;
+    int totalRoomCount = 0;
+
+    if(p == NULL) return 0;
+
+    while(p != NULL){
+        // only count rooms that have not started
+        if(p->started == 0){
+            totalRoomCount++;
+        }
+        
+        p = p->next;
+    }
+
+    return totalRoomCount;
+}
+
 // - function to serialize information of list of rooms available
 // - input: char string to store result, head pointer to list of rooms
 // - output: none
@@ -1088,9 +1110,12 @@ void serializeRoomInformation(char result[], Room *head){
     }
 
     // count total of available rooms and set it to first byte
-    int totalRoom = countRooms(head);
+    int totalRoom = countAvailableRooms(head);
     snprintf(strnum, sizeof(strnum), "%d", totalRoom);
     strcpy(result, strnum);
+
+    // total of available rooms = 0 then return "0" in result
+    if(totalRoom == 0) return;
 
     Room *p = head;
     while(p != NULL){
@@ -1114,8 +1139,7 @@ void serializeRoomInformation(char result[], Room *head){
         snprintf(strnum, sizeof(strnum), "%d", totalPlayerInRoom);
         strcat(result, strnum);
 
-        // increment
-        totalRooms++;
+        // to next room
         p = p->next;
     }
 
