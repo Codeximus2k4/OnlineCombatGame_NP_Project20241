@@ -389,7 +389,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
     message_type = buff[0];
 
     // print request type
-    printf(BLUE "[+] Request type %c from [%s:%d] with socket descriptor = %d\n" RESET, message_type, cli_addr, ntohs(cliaddr.sin_port), connectfd);
+    printf(BLUE "[+] Request type %d from [%s:%d] with socket descriptor = %d\n" RESET, message_type - 48, cli_addr, ntohs(cliaddr.sin_port), connectfd);
 
     if(message_type == '1'){
         // register request from client

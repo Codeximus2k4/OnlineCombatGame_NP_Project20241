@@ -247,7 +247,7 @@ void sendResponse6(int connectfd, int status){
     };
     
     // print to check
-    printf(YELLOW "Bytes sent to client=%d, type=%c, status=%c\n" RESET, sendBytes, data[0], data[1]);
+    printf(YELLOW "Bytes sent to client=%d, type=%d, status=%c\n" RESET, sendBytes, data[0] - 48, data[1]);
 }
 
 // - function to send players in the room all information in the waiting room
@@ -280,7 +280,7 @@ void sendResponse8(int connectfd, Player *players){
     };
     
     // print to check
-    printf(YELLOW "Bytes sent to client=%d, type=%c\n" RESET, sendBytes, packet[0]); // could be printing wrong for type since we are using ASCII value
+    printf(YELLOW "Bytes sent to client=%d, type=%d\n" RESET, sendBytes, packet[0] - 48); // could be printing wrong for type since we are using ASCII value
 }
 
 // - function to send response 11 from server to all players in the game room
@@ -309,7 +309,7 @@ void sendResponse11(int game_mode){
     }
     
     // print to check
-    printf(YELLOW "Bytes sent to each client=%d, type=%c, game_mode=%d\n" RESET, sendBytes, packet[0], packet[1]); // could be printing wrong for type since we are using ASCII value
+    printf(YELLOW "Bytes sent to each client=%d, type=%d, game_mode=%d\n" RESET, sendBytes, packet[0] - 48, packet[1]); // could be printing wrong for type since we are using ASCII value
 }
 
 // - function to handle data when connected clients want to send something to server (for e.g: player ready state)
@@ -327,7 +327,7 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
     char opcode = buff[0];
 
     // print log
-    printf(BLUE "[+] (In game room) Connected client with socket %d sent request type %c\n" RESET, clientfd, opcode);
+    printf(BLUE "[+] (In game room) Connected client with socket %d sent request type %d\n" RESET, clientfd, opcode - 48);
 
     if(opcode == '7'){
         // get user_id
