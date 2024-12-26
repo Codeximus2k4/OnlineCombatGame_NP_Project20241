@@ -79,7 +79,7 @@ class Player(PhysicsEntity):
         #handle jump end:
     
     def convert_entity_class(self):
-        ent_class = {0:"Samurai",1:"Evil Mage"}
+        ent_class = {0:"Samurai",1:"Wizard",2:"King", 3:"Witch"}
         return ent_class[self.entity_class]
         
     def convert_action_type(self):

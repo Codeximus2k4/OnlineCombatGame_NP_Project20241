@@ -60,6 +60,30 @@ class GameManager:
                 'Samurai/jump':Animation(load_images('entities/Samurai/Jump'),img_dur= 5, loop=False),
                 'Samurai/fall':Animation(load_images('entities/Samurai/Fall'),img_dur= 5, loop=False),
                 'Samurai/take hit':Animation(load_images('entities/Samurai/Take Hit'),img_dur= 5, loop=False),
+                'King/idle': Animation(load_images('entities/King/Idle'), img_dur=5, loop = True),
+                'King/attack1': Animation(load_images('entities/King/Attack1'), img_dur = 5, loop =False),
+                'King/attack2': Animation(load_images('entities/King/Attack2'),img_dur = 5, loop = False),
+                'King/death':Animation(load_images('entities/King/Death'),img_dur = 5, loop = False),
+                'King/run':Animation(load_images('entities/King/Run'),img_dur=5, loop = True),
+                'King/jump':Animation(load_images('entities/King/Jump'),img_dur= 5, loop=False),
+                'King/fall':Animation(load_images('entities/King/Fall'),img_dur= 5, loop=False),
+                'King/take hit':Animation(load_images('entities/King/Take Hit'),img_dur= 5, loop=False),
+                'Wizard/idle': Animation(load_images('entities/Wizard/Idle'), img_dur=5, loop = True),
+                'Wizard/attack1': Animation(load_images('entities/Wizard/Attack1'), img_dur = 5, loop =False),
+                'Wizard/attack2': Animation(load_images('entities/Wizard/Attack2'),img_dur = 5, loop = False),
+                'Wizard/death':Animation(load_images('entities/Wizard/Death'),img_dur = 5, loop = False),
+                'Wizard/run':Animation(load_images('entities/Wizard/Run'),img_dur=5, loop = True),
+                'Wizard/jump':Animation(load_images('entities/Wizard/Jump'),img_dur= 5, loop=False),
+                'Wizard/fall':Animation(load_images('entities/Wizard/Fall'),img_dur= 5, loop=False),
+                'Wizard/take hit':Animation(load_images('entities/Wizard/Take Hit'),img_dur= 5, loop=False),
+                'Witch/idle': Animation(load_images('entities/Witch/Idle'), img_dur=5, loop = True),
+                'Witch/attack1': Animation(load_images('entities/Witch/Attack1'), img_dur = 5, loop =False),
+                'Witch/attack2': Animation(load_images('entities/Witch/Attack2'),img_dur = 5, loop = False),
+                'Witch/death':Animation(load_images('entities/Witch/Death'),img_dur = 5, loop = False),
+                'Witch/run':Animation(load_images('entities/Witch/Run'),img_dur=5, loop = True),
+                'Witch/jump':Animation(load_images('entities/Witch/Jump'),img_dur= 5, loop=False),
+                'Witch/fall':Animation(load_images('entities/Witch/Fall'),img_dur= 5, loop=False),
+                'Witch/take hit':Animation(load_images('entities/Witch/Take Hit'),img_dur= 5, loop=False),            
                 'base/team1': Animation(load_images('team_home/teama'), img_dur=5,loop= True),
                 'base/team2': Animation(load_images('team_home/teamb'), img_dur=5,loop= True),
                 'flag/flag1': Animation(load_images('flags/flagA'), img_dur=5,loop= True),
@@ -886,11 +910,14 @@ class GameManager:
     def de_serialize_entities(self, data):
         index = 0
         length =  len(data)
-        #print(f"Analyzing payload of length {length}")
+        data = struct.unpack(f"!{length}B", data)
+        print("Game mode:" ,self.game_mode)
+        print(data)
         while (1):
-
+            score  =0 
+            team = 0
             if index >= length: 
-                #print("Payload finishes reading")
+                print("Payload finishes reading")
                 break
             else:
                 id = data[index]
@@ -905,6 +932,7 @@ class GameManager:
             
             if entity_type==0:
                 if index >= length:
+                    print(index)
                     print("Payload is missing entity_class")
                     break
                 else:
@@ -952,8 +980,6 @@ class GameManager:
                 else:   
                     stamina =  data[index]
                     index+=1
-
-                team=0
                 if self.game_mode==1:
                     if index>= length-1:
                         print("Payload is missing score")
@@ -1003,6 +1029,7 @@ class GameManager:
                     # update the position
                     each.pos[0] = posx
                     each.pos[1] = posy
+                    each.entity_class = entity_class
                     if entity_type==0:
                         each.flip = flip
                         each.set_action(action_type,False)
@@ -1029,9 +1056,10 @@ class GameManager:
     
     def run(self,room_udp_port):
         """Main game loop"""
-        if self.game_mode == 1:
+        if self.game_mode == 2:
             self.base_sign = []
-
+        if self.game_mode is None:
+            self.game_mode =1
         self.display =  pygame.Surface((960,720), pygame.SRCALPHA)
         self.display_2 =  pygame.Surface((960,720))
 
@@ -1055,7 +1083,7 @@ class GameManager:
         # Set up the player
         self.player = None
         self.horizontal_movement = [0, 0]
-        self.player_default_size = [50,60]
+        self.player_default_size = [50,100]
         # Set up queue for shared data
         q = queue.Queue(maxsize=1)
         def receive_messages(sock, q):
@@ -1170,7 +1198,7 @@ class GameManager:
                         self.scroll[1] +=  (self.player.rect(topleft =  self.player.pos).centery -  self.display.get_height()/2 - self.scroll[1])/30
             render_scroll =  (int(self.scroll[0]),int (self.scroll[1]))
 
-            if (self.game_mode ==1):
+            if (self.game_mode ==2):
                 self.display_base_sign(render_scroll)        
             self.tilemap.render(self.display, offset =  render_scroll)
             

@@ -375,6 +375,7 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
             return;
         }
         game->game_mode = buff[0];
+        game->game_mode -= '0'; // convert back to int
 
         // send response back to all players about this change of game mode
         sendResponse11(game->game_mode);
@@ -401,7 +402,8 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
 
         // store choice of hero_id for the corresponding player
         Player *p = findPlayerInRoomBySocketDescriptor(players, clientfd);
-        p->char_type = hero_id;
+        p->char_type = hero_id - '1'; // convert back to int
+        printf("hero id : %d\n",p->char_type);
     }
 }
 
@@ -465,6 +467,7 @@ Main function to handle game room logic
 // - will run until the room closes
 int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     int gameStart =0;
+    game->game_mode = 1; //set default game mode to 1 <Classic>
     fd_set master; // master file descriptor list 
     fd_set read_fds; // temp file descriptor list for select()
     int connectfd;
@@ -766,7 +769,6 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     game->items = NULL;
     game->respawn_time=RESPAWN_TIME;
     game->players =  players;
-    game->game_mode = 2;
     if (game->game_mode==2)
     {
         game->Score_team1 = 0;
@@ -786,7 +788,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     characterSpawner(game->players, game);
     // set up a number of buffer for each client
     
-    char send_buffer[1024];
+    unsigned char send_buffer[1024];
     int byteSerialized;
     int fresh_start =1;
 
@@ -798,6 +800,8 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
     struct timespec last_tick, current_time, start_time;
     clock_gettime(CLOCK_MONOTONIC, &last_tick);
     start_time =  last_tick;
+    printf("Game mode is %d\n",game->game_mode);
+
     while (true)
         {
            // printf("inside the loop");
@@ -882,12 +886,12 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
             {
                check_player_contact(temp,game->tilemap);
             }
+
             // update player
             for (temp=game->players;temp!=NULL;temp= temp->next)
             {
                 update_player(temp,game);
             }
-
             //check attack
             Player *player1, *player2;
             for (player1= game->players;player1!=NULL;player1= player1->next)
@@ -912,22 +916,26 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     }
                 }
             }
-    
+
             //checking flag interaction
-            for (player1= game->players;player1!=NULL;player1=player1->next)
+            if (game->game_mode==2)
             {
-                if (player1->flagTaken ==NULL) 
+                for (player1= game->players;player1!=NULL;player1=player1->next)
                 {
-                    int status = captureTheFlag(player1, game->flag1);
-                    status =  captureTheFlag(player1, game->flag2);
-                }
-                else 
-                {
-                    int status = scoreTheFlag(player1, game);
+                    if (player1->flagTaken ==NULL) 
+                    {
+                        int status = captureTheFlag(player1, game->flag1);
+                        status =  captureTheFlag(player1, game->flag2);
+                    }
+                    else 
+                    {
+                        int status = scoreTheFlag(player1, game);
+                    }
                 }
             }
             // Packaging payload
             // update and serialize players' info
+            // printf("Done checking flag\n");
             memset(send_buffer, 0, BUFF_SIZE);
             byteSerialized=0;
             for (temp=game->players;temp!=NULL;temp= temp->next)
@@ -948,7 +956,8 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     }  
                 else
                 {
-                    //printf("Sent %d bytes to clients\n",byteSent);
+                //    for (int i =0;i<byteSerialized;i++ ) printf("%d ",send_buffer[i]);
+                //    printf("\n");
                 }
                     
             }

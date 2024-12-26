@@ -548,7 +548,7 @@ void update_player(Player* player, Game *game)
         // finished updating the action now, let's update the position
     }
 }
-int serialize_player_info(char *send_buffer, int byteSerialized, Player *player, Game* game)
+int serialize_player_info(unsigned char *send_buffer, int byteSerialized, Player *player, Game* game)
 {
     send_buffer[byteSerialized] =  player->id;
     byteSerialized++;
@@ -656,7 +656,7 @@ void characterSpawner(Player* players, Game *game)
         {
                 temp->flagTaken = NULL;
                 temp->posx = 500;
-                temp->posy = 420;
+                temp->posy = 325;
                 temp->health=100;
                 temp->stamina = 100;
                 temp->isFacingLeft=1;
@@ -670,14 +670,32 @@ void characterSpawner(Player* players, Game *game)
                 temp->timeSinceAttack=52;
                 temp->timeSinceDash=0;
                 temp->movement_x=0;
-                temp->movement_y=0; 
-                temp->char_type=0;        
+                temp->movement_y=0;         
                 temp->is_falling = 0; 
                 temp->Hit = 0;
                 temp->timeSinceDeath=game->respawn_time+1;
                 temp->vertical_velocity = 0;
-                temp->sizex = 50;
-                temp->sizey = 60;
+                printf("Character type: %d\n",temp->char_type);
+                if (temp->char_type==0)
+                {
+                    temp->sizex=50;
+                    temp->sizey=60;
+                }
+                else if (temp->char_type==1)
+                {
+                    temp->sizex = 50;
+                    temp->sizey=100;
+                }
+                else if (temp->char_type==2)
+                {
+                    temp->sizex = 35;
+                    temp->sizey=86;
+                }
+                else if (temp->char_type==3)
+                {
+                    temp->sizex = 57;
+                    temp->sizey=90;
+                }
                 temp->previous_sizex=50;
                 temp->previous_sizey=60;
                 temp->selfHitBox=  makeHitbox(temp->posx, temp->posy, temp->sizex, temp->sizey);
@@ -772,7 +790,7 @@ void handleStateChange(Player *player, int input_action)
     
 }
 
-int serialize_flag_info(char *send_buffer, int byteSerialized, Game *game)
+int serialize_flag_info(unsigned char *send_buffer, int byteSerialized, Game *game)
 {
     // flag 1
     Flag* flag1 =  game->flag1; 

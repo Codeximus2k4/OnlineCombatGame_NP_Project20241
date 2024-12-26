@@ -247,8 +247,8 @@ def rank_request():
         num_game_played = ord(num_game_played)
 
         # Get the score of the player
-        score = rank_socket.receive_tcp_message(buff_size=2).decode() # 2 bytes
-        score = struct.unpack("!H", score.encode("utf-8"))[0]
+        score = rank_socket.receive_tcp_message(buff_size=2) # 2 bytes
+        score = struct.unpack("!H", score)[0]
         
         # Add to the list
         top5.append({"username": username, "num_game": num_game_played, "score": score})
@@ -299,8 +299,8 @@ def my_stats_request(user_id: int):
     num_game = ord(num_game)
 
     # Get the score
-    score = my_stats_socket.receive_tcp_message(buff_size=2).decode() # 2 byte (score)
-    score = struct.unpack("!H", score.encode("utf-8"))[0]
+    score = my_stats_socket.receive_tcp_message(buff_size=2) # 2 byte (score)
+    score = struct.unpack("!H", score)[0]
 
     my_stats_socket.close()
     my_stats = {"username": username, "num_game": num_game, "score": score}
