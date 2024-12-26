@@ -338,6 +338,11 @@ void *message_handler(void *arg) {
             Room *room_updated = findRoomById(rooms, room_id_updated); //find room
             room_updated->total_players = message.text[1] - '0'; //update num of players in room
             printf("Total number of player in room %d is %d\n", room_id_updated, room_updated->total_players);
+
+            // update started state of the room
+            room_updated->started = (int) message.text[2];
+            printf("Ready state of room %d is %d\n", room_id_updated, room_updated->started);
+
             // if the room does not have any player left
             if (room_updated->total_players == 0) {
                 // remove room from list of rooms

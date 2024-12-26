@@ -882,7 +882,7 @@ struct Room {
 // game_start_yet? = '0' --> waiting, = '1' --> started, = '2' --> finish
 struct ipc_msg {
     long type;
-    char text[4];
+    char text[5];
 };
 
 // - function to serialize information in game room to a string
@@ -1148,12 +1148,13 @@ void serializeRoomInformation(char result[], Room *head){
 }
 
 // message format: [room_id][num_players_in_room]
-// input: the message, the room_id, the head of the player list
-void serializeIpcMsg(ipc_msg *message, int room_id, Player *head) {
+// input: the message, the room_id, the head of the player list, started state of the room
+void serializeIpcMsg(ipc_msg *message, int room_id, Player *head, int started) {
     message->type = 1;
     message->text[0] = room_id + '0';
     message->text[1] = countPlayerInRoom(head) + '0';
-    message->text[2] = '\0';
+    message->text[2] = (char) started;
+    message->text[3] = '\0';
 }
 
 // - function to find room by id

@@ -607,7 +607,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                                 // send message to main server about this change 
                                 ipc_msg message;
                                 
-                                serializeIpcMsg(&message, room_id, players);
+                                serializeIpcMsg(&message, room_id, players, 0);
                                 
                                 // Send the message
                                 if (msgsnd(msgid, &message, sizeof(message.text), 0) == -1) {
@@ -662,7 +662,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         // send message to main server about this change 
                         ipc_msg message;
                         
-                        serializeIpcMsg(&message, room_id, players);
+                        serializeIpcMsg(&message, room_id, players, 0);
 
                         // Send the message
                         if (msgsnd(msgid, &message, sizeof(message.text), 0) == -1) {
@@ -696,6 +696,19 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
         if (gameStart)
             {
                 printf("Game is starting...\n");
+
+                // send message to parent process to update information of this room
+                ipc_msg message;
+                        
+                serializeIpcMsg(&message, room_id, players, 1);
+
+                // Send the message
+                if (msgsnd(msgid, &message, sizeof(message.text), 0) == -1) {
+                    perror(RED "Error in waiting room, msgsnd failed" RESET);
+                    exit(1);
+                }
+                printf("Child: Message sent to parent. %s\n", message.text);
+
                 break;
             }
 
