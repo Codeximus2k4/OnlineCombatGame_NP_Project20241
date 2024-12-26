@@ -288,8 +288,17 @@ class GameManager:
 
             rank_button = Button(
                 image=pygame.image.load("data/images/menuAssets/Play Rect.png"), 
-                pos=(config.SCREEN_WIDTH//2, 400),
+                pos=(config.SCREEN_WIDTH//2, 370),
                 text_input="RANK", 
+                font=self.button_font, 
+                base_color=config.COLORS['BUTTON_BASE'], 
+                hovering_color="White"
+            )
+            
+            guide_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Play Rect.png"), 
+                pos=(config.SCREEN_WIDTH//2, 490),
+                text_input="GUIDE", 
                 font=self.button_font, 
                 base_color=config.COLORS['BUTTON_BASE'], 
                 hovering_color="White"
@@ -297,7 +306,7 @@ class GameManager:
             
             quit_button = Button(
                 image=pygame.image.load("data/images/menuAssets/Quit Rect.png"), 
-                pos=(config.SCREEN_WIDTH//2, 550),
+                pos=(config.SCREEN_WIDTH//2, 610),
                 text_input="QUIT", 
                 font=self.button_font, 
                 base_color=config.COLORS['BUTTON_BASE'], 
@@ -306,7 +315,7 @@ class GameManager:
             
             self.screen.blit(menu_text, menu_rect)
             
-            for button in [play_button, rank_button, quit_button]:
+            for button in [play_button, rank_button, guide_button, quit_button]:
                 button.changeColor(mouse_pos)
                 button.update(self.screen)
             
@@ -325,8 +334,404 @@ class GameManager:
 
                     if rank_button.checkForInput(mouse_pos):
                         self.rank_screen()
+                        
+                    if guide_button.checkForInput(mouse_pos):
+                        self.guide_screen()
             
             pygame.display.update()
+            
+    def guide_screen(self):
+        """Guide screen"""
+        while True:
+            self.screen.blit(self.menu_background, (0, 0))
+            mouse_pos = pygame.mouse.get_pos()
+            
+            # Menu Title
+            menu_text = self.title_font.render("GUIDE", True, config.COLORS['MENU_TEXT'])
+            menu_rect = menu_text.get_rect(center=(config.SCREEN_WIDTH//2, 100))
+            
+            # Buttons
+            get_started_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Play Rect.png"), 
+                pos=(config.SCREEN_WIDTH//2, 250),
+                text_input="GET STARTED", 
+                font=get_font(25),  
+                base_color=config.COLORS['BUTTON_BASE'], 
+                hovering_color="White"
+            )
+
+            game_play_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Play Rect.png"), 
+                pos=(config.SCREEN_WIDTH//2, 370),
+                text_input="GAME PLAY", 
+                font=get_font(25), 
+                base_color=config.COLORS['BUTTON_BASE'], 
+                hovering_color="White"
+            )
+            
+            game_mode_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Play Rect.png"), 
+                pos=(config.SCREEN_WIDTH//2, 490),
+                text_input="GAME MODE", 
+                font=get_font(25),
+                base_color=config.COLORS['BUTTON_BASE'], 
+                hovering_color="White"
+            )
+            
+            back_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Quit Rect.png"), 
+                pos=(config.SCREEN_WIDTH//2, 610),
+                text_input="BACK", 
+                font=get_font(25),
+                base_color=config.COLORS['BUTTON_BASE'], 
+                hovering_color="White"
+            )
+            
+            self.screen.blit(menu_text, menu_rect)
+            
+            for button in [get_started_button, game_play_button, game_mode_button, back_button]:
+                button.changeColor(mouse_pos)
+                button.update(self.screen)
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if get_started_button.checkForInput(mouse_pos):
+                        self.get_started_screen()
+                    
+                    if game_play_button.checkForInput(mouse_pos):
+                        self.game_play_screen()
+
+                    if game_mode_button.checkForInput(mouse_pos):
+                        self.game_mode_guide()
+                        
+                    if back_button.checkForInput(mouse_pos):
+                        self.main_menu()
+            
+            pygame.display.update()   
+    
+    def get_started_screen(self):
+        # Pagination variables
+        current_page = 1
+        
+        while True:
+            self.screen.blit(self.menu_background, (0, 0))
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Title
+            # title_text = self.title_font.render("GET STARTED", True, config.COLORS['MENU_TEXT'])
+            # title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH // 2, 100))
+            # self.screen.blit(title_text, title_rect)
+
+            # Pagination Buttons
+            left_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Buttons Rect.png"),
+                pos=(config.SCREEN_WIDTH // 10, config.SCREEN_HEIGHT // 2),
+                text_input="<",
+                font=get_font(30),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            right_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Buttons Rect.png"),
+                pos=(config.SCREEN_WIDTH - config.SCREEN_WIDTH // 10, config.SCREEN_HEIGHT // 2),
+                text_input=">",
+                font=get_font(30),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+
+            back_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+                text_input="BACK",
+                font=get_font(20),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            
+            #Draw picture 
+            image_path = f"data/images/guide/tut_{current_page}.jpg"
+            pic_button = Button(
+                image=pygame.image.load(image_path),
+                pos=(config.SCREEN_WIDTH // 2, config.SCREEN_HEIGHT//2 - 50),
+                text_input="",
+                font=get_font(20),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            
+            # Draw all buttons
+            buttons = [left_button, right_button, back_button, pic_button]
+            for button in buttons:
+                button.changeColor(mouse_pos)
+                button.update(self.screen)
+
+            # Event handling
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    # Pagination button logic
+                    if left_button.checkForInput(mouse_pos) and current_page > 1:
+                        current_page -= 1
+                    if right_button.checkForInput(mouse_pos) and current_page < 4:
+                        current_page += 1
+                    
+                    if back_button.checkForInput(mouse_pos):
+                        self.guide_screen() # Return to the menu                            
+
+            pygame.display.update()
+    
+    def game_play_screen(self):
+        while True:
+            self.screen.blit(self.menu_background, (0, 0))
+            mouse_pos = pygame.mouse.get_pos()
+            
+            # Title
+            title_text = self.title_font.render("GAME PLAY", True, config.COLORS['MENU_TEXT'])
+            title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH//2, 100))
+            self.screen.blit(title_text, title_rect)
+            
+            # Buttons
+            back_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+                text_input="BACK",
+                font=get_font(20),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            
+            back_button.changeColor(mouse_pos)
+            back_button.update(self.screen)
+            
+            run_text = f"A, D:       Run"
+            run_text_rendered = get_font(17).render(run_text, True, config.COLORS['WHITE'])
+            run_text_rect = run_text_rendered.get_rect(topleft = (150, 200))
+            self.screen.blit(run_text_rendered, run_text_rect)
+            
+            jump_text = f"W:          Jump"
+            jump_text_rendered = get_font(17).render(jump_text, True, config.COLORS['WHITE'])
+            jump_text_rect = jump_text_rendered.get_rect(topleft = (150, 250))
+            self.screen.blit(jump_text_rendered, jump_text_rect)
+            
+            fall_text = f"S:          Fall"
+            fall_text_rendered = get_font(17).render(fall_text, True, config.COLORS['WHITE'])
+            fall_text_rect = fall_text_rendered.get_rect(topleft = (150, 300))
+            self.screen.blit(fall_text_rendered, fall_text_rect)
+            
+            attack_text = f"Q, E:       Attack"
+            attack_text_rendered = get_font(17).render(attack_text, True, config.COLORS['WHITE'])
+            attack_text_rect = attack_text_rendered.get_rect(topleft = (150, 350))
+            self.screen.blit(attack_text_rendered, attack_text_rect)
+            
+            block_text = f"Space:      Block Attack"
+            block_text_rendered = get_font(17).render(block_text, True, config.COLORS['WHITE'])
+            block_text_rect = block_text_rendered.get_rect(topleft = (150, 400))
+            self.screen.blit(block_text_rendered, block_text_rect)
+            
+            dash_text = f"K:          Dash"
+            dash_text_rendered = get_font(17).render(dash_text, True, config.COLORS['WHITE'])
+            dash_text_rect = dash_text_rendered.get_rect(topleft = (150, 450))
+            self.screen.blit(dash_text_rendered, dash_text_rect)
+            
+            interact_text = f"F:          Consume items/Activate traps"
+            interact_text_rendered = get_font(17).render(interact_text, True, config.COLORS['WHITE'])
+            interact_text_rect = interact_text_rendered.get_rect(topleft = (150, 500))
+            self.screen.blit(interact_text_rendered, interact_text_rect)
+            
+            capture_text = f"G:          Capture the flags"
+            capture_text_rendered = get_font(17).render(capture_text, True, config.COLORS['WHITE'])
+            capture_text_rect = capture_text_rendered.get_rect(topleft = (150, 550))
+            self.screen.blit(capture_text_rendered, capture_text_rect)
+            
+            # Event handling
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if back_button.checkForInput(mouse_pos):
+                        self.guide_screen() # Return to the menu 
+            
+            pygame.display.update()
+            
+    
+    def game_mode_guide(self):
+        
+        current_page = 1
+        
+        while True:
+            self.screen.blit(self.menu_background, (0, 0))
+            mouse_pos = pygame.mouse.get_pos()
+            
+            # Title
+            title_text = self.title_font.render("GAME MODE", True, config.COLORS['MENU_TEXT'])
+            title_rect = title_text.get_rect(center=(config.SCREEN_WIDTH//2, 100))
+            self.screen.blit(title_text, title_rect)
+            
+            # Buttons
+            
+            # Pagination Buttons
+            left_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Buttons Rect.png"),
+                pos=(config.SCREEN_WIDTH // 18, config.SCREEN_HEIGHT // 2),
+                text_input="<",
+                font=get_font(30),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            right_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Buttons Rect.png"),
+                pos=(config.SCREEN_WIDTH - config.SCREEN_WIDTH // 18, config.SCREEN_HEIGHT // 2),
+                text_input=">",
+                font=get_font(30),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            
+            back_button = Button(
+                image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+                pos=(config.SCREEN_WIDTH // 5, config.SCREEN_HEIGHT - 100),
+                text_input="BACK",
+                font=get_font(20),
+                base_color=config.COLORS['BUTTON_BASE'],
+                hovering_color="White"
+            )
+            
+            # Draw all buttons
+            buttons = [left_button, right_button, back_button]
+            for button in buttons:
+                button.changeColor(mouse_pos)
+                button.update(self.screen)
+            
+            #Display text
+            if current_page == 1: #classic mode
+                classic_title_text = f"Classic: "
+                classic_title_rendered = get_font(22).render(classic_title_text, True, config.COLORS['MENU_TEXT'])
+                classic_title_rect = classic_title_rendered.get_rect(topleft = (100, 180))
+                self.screen.blit(classic_title_rendered, classic_title_rect)
+                
+                classic_des_text = f"- At most 4 players in a game."
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 220))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"- They are spawned in different positions on"                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 260))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"the map at the beginning."                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 300))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"- Players attack to kill others to gain points."                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 340))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f" + 1 kill = 10 points."                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 380))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f" + x kill spree = increase points x times"                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 420))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"- Players respawn immediately after being killed"                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 460))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"- Game ends after 1 minute. Players having the"                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 500))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"highest score wins."                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 540))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+            
+            else: #capture the flag mode 
+                classic_title_text = f"Capture The Flag: "
+                classic_title_rendered = get_font(22).render(classic_title_text, True, config.COLORS['MENU_TEXT'])
+                classic_title_rect = classic_title_rendered.get_rect(topleft = (100, 180))
+                self.screen.blit(classic_title_rendered, classic_title_rect)
+                
+                classic_des_text = f"- At most 4 players are divided into 2 teams"
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 220))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"with their own flags on each side"                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 260))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"- The team earn points by captureing the other"                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 300))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"team's flag and carrying it to their base."                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 340))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"- When carrying the flag, player cannot attack/block."                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 380))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"- The team scoring 10 flags first win, game is over."                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 420))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"- Score of a player = Number of flags his team scores."                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 460))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"- Each player's kill when his teammate is carrying the"                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 500))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+                
+                classic_des_text = f"flag is considered a plus point."                                                
+                classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
+                classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 540))
+                self.screen.blit(classic_des_rendered, classic_des_rect)
+            
+            # Event handling
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if back_button.checkForInput(mouse_pos):
+                        self.guide_screen() # Return to the menu 
+                    # Pagination button logic
+                    if left_button.checkForInput(mouse_pos) and current_page > 1:
+                        current_page -= 1
+                    if right_button.checkForInput(mouse_pos) and current_page < 2:
+                        current_page += 1
+            
+            pygame.display.update()
+            
 
     def game_mode_screen(self):
         """Game mode selection screen"""
