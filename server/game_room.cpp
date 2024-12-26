@@ -280,7 +280,7 @@ void sendResponse8(int connectfd, Player *players){
     };
     
     // print to check
-    printf(YELLOW "Bytes sent to client=%d, type=%c\n" RESET, sendBytes, packet[0]);
+    printf(YELLOW "Bytes sent to client=%d, type=%c\n" RESET, sendBytes, packet[0]); // could be printing wrong for type since we are using ASCII value
 }
 
 // - function to send response 11 from server to all players in the game room
@@ -309,7 +309,7 @@ void sendResponse11(int game_mode){
     }
     
     // print to check
-    printf(YELLOW "Bytes sent to each client=%d, type=%c, game_mode=%c\n" RESET, sendBytes, packet[0], packet[1]);
+    printf(YELLOW "Bytes sent to each client=%d, type=%c, game_mode=%d\n" RESET, sendBytes, packet[0], packet[1]); // could be printing wrong for type since we are using ASCII value
 }
 
 // - function to handle data when connected clients want to send something to server (for e.g: player ready state)
@@ -689,6 +689,9 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     sendResponse8(fd, head);
                     p = p->next;
                 }
+
+                // also sendResponse11 to all players
+                sendResponse11(game->game_mode);
 
             } // END got new incoming connections
         } // END looping through file descriptors
