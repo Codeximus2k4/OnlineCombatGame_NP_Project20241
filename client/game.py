@@ -1116,6 +1116,19 @@ class GameManager:
             self.display.fill(color = (0,0,0,0))
             self.display_2.blit(pygame.transform.scale(self.game_background, self.display.get_size()), (0,0))
 
+            back_button = Button(
+                image=pygame.transform.scale(pygame.image.load("data/images/menuAssets/Refresh Rect.png"), (100, 50)),
+                pos=(config.SCREEN_WIDTH-50, 50),
+                text_input="BACK",
+                font=get_font(20),
+                base_color=config.COLORS['RED'],
+                hovering_color="White"
+            )
+
+            mouse_pos = pygame.mouse.get_pos()
+            back_button.changeColor(mouse_pos)
+            back_button.update(self.display)
+
         # --------Find the player in the list of entities ------------
             if self.player is None:
                 for each in self.entities:
@@ -1131,6 +1144,9 @@ class GameManager:
             action = 0
             interaction= 0 
             for event in pygame.event.get():
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if back_button.checkForInput(mouse_pos):
+                        return
                 if event.type ==pygame.QUIT:
                     logout_request(self.user_id)
                     pygame.quit()

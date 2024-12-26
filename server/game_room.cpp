@@ -830,14 +830,14 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
             printf("Time limit reached, the match is ending ...\n");
             break; // should implement some catch error on the client side to know when the game ends
         }
-        else if (game->game_mode==2)
-        {
-            if (game->Score_team1> FLAG_SCORE_LIMIT || game->Score_team2>FLAG_SCORE_LIMIT)
-            {
-                printf("Score limit reached, the match is ending\n");
-                break;
-            } 
-        }
+        // else if (game->game_mode==2)
+        // {
+        //     if (game->Score_team1> FLAG_SCORE_LIMIT || game->Score_team2>FLAG_SCORE_LIMIT)
+        //     {
+        //         printf("Score limit reached, the match is ending\n");
+        //         break;
+        //     } 
+        // }
         // Listen from each client
         if (elapsed_ms >TICK_RATE)
         {
