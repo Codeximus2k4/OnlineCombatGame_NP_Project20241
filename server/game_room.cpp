@@ -247,7 +247,7 @@ void sendResponse6(int connectfd, int status){
     };
     
     // print to check
-    printf(YELLOW "Bytes sent to client=%d, type=%c, status=%c\n" RESET, sendBytes, data[0], data[1]);
+    printf(YELLOW "Bytes sent to client=%d, type=%d, status=%c\n" RESET, sendBytes, data[0] - 48, data[1]);
 }
 
 // - function to send players in the room all information in the waiting room
@@ -280,7 +280,7 @@ void sendResponse8(int connectfd, Player *players){
     };
     
     // print to check
-    printf(YELLOW "Bytes sent to client=%d, type=%c\n" RESET, sendBytes, packet[0]);
+    printf(YELLOW "Bytes sent to client=%d, type=%d\n" RESET, sendBytes, packet[0] - 48); // could be printing wrong for type since we are using ASCII value
 }
 
 // - function to send response 11 from server to all players in the game room
@@ -309,7 +309,7 @@ void sendResponse11(int game_mode){
     }
     
     // print to check
-    printf(YELLOW "Bytes sent to each client=%d, type=%c, game_mode=%c\n" RESET, sendBytes, packet[0], packet[1]);
+    printf(YELLOW "Bytes sent to each client=%d, type=%d, game_mode=%d\n" RESET, sendBytes, packet[0] - 48, packet[1]); // could be printing wrong for type since we are using ASCII value
 }
 
 // - function to handle data when connected clients want to send something to server (for e.g: player ready state)
@@ -327,7 +327,7 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
     char opcode = buff[0];
 
     // print log
-    printf("(In game room) Connected client with socket %d sent request type %c\n", clientfd, opcode);
+    printf(BLUE "[+] (In game room) Connected client with socket %d sent request type %d\n" RESET, clientfd, opcode - 48);
 
     if(opcode == '7'){
         // get user_id
@@ -375,7 +375,6 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
             return;
         }
         game->game_mode = buff[0];
-        game->game_mode -= '0'; // convert back to int
 
         // send response back to all players about this change of game mode
         sendResponse11(game->game_mode);
@@ -402,7 +401,7 @@ void handleConnectedClients(int clientfd, char buff[BUFF_SIZE + 1]) {
 
         // store choice of hero_id for the corresponding player
         Player *p = findPlayerInRoomBySocketDescriptor(players, clientfd);
-        p->char_type = hero_id - '1'; // convert back to int
+        p->char_type = hero_id;
         printf("hero id : %d\n",p->char_type);
     }
 }
@@ -607,7 +606,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                                 // send message to main server about this change 
                                 ipc_msg message;
                                 
-                                serializeIpcMsg(&message, room_id, players);
+                                serializeIpcMsg(&message, room_id, players, 0);
                                 
                                 // Send the message
                                 if (msgsnd(msgid, &message, sizeof(message.text), 0) == -1) {
@@ -662,7 +661,7 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                         // send message to main server about this change 
                         ipc_msg message;
                         
-                        serializeIpcMsg(&message, room_id, players);
+                        serializeIpcMsg(&message, room_id, players, 0);
 
                         // Send the message
                         if (msgsnd(msgid, &message, sizeof(message.text), 0) == -1) {
@@ -691,11 +690,27 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     p = p->next;
                 }
 
+                // also sendResponse11 to all players
+                sendResponse11(game->game_mode);
+
             } // END got new incoming connections
         } // END looping through file descriptors
         if (gameStart)
             {
                 printf("Game is starting...\n");
+
+                // send message to parent process to update information of this room
+                ipc_msg message;
+                        
+                serializeIpcMsg(&message, room_id, players, 1);
+
+                // Send the message
+                if (msgsnd(msgid, &message, sizeof(message.text), 0) == -1) {
+                    perror(RED "Error in waiting room, msgsnd failed" RESET);
+                    exit(1);
+                }
+                printf("Child: Message sent to parent. %s\n", message.text);
+
                 break;
             }
 
@@ -815,14 +830,14 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
             printf("Time limit reached, the match is ending ...\n");
             break; // should implement some catch error on the client side to know when the game ends
         }
-        else if (game->game_mode==2)
-        {
-            if (game->Score_team1> FLAG_SCORE_LIMIT || game->Score_team2>FLAG_SCORE_LIMIT)
-            {
-                printf("Score limit reached, the match is ending\n");
-                break;
-            } 
-        }
+        // else if (game->game_mode==2)
+        // {
+        //     if (game->Score_team1> FLAG_SCORE_LIMIT || game->Score_team2>FLAG_SCORE_LIMIT)
+        //     {
+        //         printf("Score limit reached, the match is ending\n");
+        //         break;
+        //     } 
+        // }
         // Listen from each client
         if (elapsed_ms >TICK_RATE)
         {

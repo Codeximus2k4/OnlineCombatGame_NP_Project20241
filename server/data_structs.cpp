@@ -465,18 +465,18 @@ void update_player(Player* player, Game *game)
 
         player->timeSinceAttack = min(player->timeSinceAttack+1, player->attack_cooldown+1);
 
-        if (player->proposed_action==1 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=10) 
+        if (player->proposed_action==1 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>30) 
         {
             player->action=1;
             player->timeSinceAttack=0;
-            player->stamina = max(player->stamina -20,0);
+            player->stamina = max(player->stamina -30,0);
         } 
 
-        if (player->proposed_action==2 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=20) 
+        if (player->proposed_action==2 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=50) 
         {
             player->action=2;
             player->timeSinceAttack = 0;
-            player->stamina = max(player->stamina -40,0);
+            player->stamina = max(player->stamina -50,0);
         } 
 
         // align the position according to the previous frame first
@@ -709,7 +709,7 @@ void check_attack(Player *player1, Player *player2)
     printf("player id %d is hit? %d\n",player2->id, attacked);
     if (attacked==1 && player1->action==1) 
     {
-        player2->health = max(player2->health-10, 0);
+        player2->health = max(player2->health-30, 0);
         player2->action=10;
         if (player2->health>0) 
         {
@@ -731,7 +731,7 @@ void check_attack(Player *player1, Player *player2)
     }
     if (attacked==1 && player1->action==2) 
     {
-        player2->health = max(player2->health-20, 0);
+        player2->health = max(player2->health-50, 0);
         if (player2->health>0)
         {
             player2->action=10;
@@ -882,7 +882,7 @@ struct Room {
 // game_start_yet? = '0' --> waiting, = '1' --> started, = '2' --> finish
 struct ipc_msg {
     long type;
-    char text[4];
+    char text[5];
 };
 
 // - function to serialize information in game room to a string
@@ -1069,6 +1069,28 @@ int countRooms(Room *head) {
     return totalRoomCount;
 }
 
+// - function to count total number of AVAILABLE rooms in server
+// - input: pointer to head of list of rooms
+// - output: number of rooms in the list
+// - dependencies: none
+int countAvailableRooms(Room *head){
+    Room *p = head;
+    int totalRoomCount = 0;
+
+    if(p == NULL) return 0;
+
+    while(p != NULL){
+        // only count rooms that have not started
+        if(p->started == 0){
+            totalRoomCount++;
+        }
+        
+        p = p->next;
+    }
+
+    return totalRoomCount;
+}
+
 // - function to serialize information of list of rooms available
 // - input: char string to store result, head pointer to list of rooms
 // - output: none
@@ -1088,9 +1110,12 @@ void serializeRoomInformation(char result[], Room *head){
     }
 
     // count total of available rooms and set it to first byte
-    int totalRoom = countRooms(head);
+    int totalRoom = countAvailableRooms(head);
     snprintf(strnum, sizeof(strnum), "%d", totalRoom);
     strcpy(result, strnum);
+
+    // total of available rooms = 0 then return "0" in result
+    if(totalRoom == 0) return;
 
     Room *p = head;
     while(p != NULL){
@@ -1114,8 +1139,7 @@ void serializeRoomInformation(char result[], Room *head){
         snprintf(strnum, sizeof(strnum), "%d", totalPlayerInRoom);
         strcat(result, strnum);
 
-        // increment
-        totalRooms++;
+        // to next room
         p = p->next;
     }
 
@@ -1124,12 +1148,13 @@ void serializeRoomInformation(char result[], Room *head){
 }
 
 // message format: [room_id][num_players_in_room]
-// input: the message, the room_id, the head of the player list
-void serializeIpcMsg(ipc_msg *message, int room_id, Player *head) {
+// input: the message, the room_id, the head of the player list, started state of the room
+void serializeIpcMsg(ipc_msg *message, int room_id, Player *head, int started) {
     message->type = 1;
     message->text[0] = room_id + '0';
     message->text[1] = countPlayerInRoom(head) + '0';
-    message->text[2] = '\0';
+    message->text[2] = (char) started;
+    message->text[3] = '\0';
 }
 
 // - function to find room by id
@@ -1615,7 +1640,7 @@ int scoreTheFlag(Player *player, Game *game)
         if (flag->id==1) game->Score_team2++;
         if (flag->id==2) game->Score_team1++;
         player->score+=50;
-        printf("Player id %d has scored\n", player->id);
+        printf("Player id %d has scored: %d\n", player->id, player->score);
         respawnFlag(player);
         return 1;
     }

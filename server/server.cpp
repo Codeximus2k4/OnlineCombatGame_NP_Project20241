@@ -155,6 +155,15 @@ void sendResponse3(int connectfd){
 
     memset(roomInformation, 0, sizeof(roomInformation));
 
+    // print log of current rooms in the server
+    printf(CYAN "\t(In main server) Current active rooms information:\n" RESET);
+    Room *p = rooms;
+    while(p != NULL){
+        printf("\t\tRoom id %d: number of players: %d, started: %d\n", p->id, p->total_players, p->started);
+
+        p = p->next;
+    }
+
     // init data to send
     serializeRoomInformation(roomInformation, rooms);
     strcpy(data, "3");
@@ -329,6 +338,11 @@ void *message_handler(void *arg) {
             Room *room_updated = findRoomById(rooms, room_id_updated); //find room
             room_updated->total_players = message.text[1] - '0'; //update num of players in room
             printf("Total number of player in room %d is %d\n", room_id_updated, room_updated->total_players);
+
+            // update started state of the room
+            room_updated->started = (int) message.text[2];
+            printf("Ready state of room %d is %d\n", room_id_updated, room_updated->started);
+
             // if the room does not have any player left
             if (room_updated->total_players == 0) {
                 // remove room from list of rooms
@@ -375,7 +389,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
     message_type = buff[0];
 
     // print request type
-    printf(BLUE "[+] Request type %c from [%s:%d] with socket descriptor = %d\n" RESET, message_type, cli_addr, ntohs(cliaddr.sin_port), connectfd);
+    printf(BLUE "[+] Request type %d from [%s:%d] with socket descriptor = %d\n" RESET, message_type - 48, cli_addr, ntohs(cliaddr.sin_port), connectfd);
 
     if(message_type == '1'){
         // register request from client

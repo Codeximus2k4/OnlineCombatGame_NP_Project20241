@@ -13,8 +13,7 @@ from scripts.button import Button
 from scripts.tilemap  import Tilemap
 
 class GameManager:
-    def __init__(self,network_manager: NetworkManager):
-        self.network = network_manager
+    def __init__(self):
         self.screen = pygame.display.set_mode((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
         pygame.display.set_caption('combat game')
         
@@ -321,6 +320,7 @@ class GameManager:
             
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    logout_request(self.user_id)
                     pygame.quit()
                     sys.exit()
                 
@@ -329,6 +329,7 @@ class GameManager:
                         self.game_mode_screen()
                     
                     if quit_button.checkForInput(mouse_pos):
+                        logout_request(self.user_id)
                         pygame.quit()
                         sys.exit()
 
@@ -779,6 +780,7 @@ class GameManager:
             
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    logout_request(self.user_id)
                     pygame.quit()
                     sys.exit()
                 
@@ -908,6 +910,7 @@ class GameManager:
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    logout_request(self.user_id)
                     pygame.quit()
                     sys.exit()
 
@@ -944,16 +947,21 @@ class GameManager:
         hero_picked = " "
         game_mode_picked = "CLASSIC"
         hero_to_id = {
-            "Samurai": "1",
-            "Wizard": "2",
-            "King": "3",
-            "Witch": "4"
+            "Samurai": 1,
+            "Wizard": 2,
+            "King": 3,
+            "Witch": 4
         }
 
         game_mode_to_id = {
-            "CLASSIC": "1",
-            "CAPTURE THE FLAG": "2"
+            "CLASSIC": 1,
+            "CAPTURE THE FLAG": 2
         }
+        id_to_game_mode ={
+            1: "CLASSIC",
+            2: "CAPTURE THE FLAG"
+        }
+        self.game_mode = game_mode_to_id[game_mode_picked]
 
         def waiting_room_process():
             new_players = []
@@ -979,11 +987,8 @@ class GameManager:
                     message_type = ord(message_type)
                     print(f"Message type: {message_type}")
                     game_mode = room_tcp_socket.receive_tcp_message(buff_size=1).decode()
-                    print(f"Game mode: {game_mode}")
-                    if game_mode == "1":
-                        self.game_mode = 1
-                    elif game_mode == "2":
-                        self.game_mode = 2
+                    game_mode = ord(game_mode)
+                    self.game_mode = game_mode
                 return new_players
             except Exception as e:
                 print(f"Error when receiving message type 7/8: {e}")
@@ -1113,6 +1118,7 @@ class GameManager:
                 text_rendered = get_font(15).render(text, True, config.COLORS['MENU_TEXT'])
                 self.screen.blit(text_rendered, (50, sc_offset+270))
 
+                game_mode_picked = id_to_game_mode[self.game_mode]
                 game_mode_text = get_font(15).render(game_mode_picked, True, config.COLORS['MENU_TEXT'])
                 text_rect = game_mode_text.get_rect(center=(175, sc_offset+300))
                 self.screen.blit(game_mode_text, text_rect)
@@ -1126,6 +1132,7 @@ class GameManager:
                     if event.type == pygame.QUIT:
                         stop_thread.set()
                         room_tcp_socket.close()
+                        logout_request(self.user_id)
                         pygame.quit()
                         sys.exit()
 
@@ -1151,22 +1158,21 @@ class GameManager:
                                 ready_button.text_input = "READY"
                                 ready_button.base_color = config.COLORS["GREEN"]
                                 ready_button.text = ready_button.font.render(ready_button.text_input, True, ready_button.base_color)
-                            hero_request(user_id=user_id, hero_id=hero_to_id[hero_picked], hero_socket=room_tcp_socket)
-                            game_mode_request(user_id=user_id, game_mode=game_mode_to_id[game_mode_picked], game_mode_socket=room_tcp_socket)
+                            hero_request(user_id=user_id, hero_id=hero_to_id[hero_picked], hero_socket=room_tcp_socket)                            
                             update_ready_request(user_id=self.user_id, is_ready=is_ready, update_ready_socket=room_tcp_socket)
 
                         # Add to event handling section
                         if left_arrow.checkForInput(mouse_pos):
                             if game_mode_picked == "CLASSIC":
-                                game_mode_picked = "CAPTURE THE FLAG"
+                                game_mode_request(user_id=user_id, game_mode=2, game_mode_socket=room_tcp_socket)
                             else:
-                                game_mode_picked = "CLASSIC"
+                                game_mode_request(user_id=user_id, game_mode=1, game_mode_socket=room_tcp_socket)
 
                         if right_arrow.checkForInput(mouse_pos):
                             if game_mode_picked == "CLASSIC":
-                                game_mode_picked = "CAPTURE THE FLAG"
+                                game_mode_request(user_id=user_id, game_mode=2, game_mode_socket=room_tcp_socket)
                             else:
-                                game_mode_picked = "CLASSIC"
+                                game_mode_request(user_id=user_id, game_mode=1, game_mode_socket=room_tcp_socket)
                         
                         if back_button.checkForInput(mouse_pos):
                             stop_thread.set()
@@ -1184,7 +1190,6 @@ class GameManager:
             if udp_room_port:
                 for player in players:
                     self.id_to_username[player["player_id"]] = player["username"]
-                print(f"Game mode: {self.game_mode}")
                 self.run(room_udp_port=udp_room_port)
 
 
@@ -1278,6 +1283,7 @@ class GameManager:
             # Event handling
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    logout_request(self.user_id)
                     pygame.quit()
                     sys.exit()
 
@@ -1316,7 +1322,6 @@ class GameManager:
         index = 0
         length =  len(data)
         data = struct.unpack(f"!{length}B", data)
-        print("Game mode:" ,self.game_mode)
         print(data)
         while (1):
             score  =0 
@@ -1434,7 +1439,7 @@ class GameManager:
                     # update the position
                     each.pos[0] = posx
                     each.pos[1] = posy
-                    each.entity_class = entity_class
+                    each.entity_class = entity_class-1
                     if entity_type==0:
                         each.flip = flip
                         each.set_action(action_type,False)
@@ -1506,9 +1511,28 @@ class GameManager:
         thread = threading.Thread(target=receive_messages, args = (self.udp_room_socket, q),daemon=True)
         thread.start()
 
+        # start time
+        start_time = time.time()
+
         while True:
+            current_time = time.time()
+            if current_time - start_time >= 90:
+                break
             self.display.fill(color = (0,0,0,0))
             self.display_2.blit(pygame.transform.scale(self.game_background, self.display.get_size()), (0,0))
+
+            back_button = Button(
+                image=pygame.transform.scale(pygame.image.load("data/images/menuAssets/Refresh Rect.png"), (100, 50)),
+                pos=(config.SCREEN_WIDTH-50, 50),
+                text_input="BACK",
+                font=get_font(20),
+                base_color=config.COLORS['RED'],
+                hovering_color="White"
+            )
+
+            mouse_pos = pygame.mouse.get_pos()
+            back_button.changeColor(mouse_pos)
+            back_button.update(self.display)
 
         # --------Find the player in the list of entities ------------
             if self.player is None:
@@ -1525,7 +1549,11 @@ class GameManager:
             action = 0
             interaction= 0 
             for event in pygame.event.get():
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if back_button.checkForInput(mouse_pos):
+                        return
                 if event.type ==pygame.QUIT:
+                    logout_request(self.user_id)
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.KEYDOWN:
@@ -1612,8 +1640,16 @@ class GameManager:
                 # pygame.draw.rect(self.display, (255,0,0),
                 #                  pygame.Rect(self.player.pos[0]-render_scroll[0], self.player.pos[1]-render_scroll[1],self.player.size[0],self.player.size[1]),
                 #                  1)
-                self.display_username(self.player, render_scroll, config.COLORS["LIGHT_GREEN"])
-                self.display_score(self.player, 0, render_scroll, config.COLORS["WHITE"])
+                if self.game_mode == 1:
+                    self.display_username(self.player, render_scroll, config.COLORS["LIGHT_GREEN"])
+                    self.display_score(self.player, self.player.score, 5, 5, config.COLORS["LIGHT_GREEN"])
+                else:
+                    if self.player.team == 1:
+                        self.display_username(self.player, render_scroll, config.COLORS["LIGHT_GREEN"])
+                        self.display_score(self.player, self.player.score, 5, 5, config.COLORS["LIGHT_GREEN"])
+                    else:
+                        self.display_username(self.player, render_scroll, config.COLORS["RED"])
+                        self.display_score(self.player, self.player.score, 5, 5, config.COLORS["RED"])
                 self.display_healthbar_staminabar(self.player, render_scroll)
                 self.player.render(self.display,offset = render_scroll)
             
@@ -1624,17 +1660,108 @@ class GameManager:
                     each.render(self.display,offset = render_scroll)
 
             # render the player after the flags,items,traps to make them appear on top 
+            y_offset = 5
             for each in self.entities:
                 if each is not self.player and isinstance(each, Player):
                     each.render(self.display,offset = render_scroll)
-                    self.display_username(each, render_scroll, config.COLORS["BLUE"])
-                    # self.display_score(each, each.score, render_scroll, config.COLORS["WHITE"])
-                    self.display_healthbar_staminabar(each, render_scroll)
+                    if self.game_mode == 1:
+                        self.display_username(each, render_scroll, config.COLORS["RED"])
+                        self.display_score(each, each.score, 5, y_offset + 15, config.COLORS["RED"])
+                    else:
+                        if each.team == 1:
+                            self.display_username(each, render_scroll, config.COLORS["LIGHT_GREEN"])
+                            self.display_score(each, each.score, 5, y_offset + 15, config.COLORS["LIGHT_GREEN"])
+                        else:
+                            self.display_username(each, render_scroll, config.COLORS["RED"])
+                            self.display_score(each, each.score, 5, y_offset + 15, config.COLORS["RED"])
 
+                    
+                    self.display_healthbar_staminabar(each, render_scroll)
+                    y_offset = y_offset + 15
+
+            self.display_remaining_time(90-int(current_time-start_time), config.COLORS["YELLOW"])
             self.display_2.blit(self.display, (0,0))
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), dest = (0,0))
             pygame.display.update()
             self.clock.tick(40)
+
+        self.display_winner()
+
+    def display_winner(self):
+        """Display the winner(s) of the game on the final screen."""
+        # Blur the gameplay screen
+        # gameplay_surface = pygame.Surface(self.display.get_size())
+        # gameplay_surface.blit(self.display, (0, 0))
+        # gameplay_surface = pygame.transform.smoothscale(gameplay_surface, (self.display.get_width() // 2, self.display.get_height() // 2))
+        # gameplay_surface = pygame.transform.smoothscale(gameplay_surface, self.display.get_size())
+        # self.screen.blit(gameplay_surface, (0, 0))
+
+        # Smaller background for winner display
+        winner_background = pygame.Surface((600, 400))
+        winner_background.fill((0, 0, 0))  # Black background
+        winner_background.set_alpha(200)  # Semi-transparent
+        winner_rect = winner_background.get_rect(center=(self.display.get_width() // 2, self.display.get_height() // 2))
+        self.screen.blit(winner_background, winner_rect.topleft)
+
+        # Determine winner(s)
+        print(f"Display game mode: {self.game_mode}")
+        if self.game_mode == 1:
+            # Find the player with the highest score
+            winner = max(self.entities, key=lambda e: e.score if isinstance(e, Player) else float('-inf'))
+            winner_text = f"Winner: {self.id_to_username[winner.id]} (Score: {winner.score})"
+        elif self.game_mode == 2:
+            # Find the two players in the team with the highest combined score
+            team_scores = {}
+            for entity in self.entities:
+                if isinstance(entity, Player):
+                    team_id = entity.team  # Assuming each player has a team_id attribute
+                    if team_id not in team_scores:
+                        team_scores[team_id] = []
+                    team_scores[team_id].append(entity)
+
+            print(team_scores)
+            # Calculate combined scores for each team
+            top_team = max(team_scores.values(), key=lambda team: sum(player.score for player in team))
+            top_team = sorted(top_team, key=lambda p: p.score, reverse=True)[:2]  # Top 2 players
+
+            winner_text = "Winners:\n"
+            for player in top_team:
+                winner_text += f"{self.id_to_username[player.id]} (Score: {player.score})\n"
+
+        # Display winner text
+        font = get_font(22)
+        lines = winner_text.strip().split('\n')
+        for i, line in enumerate(lines):
+            rendered_text = font.render(line, True, config.COLORS['MENU_TEXT'])
+            text_rect = rendered_text.get_rect(center=(self.display.get_width() // 2, winner_rect.top + 50 + i * 50))
+            self.screen.blit(rendered_text, text_rect)
+
+        # Add Exit Button
+        exit_button = Button(
+            image=pygame.image.load("data/images/menuAssets/Refresh Rect.png"),
+            pos=(self.display.get_width() // 2, winner_rect.bottom - 50),
+            text_input="EXIT",
+            font=get_font(25),
+            base_color=config.COLORS['RED'],
+            hovering_color="White"
+        )
+
+        while True:
+            mouse_pos = pygame.mouse.get_pos()
+            exit_button.changeColor(mouse_pos)
+            exit_button.update(self.screen)
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if exit_button.checkForInput(mouse_pos):
+                        return  # Exit the winner screen
+
+            pygame.display.update()
+
+
 
     def display_healthbar_staminabar(self, player: Player, render_scroll):
         """
@@ -1676,7 +1803,7 @@ class GameManager:
         # Blit the username onto the display
         self.display.blit(username_text, username_rect)
 
-    def display_score(self, player: Player, score, render_scroll, color):
+    def display_score(self, player: Player, score, posx, posy, color):
         """
         Display the player's score next to the right of the health bar.
         
@@ -1688,12 +1815,11 @@ class GameManager:
         """
         # Load the font and render the score text
         score_font = pygame.font.Font(config.FONT_PATH, 10)
-        score_text = score_font.render(f"Score: {score}", True, color)
+        score_text = score_font.render(f"{self.id_to_username[player.id]}: {score}", True, color)
         
         # Calculate the position of the score (next to the right of the health bar)
         score_rect = score_text.get_rect(topleft=(
-            player.pos[0] - render_scroll[0] + 55,  # Positioned to the right of the health bar
-            player.pos[1] - render_scroll[1] - 17  # Align vertically with the health bar
+            posx, posy
         ))
         
         # Blit the score onto the display
@@ -1706,6 +1832,25 @@ class GameManager:
         for each in self.base_sign:
             each.update()
             each.render(self.display,offset)
+    def display_remaining_time(self, remaining_time, color):
+        """
+        Display the remaining time at the top center of the screen.
+        
+        Args:
+        - remaining_time: The remaining time in seconds to display.
+        - color: The color of the text displaying the time.
+        """
+        # Load the font and render the remaining time text
+        time_font = pygame.font.Font(config.FONT_PATH, 20)
+        time_text = time_font.render(f"Time Left: {remaining_time}s", True, color)
+        
+        # Calculate the position of the text (top center of the screen)
+        time_rect = time_text.get_rect(center=(config.SCREEN_WIDTH // 2, 20))
+        
+        # Blit the text onto the display
+        self.display.blit(time_text, time_rect)
+
+
 
 if __name__ == "__main__":
     GameManager().menu()
