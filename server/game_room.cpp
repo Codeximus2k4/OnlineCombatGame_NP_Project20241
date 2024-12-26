@@ -819,7 +819,6 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
 
     while (true)
         {
-           // printf("inside the loop");
         clock_gettime(CLOCK_MONOTONIC, &current_time);
         long elapsed_ms  =  (current_time.tv_sec - last_tick.tv_sec)*1000 
                             + (current_time.tv_nsec - last_tick.tv_nsec)/1000000;
@@ -919,19 +918,24 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     else if (player1->timeSinceAttack== player1->HitFrame && player2->timeSinceAttack>player2->HitFrame) {
                         if (player1->isFacingLeft) 
                         {
-                            player1->attackHitBox->offset_x = player1->posx;
-                            player1->attackHitBox->offset_y = player1->posy;
+                            player1->attackHitBox1->offset_x = player1->posx;
+                            player1->attackHitBox1->offset_y = player1->posy;
+                            player1->attackHitBox2->offset_x = player1->posx;
+                            player1->attackHitBox2->offset_y = player1->posy;
                         }
                         else
                         {
-                            player1->attackHitBox->offset_x = player1->posx+DISTANCE_FROM_ATTACK_HITBOX;
-                            player1->attackHitBox->offset_y =  player1->posy;
+                            player1->attackHitBox1->offset_x = player1->posx+DISTANCE_FROM_ATTACK_HITBOX;
+                            player1->attackHitBox1->offset_y =  player1->posy;
+                            player1->attackHitBox2->offset_x = player1->posx+DISTANCE_FROM_ATTACK_HITBOX;
+                            player1->attackHitBox2->offset_y =  player1->posy;
                         }
-                        check_attack(player1, player2);
+                        check_attack(player1, player2,game);
                     }
                 }
             }
 
+            printf("Done checking attack\n");
             //checking flag interaction
             if (game->game_mode==2)
             {

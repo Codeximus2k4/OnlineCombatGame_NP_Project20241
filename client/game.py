@@ -1602,9 +1602,13 @@ class GameManager:
             
         # get player size
             if self.player is not None:
-                if (action==1 or action==2):
+                if (action==1 or action==2 ) and (self.player.action_type!=2 or self.player.action_type!=1):
                     size = self.player.predict_next_frame_size(action)
                     msg +=size[0].to_bytes(1,"big") +size[1].to_bytes(1,"big")
+                elif (self.player.action_type==2 or self.player.action_type==1):
+                    size = self.player.predict_next_frame_size(self.player.action_type)
+                    msg +=size[0].to_bytes(1,"big") +size[1].to_bytes(1,"big")
+                
                 else:
                     msg += self.player.size[0].to_bytes(1,"big") + self.player.size[1].to_bytes(1,"big")
             else :
@@ -1770,14 +1774,28 @@ class GameManager:
         - player: the player who need to display his/her health and stamina status
         - render_scroll: To modify the position of the bars
         """
+
+        # get the specific health and stamina stats of each class of players
+        if (player.entity_class==1):
+            max_health = 50
+            max_stamina = 60
+        elif (player.entity_class==2):
+            max_health = 60
+            max_stamina=120
+        elif (player.entity_class==3):
+            max_health= 100
+            max_stamina=60
+        elif (player.entity_class==4):
+            max_health = 60
+            max_stamina =100
         # Display health loss
         pygame.draw.rect(self.display, config.COLORS['RED'], (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-17, 50, 7))
         
         # Display current health
-        pygame.draw.rect(self.display, config.COLORS['LIGHT_GREEN'], (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-17, (50/100) * (player.health), 7))
+        pygame.draw.rect(self.display, config.COLORS['LIGHT_GREEN'], (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-17, (50/max_health) * (player.health), 7))
         
         # Display stamina
-        pygame.draw.rect(self.display, config.COLORS['YELLOW'], (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-7, (50/100) * (player.stamina), 3))
+        pygame.draw.rect(self.display, config.COLORS['YELLOW'], (player.pos[0]-render_scroll[0], player.pos[1]-render_scroll[1]-7, (50/max_stamina) * (player.stamina), 3))
 
     def display_username(self, player: Player, render_scroll, color):
         """

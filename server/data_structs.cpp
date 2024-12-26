@@ -169,7 +169,7 @@ struct Player {
     int socket_descriptor; // socket descriptor corresponding for each player (to handle select())
     int ready;
     sockaddr_in cliaddr; // IPv4 address corresponding to each player
-    Hitbox *selfHitBox, *attackHitBox; //
+    Hitbox *selfHitBox, *attackHitBox1, *attackHitBox2; //
     unsigned char input_buffer[256]; // input buffer of each player
     int bytes_received;
     int team;
@@ -180,8 +180,10 @@ struct Player {
     int collisionx;
     int collisiony;
     int health;
+    int max_health;
     int char_type;
     int stamina;
+    int max_stamina;
     int action;
     int attack_cooldown;
     int dash_cooldown ;
@@ -205,6 +207,9 @@ struct Player {
     int HitFrame;
     int score;
     int HitTime;
+    int attack_power1, attack_power2 ;
+    int mana_consumed1, mana_consumed2;
+    int slowed_effect;
     Flag* flagTaken;
 };
 
@@ -436,7 +441,7 @@ void update_player(Player* player, Game *game)
             else player->action=0;
         }
         //handle state change
-        if (player->timeSinceAttack>player->HitFrame && (player->action==1 ||player->action==2)) player->action =0; //end attack
+        if (player->timeSinceAttack>=player->HitFrame && (player->action==1 ||player->action==2)) player->action =0; //end attack
 
         if (player->collisiony !=2 && player->vertical_velocity>0 
         && player->action!=2 && player->action!=1) player->action = 6;
@@ -452,6 +457,9 @@ void update_player(Player* player, Game *game)
             player->speed=6;
         }
         
+        if (player->char_type==3) player->speed= 4;
+        if (player->slowed_effect) player->speed = min(player->speed, 2);
+
         if (player->movement_x==0 && player->collisiony==2) player->action =0;
         if (player->movement_x!=0 && player->collisiony==2) 
         {
@@ -467,18 +475,18 @@ void update_player(Player* player, Game *game)
 
         player->timeSinceAttack = min(player->timeSinceAttack+1, player->attack_cooldown+1);
 
-        if (player->proposed_action==1 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>30) 
+        if (player->proposed_action==1 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=player->mana_consumed1) 
         {
             player->action=1;
             player->timeSinceAttack=0;
-            player->stamina = max(player->stamina -30,0);
+            player->stamina = max(player->stamina -player->mana_consumed1,0);
         } 
 
-        if (player->proposed_action==2 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=50) 
+        if (player->proposed_action==2 && player->collisiony==2 && player->timeSinceAttack>=player->attack_cooldown && player->stamina>=player->mana_consumed2) 
         {
             player->action=2;
             player->timeSinceAttack = 0;
-            player->stamina = max(player->stamina -50,0);
+            player->stamina = max(player->stamina - player->mana_consumed2,0);
         } 
 
         //position update
@@ -506,7 +514,7 @@ void update_player(Player* player, Game *game)
             {
                 player->selfHitBox->offset_y +=player->vertical_velocity;
             }
-            else if (player->collisiony!= 2 && player->collisiony!=3 && player->timeSinceAttack>player->HitFrame+1) 
+            else if (player->collisiony!= 2 && player->collisiony!=3 && player->vertical_velocity>=0) 
             {
                 player->selfHitBox->offset_y +=player->vertical_velocity;
             }
@@ -535,8 +543,14 @@ void update_player(Player* player, Game *game)
         // player->selfHitBox->height =  player->sizey;
 
         //update stamina
-        player->stamina = min(player->stamina+1, 100);
+        if (player->char_type==1) player->stamina =min(player->stamina+2, player->max_stamina);
+        else 
+        {
+        player->stamina = min(player->stamina+1, player->max_stamina);
+        }
 
+        //update health for tanker
+        if (player->char_type==3)  player->health= min(player->health+1, player->max_health);
         //update the flag position if the player is holding the flag
         if (player->flagTaken!=NULL) 
         {
@@ -648,54 +662,50 @@ void assign_players_to_team(Game *game)
             temp->team = 0;
             temp->timeSinceDeath=game->respawn_time+1;
             temp->health=0;
+            temp->score=0;
         }
     }
 }
 void characterSpawner(Player* players, Game *game)
 {
     Player* temp;
+    int index = 1;
     for (temp = players;temp!=NULL;temp=temp->next)
     {
         if (temp->health<=0 && temp->timeSinceDeath>=game->respawn_time) // This character just died or just got into the game, needs to be spawned
         {
                 temp->flagTaken = NULL;
-                temp->posx = 500;
-                temp->posy = 325;
-                temp->health=100;
-                temp->stamina = 100;
-                temp->isFacingLeft=1;
-                temp->speed = 5;
-                temp->action =  0;
-                temp->attack_cooldown = 50;
-                temp->HitFrame = 30;
-                temp->dash_cooldown = 10;
-                temp->is_blocking=false; 
-                temp->is_jumping=false;
-                temp->timeSinceAttack=52;
-                temp->timeSinceDash=0;
-                temp->movement_x=0;
-                temp->movement_y=0;         
-                temp->is_falling = 0; 
-                temp->Hit = 0;
-                temp->timeSinceDeath=game->respawn_time+1;
-                temp->vertical_velocity = 0;
-                printf("Character type: %d\n",temp->char_type);
-                if (temp->char_type==0)
+                // assigning positions
+                if (index%2==0)
+                {
+                    temp->posx = 500;
+                    temp->posy = 325;
+                    index++;
+                }
+                else 
+                {
+                    temp->posx = 1000;
+                    temp->posy = 325;
+                    index++;
+                }
+
+                // assigning the size and self hit box
+                if (temp->char_type==1)
                 {
                     temp->sizex=45;
                     temp->sizey=60;
                 }
-                else if (temp->char_type==1)
+                else if (temp->char_type==2)
                 {
                     temp->sizex = 57;
                     temp->sizey=100;
                 }
-                else if (temp->char_type==2)
+                else if (temp->char_type==3)
                 {
                     temp->sizex = 35;
                     temp->sizey=86;
                 }
-                else if (temp->char_type==3)
+                else if (temp->char_type==4)
                 {
                     temp->sizex = 57;
                     temp->sizey=90;
@@ -703,57 +713,148 @@ void characterSpawner(Player* players, Game *game)
                 temp->previous_sizex=50;
                 temp->previous_sizey=60;
                 temp->selfHitBox=  makeHitbox(temp->posx+temp->sizex-50, temp->posy+temp->sizey-60,50, 60);
-                temp->attackHitBox = makeHitbox(temp->selfHitBox->offset_x+DISTANCE_FROM_ATTACK_HITBOX+ temp->selfHitBox->width
-                , temp->selfHitBox->offset_y, ATTACK_HITBOX_WIDTH,ATTACK_HITBOX_HEIGHT);
+                
+                if (temp->char_type==1)
+                {
+                    temp->health=50;
+                    temp->max_health=50;
+                    temp->stamina = 60;
+                    temp->max_stamina=60;
+                    temp->attack_power1 = 5;
+                    temp->mana_consumed1 =20;
+                    temp->attack_power2=10;
+                    temp->mana_consumed2 =40;
+                    temp->HitFrame =30;
+                    temp->attack_cooldown=60;
+                    temp->attackHitBox1 = makeHitbox(temp->selfHitBox->offset_x+DISTANCE_FROM_ATTACK_HITBOX+ temp->selfHitBox->width
+                , temp->selfHitBox->offset_y,48,48);
+                    temp->attackHitBox2 = makeHitbox(temp->selfHitBox->offset_x+DISTANCE_FROM_ATTACK_HITBOX+ temp->selfHitBox->width
+                , temp->selfHitBox->offset_y, 64,64);
+                }
+                else if (temp->char_type==2)
+                {
+                    temp->health = 60;
+                    temp->max_health=60;
+                    temp->stamina=120;
+                    temp->max_stamina = 120;
+                    temp->attack_power1=30;
+                    temp->mana_consumed1=60;
+                    temp->attack_power2 =50;
+                    temp->mana_consumed2=90;
+                    temp->HitFrame  =40;
+                    temp->attack_cooldown = 80;
+                    temp->attackHitBox1 = makeHitbox(temp->selfHitBox->offset_x+DISTANCE_FROM_ATTACK_HITBOX+ temp->selfHitBox->width
+                , temp->selfHitBox->offset_y,64,64);
+                }
+                else if (temp->char_type==3)
+                {
+                    temp->health =100;
+                    temp->max_health= 100;
+                    temp->stamina=60;
+                    temp->max_stamina=60;
+                    temp->attack_power1=5;
+                    temp->mana_consumed1=20;
+                    temp->attack_power2 =25;
+                    temp->mana_consumed2=10;
+                    temp->HitFrame  =30;
+                    temp->attack_cooldown = 50;
+                    temp->attackHitBox1 = makeHitbox(temp->selfHitBox->offset_x+DISTANCE_FROM_ATTACK_HITBOX+ temp->selfHitBox->width
+                , temp->selfHitBox->offset_y,32,32);
+                    temp->attackHitBox2 = makeHitbox(temp->selfHitBox->offset_x+DISTANCE_FROM_ATTACK_HITBOX+ temp->selfHitBox->width
+                , temp->selfHitBox->offset_y,64,10);
+                }
+                else if (temp->char_type==4)
+                {
+                    temp->health = 60;
+                    temp->max_health=60;
+                    temp->stamina=100;
+                    temp->max_stamina = 100;
+                    temp->attack_power1=10;
+                    temp->mana_consumed1=30;
+                    temp->attack_power2 =30;
+                    temp->mana_consumed2=60;
+                    temp->HitFrame  =40;
+                    temp->attack_cooldown = 60;
+                    temp->attackHitBox1 = makeHitbox(temp->selfHitBox->offset_x+DISTANCE_FROM_ATTACK_HITBOX+ temp->selfHitBox->width
+                , temp->selfHitBox->offset_y,64,64);
+                temp->attackHitBox2 = makeHitbox(temp->selfHitBox->offset_x+DISTANCE_FROM_ATTACK_HITBOX+ temp->selfHitBox->width
+                , temp->selfHitBox->offset_y,64,64);
+                }
+                temp->slowed_effect=0;
+                temp->isFacingLeft=1;
+                temp->speed = 5;
+                temp->action =  0;
+                temp->dash_cooldown = 10;
+                temp->is_blocking=false; 
+                temp->is_jumping=false;
+                temp->timeSinceAttack=temp->attack_cooldown+1;
+                temp->timeSinceDash=0;
+                temp->movement_x=0;
+                temp->movement_y=0;         
+                temp->is_falling = 0; 
+                temp->Hit = 0;
+                temp->timeSinceDeath=game->respawn_time+1;
+                temp->vertical_velocity = 0;
         }        
     }    
 }
-void check_attack(Player *player1, Player *player2)
+void check_attack(Player *player1, Player *player2, Game *game)
 {
-    int attacked = check_collision(player1->attackHitBox, player2->selfHitBox);
+    int attacked ;
+    if (player1->action==1) attacked = check_collision(player1->attackHitBox1, player2->selfHitBox);
     printf("player id %d is hit? %d\n",player2->id, attacked);
     if (attacked==1 && player1->action==1) 
     {
-        player2->health = max(player2->health-30, 0);
-        player2->action=10;
-        if (player2->health>0) 
+
+        //attack power handling
+        player2->health =  max(player2->health -= player1->attack_power1,0);
+        if (player2->health>0)
         {
             player2->action=10;
-            player2->HitTime=0;
-            player1->score+=5;
+            player2->HitTime= 0;
+            if (game->game_mode==1) player1->score++;
         }
         else 
         {
-            player2->timeSinceDeath=0;
             player2->action=11;
-            player1->score+=100;
-            if (player2->flagTaken!=NULL) 
-            {
-                player1->score+=50;
-                respawnFlag(player2);
-            }
+            player2->timeSinceDeath=0;
+            if (game->game_mode==1) player1->score+=10;
+                else player1->score+=2;
+                if (player2->flagTaken!=NULL) 
+                {
+                    player1->score+=5;
+                    respawnFlag(player2);
+                }
         }
+        
+        // effect handling according to the attacking player
+        if (player1->char_type==4 && player2->health>0) player2->stamina = max(player2->stamina-30, 0);
     }
-    if (attacked==1 && player1->action==2) 
+    else if (attacked==1 && player1->action==2) 
     {
-        player2->health = max(player2->health-50, 0);
+        //attack power handling
+        player2->health = max(player2->health-=player1->attack_power2, 0);
         if (player2->health>0)
         {
             player2->action=10;
             player2->HitTime=0;
-            player1->score+=5;
+            if (game->game_mode==1) player1->score+=2;
         }
         else 
         {
             player2->timeSinceDeath=0;
             player2->action=11;
-            player1->score+=100;
+            if (game->game_mode==1) player1->score+=10;
             if (player2->flagTaken!=NULL) 
             {
-                player1->score+=50;
+                player1->score+=5;
                 respawnFlag(player2);
             }
         }
+
+        //effect handling according to the attacking player
+        if (player1->char_type==1 && player2->health>0) player2->slowed_effect=1; 
+        if (player1->char_type==4 && player2->health>0) player2->stamina =  max(player2->stamina-50,0);
     }
 
 }
