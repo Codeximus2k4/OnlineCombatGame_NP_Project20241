@@ -12,8 +12,8 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define ATTACK_HITBOX_WIDTH 64
-#define ATTACK_HITBOX_HEIGHT 64
+#define ATTACK_HITBOX_WIDTH 50
+#define ATTACK_HITBOX_HEIGHT 60
 #define DISTANCE_FROM_ATTACK_HITBOX 30
 #define MAX_HIT_TIME 20
 
@@ -320,16 +320,16 @@ int check_player_contact(Player* player, Tilemap* tilemap)
     int should_exit=0;
     if (player->movement_x==1)
     {
-        int y =  player->posy/tile_size;
-        int x =  (player->posx+player->sizex+1)/tile_size;
-        for (int i=y; i<= (player->posy+player->sizey)/tile_size;i++)
+        int y =  player->selfHitBox->offset_y/tile_size;
+        int x =  (player->selfHitBox->offset_x+player->selfHitBox->width+3)/tile_size;
+        for (int i=y; i<= (player->selfHitBox->offset_y+player->selfHitBox->height)/tile_size;i++)
             {
                 for (int each=0;each<tilemap->tile_num;each++)
                 {
                     //printf("%d - %d\n",x,i);
                     if (tilemap->x[each]==x && tilemap->y[each]==i)
                     {
-                        player->posx = x*tile_size - player->sizex;
+                        player->selfHitBox->offset_x = x*tile_size - player->selfHitBox->width-2;
                         player->collisionx= 1;
                         should_exit=1;
                         break;
@@ -340,15 +340,15 @@ int check_player_contact(Player* player, Tilemap* tilemap)
     }
     else if (player->movement_x==2)
     {
-        int y =  player->posy/tile_size;
-        int x =  (player->posx-1)/tile_size;
-        for (int i=y; i<= (player->posy+player->sizey)/tile_size;i++)
+        int y =  player->selfHitBox->offset_y/tile_size;
+        int x =  (player->selfHitBox->offset_x-3)/tile_size;
+        for (int i=y; i<= (player->selfHitBox->offset_y+player->selfHitBox->height)/tile_size;i++)
             {
                 for (int each=0;each<tilemap->tile_num;each++)
                 {
                     if (tilemap->x[each]==x && tilemap->y[each]==i)
                     {
-                        player->posx = x*tile_size+tile_size;
+                        player->selfHitBox->offset_x = x*tile_size+tile_size+2;
                         player->collisionx= 2;
                         should_exit=1;
                         break;
@@ -360,17 +360,17 @@ int check_player_contact(Player* player, Tilemap* tilemap)
 
 
         //check for bottom collision
-    int y =  (player->posy+player->sizey+1)/tile_size;
-    int x = (player->posx)/tile_size;
+    int y =  (player->selfHitBox->offset_y+player->selfHitBox->height+3)/tile_size;
+    int x = (player->selfHitBox->offset_x)/tile_size;
     if (player->isFacingLeft ==1)
     { 
-        for (int i=x ; i<=(player->posx + player->sizex)/tile_size;i++)
+        for (int i=x ; i<=(player->selfHitBox->offset_x + player->selfHitBox->width)/tile_size;i++)
         {
             for (int each=0;each < tilemap->tile_num;each++)
             {
                 if (tilemap->x[each]==i && tilemap->y[each]==y)
                 {
-                    player->posy =  y*tile_size- player->sizey-1;
+                    player->selfHitBox->offset_y =  y*tile_size- player->selfHitBox->height-2;
                     player->collisiony= 2;
                     player->is_jumping  =0;
                      if (player->action!=11 && player->action!=10) player->action=0;
@@ -381,13 +381,13 @@ int check_player_contact(Player* player, Tilemap* tilemap)
     }
     else
     {
-        for (int i=(player->posx+player->sizex)/tile_size;i>= x ;i--)
+        for (int i=(player->selfHitBox->offset_x+player->selfHitBox->width)/tile_size;i>= x ;i--)
         {
             for (int each=0;each < tilemap->tile_num;each++)
             {
                 if (tilemap->x[each]==i && tilemap->y[each]==y)
                 {
-                    player->posy = y * tile_size-player->sizey-1;
+                    player->selfHitBox->offset_y = y * tile_size-player->selfHitBox->height-1;
                     player->collisiony= 2;
                     player->is_jumping=0;
                     player->is_falling =0;
@@ -400,16 +400,16 @@ int check_player_contact(Player* player, Tilemap* tilemap)
     //check for top collision
     if (player->vertical_velocity<0)
     {
-        int y =  (player->posy-1)/tile_size;
-        int x = (player->posx)/tile_size;
+        int y =  (player->selfHitBox->offset_y-3)/tile_size;
+        int x = (player->selfHitBox->offset_x)/tile_size;
     
-        for (int i=x ; i<=(player->posx + player->sizex)/tile_size;i++)
+        for (int i=x ; i<=(player->selfHitBox->offset_x+ player->selfHitBox->width)/tile_size;i++)
         {
             for (int each=0;each < tilemap->tile_num;each++)
             {
                 if (tilemap->x[each]==i && tilemap->y[each]==y)
                 {
-                    player->posy =  y*tile_size+tile_size+1;
+                    player->selfHitBox->offset_y =  y*tile_size+tile_size+2;
                     player->collisiony= 1;
                     if (player->action!=11 && player->action!=10) player->action=0;
                     return 0 ;
@@ -445,13 +445,15 @@ void update_player(Player* player, Game *game)
         else if (player->action==1 || player->action==2) 
         {
             player->speed=0; // does not move while attacking
+            player->vertical_velocity =0 ; //   does not fall while atttacking
         }
         else
         {
             player->speed=6;
         }
         
-        if (player->movement_x!=0 && player->collisiony==2 && player->action==0) 
+        if (player->movement_x==0 && player->collisiony==2) player->action =0;
+        if (player->movement_x!=0 && player->collisiony==2) 
         {
             player->action =3;
         }
@@ -459,7 +461,7 @@ void update_player(Player* player, Game *game)
         if (player->movement_y==1 && !player->is_jumping) 
                             {
                                 player->is_jumping=1;
-                                player->vertical_velocity =-15;
+                                player->vertical_velocity =-18;
                                 player->action = 4;
                             }
 
@@ -479,57 +481,58 @@ void update_player(Player* player, Game *game)
             player->stamina = max(player->stamina -50,0);
         } 
 
-        // align the position according to the previous frame first
-        if (!player->isFacingLeft)
-        {
-            player->posy-= player->sizey-player->previous_sizey;
-        }
-        else 
-        {
-            player->posy-= player->sizey-player->previous_sizey;
-            player->posx-= player->sizex-player->previous_sizex;
-        }
         //position update
         //posx
         if (player->action==3 || player->action==4 || player->action ==6)
         {
             if (player->movement_x==2 && (player->collisionx!=2 && player->collisionx!=3)) 
             {
-                player->posx -= player->speed;
-                player->posx = max(player->posx, 0);
+                player->selfHitBox->offset_x -= player->speed;
+                player->selfHitBox->offset_x = max(player->selfHitBox->offset_x, 0);
             }
             else if (player->movement_x==1 && (player->collisionx!=1 && player->collisionx!=3) )
             {
-                player->posx +=player->speed;
-                player->posx = min(player->posx, 65000); 
+                player->selfHitBox->offset_x +=player->speed;
+                player->selfHitBox->offset_x = min(player->selfHitBox->offset_x, 65000); 
             }
         }
 
         // update posy
         player->vertical_velocity = min(player->vertical_velocity+2, game->gravity);
 
-        if (player->timeSinceAttack >player->HitFrame)
+        if (player->action!=2 && player->action!=1)
         {
             if (player->is_jumping && (player->collisiony!=1 && player->vertical_velocity<0)) 
             {
-                player->posy +=player->vertical_velocity;
+                player->selfHitBox->offset_y +=player->vertical_velocity;
             }
             else if (player->collisiony!= 2 && player->collisiony!=3 && player->timeSinceAttack>player->HitFrame+1) 
             {
-                player->posy +=player->vertical_velocity;
+                player->selfHitBox->offset_y +=player->vertical_velocity;
             }
         }
-
+        
+        // align the position according to the previous frame first
+        if (!player->isFacingLeft)
+        {
+            player->posy = player->selfHitBox->offset_y+ player->selfHitBox->height -  player->sizey;
+            player->posx =  player->selfHitBox->offset_x;
+        }
+        else 
+        {
+            player->posy = player->selfHitBox->offset_y+ player->selfHitBox->height -  player->sizey;
+            player->posx = player->selfHitBox->offset_x+ player->selfHitBox->width -  player->sizex;
+        }
 
         // reassign previous size
         player->previous_sizex =  player->sizex;
         player->previous_sizey =  player->sizey;
 
         // readjust self hit box
-        player->selfHitBox->offset_x =  player->posx;
-        player->selfHitBox->offset_y =  player->posy;
-        player->selfHitBox->width =  player->sizex;
-        player->selfHitBox->height =  player->sizey;
+        // player->selfHitBox->offset_x =  player->posx;
+        // player->selfHitBox->offset_y =  player->posy;
+        // player->selfHitBox->width =  player->sizex;
+        // player->selfHitBox->height =  player->sizey;
 
         //update stamina
         player->stamina = min(player->stamina+1, 100);
@@ -538,13 +541,14 @@ void update_player(Player* player, Game *game)
         if (player->flagTaken!=NULL) 
         {
             Flag* flag = player->flagTaken;
-            flag->posx =  player->posx;
-            flag->posy = player->posy;
+            flag->posx =  player->selfHitBox->offset_x;
+
+            flag->posy = player->selfHitBox->offset_y;
         }
 
-        // printf("action: %d\n",player->action);
-        // printf("%d - %d\n",player->collisionx,player->collisiony);
-        // printf("%d - %d\n",player->posx, player->posy);
+        printf("action: %d\n",player->action);
+        printf("%d - %d\n",player->collisionx,player->collisiony);
+        printf("%d - %d\n",player->selfHitBox->offset_x, player->selfHitBox->offset_y);
         // finished updating the action now, let's update the position
     }
 }
@@ -678,12 +682,12 @@ void characterSpawner(Player* players, Game *game)
                 printf("Character type: %d\n",temp->char_type);
                 if (temp->char_type==0)
                 {
-                    temp->sizex=50;
+                    temp->sizex=45;
                     temp->sizey=60;
                 }
                 else if (temp->char_type==1)
                 {
-                    temp->sizex = 50;
+                    temp->sizex = 57;
                     temp->sizey=100;
                 }
                 else if (temp->char_type==2)
@@ -698,8 +702,9 @@ void characterSpawner(Player* players, Game *game)
                 }
                 temp->previous_sizex=50;
                 temp->previous_sizey=60;
-                temp->selfHitBox=  makeHitbox(temp->posx, temp->posy, temp->sizex, temp->sizey);
-                temp->attackHitBox = makeHitbox(temp->posx+DISTANCE_FROM_ATTACK_HITBOX, temp->posy, ATTACK_HITBOX_WIDTH,ATTACK_HITBOX_HEIGHT);
+                temp->selfHitBox=  makeHitbox(temp->posx+temp->sizex-50, temp->posy+temp->sizey-60,50, 60);
+                temp->attackHitBox = makeHitbox(temp->selfHitBox->offset_x+DISTANCE_FROM_ATTACK_HITBOX+ temp->selfHitBox->width
+                , temp->selfHitBox->offset_y, ATTACK_HITBOX_WIDTH,ATTACK_HITBOX_HEIGHT);
         }        
     }    
 }

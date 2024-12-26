@@ -971,8 +971,8 @@ int gameRoom(int room_id, int TCP_SERV_PORT, int UDP_SERV_PORT, int msgid) {
                     }  
                 else
                 {
-                //    for (int i =0;i<byteSerialized;i++ ) printf("%d ",send_buffer[i]);
-                //    printf("\n");
+                   for (int i =0;i<byteSerialized;i++ ) printf("%d ",send_buffer[i]);
+                   printf("\n");
                 }
                     
             }

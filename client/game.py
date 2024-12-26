@@ -1439,7 +1439,7 @@ class GameManager:
                     # update the position
                     each.pos[0] = posx
                     each.pos[1] = posy
-                    each.entity_class = entity_class-1
+                    each.entity_class = entity_class
                     if entity_type==0:
                         each.flip = flip
                         each.set_action(action_type,False)
