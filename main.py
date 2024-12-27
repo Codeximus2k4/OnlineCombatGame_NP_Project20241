@@ -1,32 +1,28 @@
 import pygame
+import traceback
 import sys
-import config
-from client.network import NetworkManager
 from client.game import GameManager
+from scripts.utils import logout_request
 
 def main():
     try:
         # Initialize Pygame
         pygame.init()
 
-        # Create Network Manager
-        network_manager = NetworkManager(
-            server_addr=config.SERVER_ADDR, 
-            server_port=config.SERVER_PORT
-        )
 
 
         # Create Game Manager
-        game_manager = GameManager(network_manager)
+        game_manager = GameManager()
         game_manager.login_screen()
 
 
 
     except Exception as e:
         print(f"An error occurred: {e}")
+        traceback.print_exc() # better for debugging
     finally:
-        # Ensure clean shutdown
-        network_manager.close()
+        if game_manager.user_id:
+            logout_request(game_manager.user_id)
         pygame.quit()
         sys.exit()
 

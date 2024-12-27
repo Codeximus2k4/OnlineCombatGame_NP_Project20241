@@ -35,6 +35,7 @@ int tcp_room_port = 10000; // tcp port for each game room, first used port will 
 int udp_room_port = 20000; // udp port for each game room, first used port will be 20000
 Room *rooms = NULL; // pointer to head of rooms created on server
 int roomCount = 0; // keep track of total rooms created
+User *loggedInUsers = NULL;
 
 /*---------------------------------------------
 Defining functions
@@ -61,14 +62,31 @@ void handle_sigint(int sig) {
     if (msgctl(msgid, IPC_RMID, NULL) == -1) {
         perror("msgctl (remove)");
     } else {
-        printf("Message queue removed successfully.\n");
+        printf(GREEN "[+] Message queue removed successfully.\n" RESET);
     }
+
+    // kill all game room process 
+    Room *p = rooms;
+    while(p != NULL){
+        // kill this room's process id 
+        if (kill(p->pid, SIGKILL) == 0) {
+            printf(BLUE "Game room process with id = %d, pid = %d terminated.\n" RESET, p->id, p->pid);
+        } else {
+            perror(RED "Failed to kill child process" );
+        }
+
+        // to next room
+        p = p->next;
+    }
+
+    printf(GREEN "[+] All game room processes cleaned\n" RESET);
 
     // kill currently running msg queue listening thread (without waiting for it to finish)
     if (pthread_cancel(thread_id) != 0) {
         perror(RED "pthread_cancel" RESET);
     } else {
         printf(BLUE "(In main server) Listening thread killed successfully.\n" RED);
+        printf(GREEN "[+] (In main server) Listening thread killed successfully.\n" RED);
     }
 
     exit(0); // Exit the program
@@ -136,6 +154,15 @@ void sendResponse3(int connectfd){
     int sendBytes;
 
     memset(roomInformation, 0, sizeof(roomInformation));
+
+    // print log of current rooms in the server
+    printf(CYAN "\t(In main server) Current active rooms information:\n" RESET);
+    Room *p = rooms;
+    while(p != NULL){
+        printf("\t\tRoom id %d: number of players: %d, started: %d\n", p->id, p->total_players, p->started);
+
+        p = p->next;
+    }
 
     // init data to send
     serializeRoomInformation(roomInformation, rooms);
@@ -310,9 +337,33 @@ void *message_handler(void *arg) {
             int room_id_updated = message.text[0] - '0';
             Room *room_updated = findRoomById(rooms, room_id_updated); //find room
             room_updated->total_players = message.text[1] - '0'; //update num of players in room
-            room_updated->ready = message.text[2] - '0'; //update ready status
             printf("Total number of player in room %d is %d\n", room_id_updated, room_updated->total_players);
-            if (room_updated->total_players == 0) rooms = removeRoomFromListRooms(rooms, room_updated);
+
+            // update started state of the room
+            room_updated->started = (int) message.text[2];
+            printf("Ready state of room %d is %d\n", room_id_updated, room_updated->started);
+
+            // if the room does not have any player left
+            if (room_updated->total_players == 0) {
+                // remove room from list of rooms
+                rooms = removeRoomFromListRooms(rooms, room_updated);
+
+                // kill this room's process id 
+                if (kill(room_updated->pid, SIGKILL) == 0) {
+                    printf(BLUE "Game room process with id = %d, pid = %d terminated.\n" RESET, room_id_updated, room_updated->pid);
+                } else {
+                    perror(RED "Failed to kill child process" );
+                }
+
+                // log out all rooms' information
+                printf(CYAN "\t(In main server) All rooms information currently:\n");
+                Room *p = rooms;
+                while(p != NULL){
+                    printf("\t\tRoom id = %d, room process id = %d\n", p->id, p->pid);
+
+                    p = p->next;
+                }
+            }
         }
     }
 }
@@ -338,7 +389,7 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
     message_type = buff[0];
 
     // print request type
-    printf(BLUE "[+] Request type %c from [%s:%d]\n" RESET, message_type, cli_addr, ntohs(cliaddr.sin_port));
+    printf(BLUE "[+] Request type %d from [%s:%d] with socket descriptor = %d\n" RESET, message_type - 48, cli_addr, ntohs(cliaddr.sin_port), connectfd);
 
     if(message_type == '1'){
         // register request from client
@@ -447,21 +498,43 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
         int status;
         int user_id;
 
-        if (check_user(username, password, conn)) { //login succesfully
-            status = 1;
+        if (check_user(username, password, conn)) { // check if this credential exist in database 
+            // get user_id from database
             user_id = get_user_id(username, conn);
 
-            // send response back to client
-            sendResponse2(connectfd, status, user_id);
+            // check if this user is already logged in (somewhere else)
+            if(!userAlreadyLoggedIn(loggedInUsers, user_id)){
+                // logged in successful
+                status = 1;
+
+                // send response back to client
+                sendResponse2(connectfd, status, user_id);
+
+                // update list of logged in users
+                User *p = makeUser(user_id);
+                loggedInUsers = addUserToLoggedInList(loggedInUsers, p);
+
+                // log server-side
+                printf(YELLOW "Client [%s:%d] logged in successfully\n", cli_addr, ntohs(cliaddr.sin_port));
+            } else {
+                // user already logged in somewhere else, login unsuccessful
+                status = 0;
+
+                sendResponse2(connectfd, status, user_id);
+
+                // log server-side
+                printf(YELLOW "Client [%s:%d] cannot log in with crendential: %s %s, another user is using this account\n", cli_addr, ntohs(cliaddr.sin_port), username, password);
+            }
         }
-        else { //login fail
+        else { // login fail due to wrong crendentials
             status = 0; 
             user_id = -1;
             // send response back to client
             sendResponse2(connectfd, status, user_id);
-        }
 
-        // update list of players 
+            // log server-side
+                printf(YELLOW "Client [%s:%d] cannot log in with crendential: %s %s, wrong credential\n", cli_addr, ntohs(cliaddr.sin_port), username, password);
+        }
 
     } else if(message_type == '3'){
         // get list room request from client
@@ -480,10 +553,12 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
         }
         int player_id = buff[0];
 
-        // create room and add room to list of rooms
-        // note that first tcp_udp_room will be 10000 udp_room_port will be 20000
-        Room *room = makeRoom(room_id, tcp_room_port, udp_room_port);
-        rooms = addRoom(rooms, room);
+       
+        
+        // // create room and add room to list of rooms
+        // // note that first tcp_udp_room will be 10000 udp_room_port will be 20000
+        // Room *room = makeRoom(room_id, tcp_room_port, udp_room_port);
+        // rooms = addRoom(rooms, room);
 
         // fork a new game room
         int pid = fork();
@@ -510,9 +585,14 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
         } else{ // pid > 0
             // parent process
 
+            // create room and add room to list of rooms
+            // note that first tcp_udp_room will be 10000 udp_room_port will be 20000
+            Room *room = makeRoom(room_id, pid, tcp_room_port, udp_room_port);
+
+            rooms = addRoom(rooms, room);
+
             // notify back to client
             sendResponse4(connectfd, room_id, tcp_room_port);
-            
 
             // update room count and room ports
             roomCount++;
@@ -592,6 +672,20 @@ void handleRequest(int connectfd, sockaddr_in cliaddr, char cli_addr[], PGconn *
         
         // send response to client
         sendResponse10(connectfd, data, total_length);
+    } else if(message_type == 61) { // '0' + 13 == 61
+        // get user_id 
+        if( (recvBytes = recv(connectfd, buff, 1, 0)) < 0){
+            perror(RED "Error inside handleConnectedClients() getting `user_id`" RESET);
+            return;
+        } else if(recvBytes == 0){
+            fprintf(stdout, "Client closes connection\n");
+            return;
+        }
+        int user_id = buff[0];
+
+        // remove this player from list of logged in users
+        User *p = findUserInLoggedInListById(loggedInUsers, user_id);
+        loggedInUsers = removeUserFromListOfLoggedIn(loggedInUsers, p);
     }
 
     return;
@@ -663,7 +757,7 @@ int main (int argc, char *argv[]) {
         return 1;
     }
 
-    printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP)\n" RESET, SERV_PORT);
+    printf(GREEN "[+] Server started. Listening on port: %d using SOCK_STREAM (TCP) with socket descriptor = %d\n" RESET, SERV_PORT, sockfd);
 
     //-----------handle ipc-------------------------
 

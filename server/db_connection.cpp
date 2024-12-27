@@ -366,3 +366,48 @@ int get_personal_statistics(PGconn *conn, int player_id, char result[256]) {
     // Return the total length of the data in result
     return 1 + username_length + 1 + 2;
 }
+
+// - function to query for username based on player_id provided
+// - input: username (data to be populated after calling the function), player id
+// - output: string length of username on successful, 0 otherwise
+// - dependencies: 
+int query_for_username(char username[256], int player_id){
+    // connect to database
+    PGconn *conn = connect_db();
+
+    const char *query = "SELECT username FROM users WHERE id = $1";
+
+    // Convert the player_id to a string since libpq expects string parameters
+    char player_id_str[32]; 
+    snprintf(player_id_str, sizeof(player_id_str), "%d", player_id);
+    
+    const char *paramValues[1];
+    paramValues[0] = player_id_str; 
+
+    // Execute the query
+    PGresult *res = PQexecParams(conn, query, 1, NULL, paramValues, NULL, NULL, 0);
+
+    // Check for errors in query execution
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        fprintf(stderr, "SELECT query failed: %s\n", PQerrorMessage(conn));
+        PQclear(res);
+        return 0; // Query failed
+    }
+
+    // Check if a row was returned
+    if (PQntuples(res) > 0) {
+        // Copy the username from the query result into `username` string
+        strncpy(username, PQgetvalue(res, 0, 0), 255); // Copy the first column (username)
+        username[255] = '\0'; // Ensure null-termination
+    } else {
+        username[0] = '\0'; // No username found for the player_id
+    }
+
+    // Clean up
+    PQclear(res);
+
+    // close db connection
+    close_db(conn);
+    
+    return strlen(username);
+}

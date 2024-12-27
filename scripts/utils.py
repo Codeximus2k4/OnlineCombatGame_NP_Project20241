@@ -1,9 +1,8 @@
 import os
-import sys
 import pygame
-import config
 import struct
 from client.network import NetworkManager
+import config
 
 def load_image(path):
     img = pygame.image.load(config.BASE_IMG_PATH+path).convert_alpha()
@@ -20,10 +19,9 @@ def render_text(text, font, color):
     Render text in desired font and color
     """
     return font.render(text, True, color)
-
 def get_font(size):
-        """Returns font in desired size"""
-        return pygame.font.Font(config.FONT_PATH, size)
+    """Return font in desired size"""
+    return pygame.font.Font(config.FONT_PATH,size)
 
 def login_register_request(username, password, mode):
     """
@@ -73,6 +71,45 @@ def login_register_request(username, password, mode):
 
     return response.decode()
 
+def fetch_room_list_request():
+    """Message type 3: Fetch the list of available rooms from the server."""
+    # get message component and convert into byte
+    message = "3"
+    message = message.encode()
+
+    # Connect to the server
+    fetch_room_list_socket = NetworkManager(
+        server_addr=config.SERVER_ADDR,
+        server_port=config.SERVER_PORT
+    )
+    fetch_room_list_socket.connect()
+
+    # Send the message to the server
+    fetch_room_list_socket.send_tcp_message(message)
+
+    # Get the components
+    room_list = []
+    message_type = fetch_room_list_socket.receive_tcp_message(buff_size=1)
+    print(f"Message type: {message_type}" )
+
+    rooms_num = fetch_room_list_socket.receive_tcp_message(buff_size=1)
+    rooms_num = int(rooms_num)
+    print(f"Number of room: {rooms_num}")
+    while rooms_num:
+        room_id = fetch_room_list_socket.receive_tcp_message(buff_size=1)
+        room_id = int(room_id)
+        print(f"Room ID: {room_id}")
+
+        players_num = fetch_room_list_socket.receive_tcp_message(buff_size=1)
+        players_num = int(players_num)
+        print(f"Number of players: {players_num}")
+
+        room_list.append({"room_id": room_id, "total_players": players_num})
+        rooms_num = rooms_num - 1
+
+    fetch_room_list_socket.close()
+    print(room_list)
+    return room_list
 def host_room_request(user_id: int):
     """
     Send the host room request to server
@@ -117,7 +154,7 @@ def host_room_request(user_id: int):
     return status, room_id, tcp_port
 
 def connect_room_request(user_id: int, host_room_socket: NetworkManager):
-    """Send the connect room request to the game room server"""
+    """Message type 6: Send the connect room request to the game room server"""
     # Message component
     request_type = "6"
     user_id = user_id
@@ -210,8 +247,8 @@ def rank_request():
         num_game_played = ord(num_game_played)
 
         # Get the score of the player
-        score = rank_socket.receive_tcp_message(buff_size=2).decode() # 2 bytes
-        score = struct.unpack("!H", score.encode("utf-8"))[0]
+        score = rank_socket.receive_tcp_message(buff_size=2) # 2 bytes
+        score = struct.unpack("!H", score)[0]
         
         # Add to the list
         top5.append({"username": username, "num_game": num_game_played, "score": score})
@@ -262,13 +299,84 @@ def my_stats_request(user_id: int):
     num_game = ord(num_game)
 
     # Get the score
-    score = my_stats_socket.receive_tcp_message(buff_size=2).decode() # 2 byte (score)
-    score = struct.unpack("!H", score.encode("utf-8"))[0]
+    score = my_stats_socket.receive_tcp_message(buff_size=2) # 2 byte (score)
+    score = struct.unpack("!H", score)[0]
 
     my_stats_socket.close()
     my_stats = {"username": username, "num_game": num_game, "score": score}
     
     return my_stats
+
+def update_ready_request(user_id: int, is_ready:int, update_ready_socket: NetworkManager):
+    """Message type 7: Update the ready state of each player"""
+    # Message components
+    request_type = "7"
+    user_id = user_id
+    is_ready = is_ready
+
+    # Convert to bytes and combine into message
+    request_type_byte = request_type.encode("ascii")
+    user_id_byte = bytes([user_id])
+    is_ready_byte = bytes([is_ready])
+    message = request_type_byte + user_id_byte + is_ready_byte
+
+    # Send the message
+    update_ready_socket.send_tcp_message(message)
+
+def game_mode_request(user_id: int, game_mode: int, game_mode_socket: NetworkManager):
+    """Message type 11: Request the game mode for game play"""
+    # Get the message components
+    request_type = 59 # request type 11
+    user_id = user_id
+    game_mode = game_mode
+
+    # Convert to bytes and combine into 1 message
+    request_type_byte = bytes([request_type])
+    user_id_byte = bytes([user_id])
+    game_mode_byte = bytes([game_mode])
+    message = request_type_byte + user_id_byte + game_mode_byte
+
+    # Send the request to the server
+    game_mode_socket.send_tcp_message(message)
+
+def hero_request(user_id: int, hero_id: int, hero_socket: NetworkManager):
+    """Message type 12: Request the hero type"""
+    request_type = 60 # request type 12
+    user_id = user_id
+    hero_id = hero_id
+
+    # Convert to bytes and combine into 1 message
+    request_type_byte = bytes([request_type])
+    user_id_byte = bytes([user_id])
+    hero_id_byte = bytes([hero_id])
+    message = request_type_byte + user_id_byte + hero_id_byte
+
+
+    # Send the request to the server
+    hero_socket.send_tcp_message(message)
+
+def logout_request(user_id: int):
+    """Message type 13: Requst log out"""
+    # Message components
+    request_type = 61 # Request type 13
+    user_id = user_id
+
+    # Convert to bytes and combine into 1 message
+    request_type_byte = bytes([request_type])
+    user_id_byte = bytes([user_id])
+    message = request_type_byte + user_id_byte
+
+    # Connect to the server
+    logout_socket = NetworkManager(
+        server_addr=config.SERVER_ADDR,
+        server_port=config.SERVER_PORT
+    )
+    logout_socket.connect()
+
+    # Send the message to the server
+    logout_socket.send_tcp_message(message)
+    logout_socket.close()
+
 
 class Animation:
     def __init__(self, images ,img_dur = 5, loop =True):
@@ -284,10 +392,13 @@ class Animation:
         if self.loop:
             self.frame =  (self.frame+1)%(self.img_duration* len(self.images))
         else :
-            self.frame = min(self.frame+1 , self.img_duration* len(self.images) )
+            self.frame = min(self.frame+1 , self.img_duration* len(self.images)-1)
             if self.frame >= self.img_duration* len(self.images) -1:
                 self.done = True
-        
+    def revert_frame(self):
+        self.frame -=1
+    def get_size(self):
+        return self.images[int(self.frame/self.img_duration)].get_size()
     def get_img(self):
         return self.images[int(self.frame/self.img_duration)]
 
