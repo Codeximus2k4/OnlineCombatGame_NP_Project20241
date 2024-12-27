@@ -80,12 +80,18 @@ class Player(PhysicsEntity):
     
     def convert_entity_class(self):
         ent_class = {1:"Samurai",2:"Wizard",3:"King", 4:"Witch"}
-        return ent_class[self.entity_class]
+        if self.entity_class>=1 and self.entity_class<=4:
+            return ent_class[self.entity_class]
+        else:
+            return ent_class[1]
         
     def convert_action_type(self):
         action = {0:"idle",1:"attack1",2:"attack2",3:"run",4:"jump",5:"crouch",6:"fall",
                   7:"special ability",8:"block",9:"dash",10:"take hit",11:"death"}
-        return action[self.action_type]
+        if self.action_type <=11 and self.action_type>=0:
+            return action[self.action_type]
+        else :
+            return action[0]
     def set_action(self, action, fresh_start):
         super().set_action(action, fresh_start)
     def render(self,surf,offset = (0,0)):
@@ -109,7 +115,10 @@ class Flag:
         self.pos=pos
         self.game=game
         self.entity_type =  3
-        self.animation =  self.game.assets['flag/flag'+str(team_id)].copy()
+        if (self.id >=1 and self.id<=2):
+            self.animation =  self.game.assets['flag/flag'+str(self.id)].copy()
+        else :
+            self.animation = self.game.assets['flag/flag1'].copy()
     def update(self):
         self.animation.update()
     def render(self, surf , offset= (0,0)):

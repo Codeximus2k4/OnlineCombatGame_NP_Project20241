@@ -2,7 +2,7 @@ import os
 import pygame
 
 # Network Configuration
-SERVER_ADDR = "127.0.0.1"
+SERVER_ADDR = "192.168.39.82"
 SERVER_PORT = 5500
 
 # Display Configuration
