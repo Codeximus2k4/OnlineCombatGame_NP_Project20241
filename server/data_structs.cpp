@@ -577,14 +577,14 @@ int serialize_player_info(unsigned char *send_buffer, int byteSerialized, Player
     send_buffer[byteSerialized] = player->char_type;
     byteSerialized++;
 
-    send_buffer[byteSerialized] = player->posx/256;
+    send_buffer[byteSerialized] = player->posx/128;
     byteSerialized++;
-    send_buffer[byteSerialized] =  player->posx%256;
+    send_buffer[byteSerialized] =  player->posx%128;
     byteSerialized++;
 
-    send_buffer[byteSerialized] = player->posy/256;
+    send_buffer[byteSerialized] = player->posy/128;
     byteSerialized++;
-    send_buffer[byteSerialized] =  player->posy%256;
+    send_buffer[byteSerialized] =  player->posy%128;
     byteSerialized++;
 
     if (player->isFacingLeft) 
@@ -609,11 +609,11 @@ int serialize_player_info(unsigned char *send_buffer, int byteSerialized, Player
 
     if (player->team==0)
     {
-    int t1 =  player->score/256;
+    int t1 =  player->score/128;
     send_buffer[byteSerialized]=  t1;
     byteSerialized++;
 
-    int t2 =  player->score%256;
+    int t2 =  player->score%128;
     send_buffer[byteSerialized]=  t2;
     byteSerialized++;
     }

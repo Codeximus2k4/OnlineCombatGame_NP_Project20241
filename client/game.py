@@ -1353,14 +1353,14 @@ class GameManager:
                     print("Payload is missing posx")
                     break
                 else:
-                    posx =  data[index]*256 + data[index+1]
+                    posx =  data[index]*128 + data[index+1]
                     index+=2
 
                 if index>= length-1:
                     print("Payload is missing posy")
                     break
                 else:
-                    posy = data[index]*256 + data[index+1]
+                    posy = data[index]*128 + data[index+1]
                     index+=2
                 
                 if index>=length:
@@ -1395,7 +1395,7 @@ class GameManager:
                         print("Payload is missing score")
                         break
                     else:
-                        score = data[index]*256 + data[index+1]
+                        score = data[index]*128 + data[index+1]
                         index+=2
                 elif self.game_mode==2:
                     if index>=length:
@@ -1422,14 +1422,14 @@ class GameManager:
                     print("Payload is missing posx flag")
                     break
                 else:
-                    posx = data[index]*256 + data[index+1]
+                    posx = data[index]*128 + data[index+1]
                     index+=2
                 
                 if index>= length-1:
                     print("Payload is missing posy flag")
                     break
                 else:
-                    posy = data[index]*256 + data[index+1]
+                    posy = data[index]*128 + data[index+1]
                     index+=2
 
             found_entity = False
