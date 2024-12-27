@@ -73,7 +73,10 @@ This project is a **Multiplayer Online Combat Game** inspired by popular fightin
 ### Installation
 1. Clone the repository.
 2. Install required dependencies for the server and client.
-3. Start the server and launch the client to begin playing.
+3. Run SQL file to create database using __server/db-data/db-init.sql__
+4. Compile __server/server.cpp__ 
+5. Start the server and launch the __main.py__ to begin playing.
+
 
 ---
 
