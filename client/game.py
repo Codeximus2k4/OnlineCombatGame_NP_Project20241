@@ -512,44 +512,29 @@ class GameManager:
             back_button.changeColor(mouse_pos)
             back_button.update(self.screen)
             
-            run_text = f"A, D:       Run"
+            run_text = f"A, D:                    Run"
             run_text_rendered = get_font(17).render(run_text, True, config.COLORS['WHITE'])
             run_text_rect = run_text_rendered.get_rect(topleft = (150, 200))
             self.screen.blit(run_text_rendered, run_text_rect)
             
-            jump_text = f"W:          Jump"
+            jump_text = f"W:                       Jump"
             jump_text_rendered = get_font(17).render(jump_text, True, config.COLORS['WHITE'])
             jump_text_rect = jump_text_rendered.get_rect(topleft = (150, 250))
             self.screen.blit(jump_text_rendered, jump_text_rect)
             
-            fall_text = f"S:          Fall"
+            fall_text = f"S:                       Fall"
             fall_text_rendered = get_font(17).render(fall_text, True, config.COLORS['WHITE'])
             fall_text_rect = fall_text_rendered.get_rect(topleft = (150, 300))
             self.screen.blit(fall_text_rendered, fall_text_rect)
             
-            attack_text = f"Q, E:       Attack"
+            attack_text = f"Q, E:                    Attack"
             attack_text_rendered = get_font(17).render(attack_text, True, config.COLORS['WHITE'])
             attack_text_rect = attack_text_rendered.get_rect(topleft = (150, 350))
             self.screen.blit(attack_text_rendered, attack_text_rect)
-            
-            block_text = f"Space:      Block Attack"
-            block_text_rendered = get_font(17).render(block_text, True, config.COLORS['WHITE'])
-            block_text_rect = block_text_rendered.get_rect(topleft = (150, 400))
-            self.screen.blit(block_text_rendered, block_text_rect)
-            
-            dash_text = f"K:          Dash"
-            dash_text_rendered = get_font(17).render(dash_text, True, config.COLORS['WHITE'])
-            dash_text_rect = dash_text_rendered.get_rect(topleft = (150, 450))
-            self.screen.blit(dash_text_rendered, dash_text_rect)
-            
-            interact_text = f"F:          Consume items/Activate traps"
-            interact_text_rendered = get_font(17).render(interact_text, True, config.COLORS['WHITE'])
-            interact_text_rect = interact_text_rendered.get_rect(topleft = (150, 500))
-            self.screen.blit(interact_text_rendered, interact_text_rect)
-            
-            capture_text = f"G:          Capture the flags"
+
+            capture_text = f"Touch the flag:          Capture the flags"
             capture_text_rendered = get_font(17).render(capture_text, True, config.COLORS['WHITE'])
-            capture_text_rect = capture_text_rendered.get_rect(topleft = (150, 550))
+            capture_text_rect = capture_text_rendered.get_rect(topleft = (150, 400))
             self.screen.blit(capture_text_rendered, capture_text_rect)
             
             # Event handling
@@ -645,17 +630,17 @@ class GameManager:
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 380))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
                 
-                classic_des_text = f" + x kill spree = increase points x times"                                                
+                classic_des_text = f" + 1 attack1/attack2 on target = 1/2 point"                                                
                 classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 420))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
                 
-                classic_des_text = f"- Players respawn immediately after being killed"                                                
+                classic_des_text = f"- Players respawn after being killed"                                                
                 classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 460))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
                 
-                classic_des_text = f"- Game ends after 1 minute. Players having the"                                                
+                classic_des_text = f"- Game ends after 90 seconds. Players having the"                                                
                 classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 500))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
@@ -681,7 +666,7 @@ class GameManager:
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 260))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
                 
-                classic_des_text = f"- The team earn points by captureing the other"                                                
+                classic_des_text = f"- The team earn points by capturing the other"                                                
                 classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 300))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
@@ -691,31 +676,31 @@ class GameManager:
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 340))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
                 
-                classic_des_text = f"- When carrying the flag, player cannot attack/block."                                                
+                classic_des_text = f"- After 90 seconds, who have the highest score are winners."                                                
                 classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 380))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
                 
-                classic_des_text = f"- The team scoring 10 flags first win, game is over."                                                
+                classic_des_text = f"- Number of captured flags are the team scores."                                                
                 classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 420))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
-                
-                classic_des_text = f"- Score of a player = Number of flags his team scores."                                                
+
+                classic_des_text = f"- Players attack to kill others to gain points."                                                
                 classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 460))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
                 
-                classic_des_text = f"- Each player's kill when his teammate is carrying the"                                                
+                classic_des_text = f" + 1 kill = 2 personal points."                                                
                 classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 500))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
                 
-                classic_des_text = f"flag is considered a plus point."                                                
+                classic_des_text = f" + 1 kill who carrying the flag = 5 personal point"                                                
                 classic_des_rendered = get_font(14).render(classic_des_text, True, config.COLORS['WHITE'])
                 classic_des_rect = classic_des_rendered.get_rect(topleft = (100, 540))
                 self.screen.blit(classic_des_rendered, classic_des_rect)
-            
+                
             # Event handling
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
