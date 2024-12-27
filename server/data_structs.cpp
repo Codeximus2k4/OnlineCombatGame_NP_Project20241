@@ -910,16 +910,16 @@ int serialize_flag_info(unsigned char *send_buffer, int byteSerialized, Game *ga
     send_buffer[byteSerialized] = 0;
     byteSerialized++;
 
-    send_buffer[byteSerialized] = game->flag1->posx/256;
+    send_buffer[byteSerialized] = game->flag1->posx/128;
     byteSerialized++;
 
-    send_buffer[byteSerialized] = game->flag1->posx%256;
+    send_buffer[byteSerialized] = game->flag1->posx%128;
     byteSerialized++;
 
-    send_buffer[byteSerialized] = game->flag1->posy/256;
+    send_buffer[byteSerialized] = game->flag1->posy/128;
     byteSerialized++;
 
-    send_buffer[byteSerialized] = game->flag1->posy%256;
+    send_buffer[byteSerialized] = game->flag1->posy%128;
     byteSerialized++;
 
     // flag 2
@@ -933,16 +933,16 @@ int serialize_flag_info(unsigned char *send_buffer, int byteSerialized, Game *ga
     send_buffer[byteSerialized] = 0;
     byteSerialized++;
 
-    send_buffer[byteSerialized] = game->flag2->posx/256;
+    send_buffer[byteSerialized] = game->flag2->posx/128;
     byteSerialized++;
 
-    send_buffer[byteSerialized] = game->flag2->posx%256;
+    send_buffer[byteSerialized] = game->flag2->posx%128;
     byteSerialized++;
 
-    send_buffer[byteSerialized] = game->flag2->posy/256;
+    send_buffer[byteSerialized] = game->flag2->posy/128;
     byteSerialized++;
 
-    send_buffer[byteSerialized] = game->flag2->posy%256;
+    send_buffer[byteSerialized] = game->flag2->posy%128;
     byteSerialized++;
 
     return byteSerialized;
